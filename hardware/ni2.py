@@ -21,12 +21,12 @@ master_task.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
 master_task.start()
 start = time.time()
 for i in range(100):
-	master_data = master_task.read(number_of_samples_per_channel=200)
+	master_data = master_task.read(number_of_samples_per_channel=100)
 
 r,d = master_data
 #pp.pprint(master_data)
-print(time.time()-start)
-master_task.close()
+print(time.time()-start,master_task.is_task_done())
+#master_task.close()
 from pylab import *
 plot(r[:-6],'-b')
 plot(d[6:],'-r')

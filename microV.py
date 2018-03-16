@@ -56,7 +56,7 @@ class microV(QtGui.QMainWindow):
 
 		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2")
 
-		self.DAQmx.timing.cfg_samp_clk_timing(1000000)
+		self.DAQmx.timing.cfg_samp_clk_timing(10000, sample_mode=AcquisitionType.FINITE)
 
 		self.DAQmx.control(TaskMode.TASK_COMMIT)
 
@@ -65,10 +65,14 @@ class microV(QtGui.QMainWindow):
 		#self.DAQmx.configure()
 	def readDAQmx(self):
 		start = time.time()
+		if self.DAQmx.is_task_done():
+			self.DAQmx.start()
 		try:
-			master_data = self.DAQmx.read(number_of_samples_per_channel=50)
+			master_data = self.DAQmx.read(number_of_samples_per_channel=100)
 		except:
-			master_data = self.DAQmx.read(number_of_samples_per_channel=50)
+			self.DAQmx.stop()
+			self.DAQmx.start()
+			return 0
 		r,d = master_data
 		r = np.array(r)
 		d = np.array(d)
@@ -77,6 +81,7 @@ class microV(QtGui.QMainWindow):
 		DATA_SHIFT=6
 		w = r>r.mean()
 		out = abs(d[w].mean()-d[~w].mean())
+
 		return out
 
 	def initHWP(self):
@@ -353,7 +358,7 @@ class microV(QtGui.QMainWindow):
 						print(time.time()-start)
 						spectra = self.getSpectra()
 						print(time.time()-start)
-						pmt_val = self.DAQmx.getData()
+						pmt_val = self.readDAQmx()
 						print(time.time()-start,pmt_val)
 						#spectra = list(medfilt(spectra,5))
 						real_position = [round(p,4) for p in self.piStage.qPOS()]
