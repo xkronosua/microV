@@ -1,4 +1,5 @@
 import sys,time
+import qdarkstyle
 from pyqtgraph.Qt import QtGui, QtCore, uic
 import traceback
 
@@ -17,6 +18,8 @@ else:
 	from hardware.CCS200 import *
 	from hardware.E727 import *
 	from hardware.TDC001 import *
+	from nidaqmx.constants import AcquisitionType, TaskMode
+	import nidaqmx
 
 import matplotlib
 import scipy.misc
@@ -29,7 +32,8 @@ class microV(QtGui.QMainWindow):
 	piStage = E727()
 	spectrometer = CCS200()
 	HWP = APTMotor(83854487, HWTYPE=31)
-	DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
+	DAQmx = nidaqmx.Task()
+	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
 	live_integr_spectra = []
 	def __init__(self, parent=None):
@@ -49,7 +53,31 @@ class microV(QtGui.QMainWindow):
 
 		#self.scan_image()
 	def initDAQmx(self):
-		self.DAQmx.configure()
+
+		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2")
+
+		self.DAQmx.timing.cfg_samp_clk_timing(1000000)
+
+		self.DAQmx.control(TaskMode.TASK_COMMIT)
+
+		self.DAQmx.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
+		self.DAQmx.start()
+		#self.DAQmx.configure()
+	def readDAQmx(self):
+		start = time.time()
+		try:
+			master_data = self.DAQmx.read(number_of_samples_per_channel=50)
+		except:
+			master_data = self.DAQmx.read(number_of_samples_per_channel=50)
+		r,d = master_data
+		r = np.array(r)
+		d = np.array(d)
+		#pp.pprint(master_data)
+		print(time.time()-start)
+		DATA_SHIFT=6
+		w = r>r.mean()
+		out = abs(d[w].mean()-d[~w].mean())
+		return out
 
 	def initHWP(self):
 		pos = self.HWP.getPos()
@@ -151,12 +179,12 @@ class microV(QtGui.QMainWindow):
 	def onCalibrTimer(self):
 		self.calibrTimer.stop()
 		spectra = self.getSpectra()
-		pmt_val = self.DAQmx.getData()
+		pmt_val = self.readDAQmx()
 		self.live_pmt.append(pmt_val)
 		s_from = self.ui.usbSpectr_from.value()
 		s_to = self.ui.usbSpectr_to.value()
-		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
-
+		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
+		self.setLine(spectra)
 		self.line_pmt.setData(self.live_pmt)
 		self.line_spectra.setData(self.live_integr_spectra)
 
@@ -192,8 +220,8 @@ class microV(QtGui.QMainWindow):
 		self.pw1 = pg.PlotWidget(name='Graph1')  ## giving the plots names allows us to link their axes together
 		self.ui.plotView.addWidget(self.pw1)
 
-		self.line_pmt = self.pw1.plot(pen=(0,0,255))
-		self.line_spectra = self.pw1.plot(pen=(0,255,2))
+		self.line_pmt = self.pw1.plot(pen=(255,0,0))
+		self.line_spectra = self.pw1.plot(pen=(0,255,0))
 
 		self.img = pg.ImageView()  ## giving the plots names allows us to link their axes together
 		data = np.zeros((100,100))
@@ -218,6 +246,10 @@ class microV(QtGui.QMainWindow):
 			traceback.print_exc()
 		try:
 			self.HWP.cleanUpAPT()
+		except:
+			traceback.print_exc()
+		try:
+			self.DAQmx.close()
 		except:
 			traceback.print_exc()
 
@@ -337,7 +369,10 @@ class microV(QtGui.QMainWindow):
 						data_pmt[yi,xi] = pmt_val
 						self.live_pmt.append(pmt_val)
 						self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
-						self.line_pmt.setData(self.live_pmt)
+						if forward:
+							self.line_pmt.setData(self.live_pmt)
+						else:
+							self.line_pmt.setData(self.live_pmt[::-1])
 						#self.line_spectra.setData(self.live_integr_spectra)
 
 						self.setLine(spectra)
@@ -369,5 +404,6 @@ if __name__ == '__main__':
 
 
 	app = QtGui.QApplication(sys.argv)
+	app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
 	ex = microV()
 	app.exec_()

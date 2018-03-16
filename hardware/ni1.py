@@ -57,12 +57,12 @@ class MultiChannelAnalogInput():
 		DAQmxStopTask(taskHandle)
 		return data
 
-	def getData(self,DATA_SHIFT=4):
+	def getData(self,DATA_SHIFT=6):
 		#self.configure()
 		start=time.time()
 		data=self.readAll()
 		print("|",time.time()-start)
-		
+
 		data_ = [data[:(len(data)//2)], data[(len(data)//2):]]
 		#print(data['Dev1/ai0,Dev1/ai2'].shape)
 		d = data_[1][DATA_SHIFT:]
@@ -96,10 +96,10 @@ if __name__ == '__main__':
 	print(time.time()-start)
 	data=multipleAI.readAll()
 	from pylab import *
-	
+
 	data_ = [data[:(len(data)//2)], data[(len(data)//2):]]
-	plot(data_[0][:-4],'-b')
-	plot(data_[1][4:]*100,'-r')
+	plot(data_[0][:-6],'-b')
+	plot(data_[1][6:],'-r')
 	find_shift(data_[0],data_[1])
 	show()
 	print(data)
