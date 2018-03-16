@@ -1,40 +1,105 @@
-import pprint
-import nidaqmx
-from nidaqmx.constants import AcquisitionType, TaskMode
+# coding= latin-1
 
-pp = pprint.PrettyPrinter(indent=4)
+import numpy
+from scipy.signal import argrelextrema
+from PyDAQmx.DAQmxFunctions import *
+from PyDAQmx.DAQmxConstants import *
+import time
 
+class MultiChannelAnalogInput():
+	"""Class to create a multi-channel analog input
 
-with nidaqmx.Task() as master_task, nidaqmx.Task() as slave_task:
-    master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
-    slave_task.ai_channels.add_ai_voltage_chan("Dev1/ai0")
+	Usage: AI = MultiChannelInput(physicalChannel)
+		physicalChannel: a string or a list of strings
+	optional parameter: limit: tuple or list of tuples, the AI limit values
+						reset: Boolean
+	Methods:
+		read(name), return the value of the input name
+		readAll(), return a dictionary name:value
+	"""
+	def __init__(self,physicalChannel, limit = None, reset = False):
+		if type(physicalChannel) == type(""):
+			self.physicalChannel = [physicalChannel]
+		else:
+			self.physicalChannel  =physicalChannel
+		self.numberOfChannel = physicalChannel.__len__()
+		if limit is None:
+			self.limit = dict([(name, (-10.0,10.0)) for name in self.physicalChannel])
+		elif type(limit) == tuple:
+			self.limit = dict([(name, limit) for name in self.physicalChannel])
+		else:
+			self.limit = dict([(name, limit[i]) for  i,name in enumerate(self.physicalChannel)])
+		if reset:
+			DAQmxResetDevice(physicalChannel[0].split('/')[0] )
+	def configure(self):
+		# Create one task handle per Channel
+		taskHandles = dict([(name,TaskHandle(0)) for name in self.physicalChannel])
+		for name in self.physicalChannel:
+			DAQmxCreateTask("",byref(taskHandles[name]))
+			DAQmxCreateAIVoltageChan(taskHandles[name],name,"",DAQmx_Val_Cfg_Default,
+									 self.limit[name][0],self.limit[name][1],
+									 DAQmx_Val_Volts,None)
+			DAQmxCfgDigEdgeStartTrig(taskHandles[name], "PFI0", DAQmx_Val_Rising);
+			DAQmxCfgSampClkTiming(taskHandles[name],"",10000.0,DAQmx_Val_Rising,DAQmx_Val_FiniteSamps,1000)
+		self.taskHandles = taskHandles
+	def readAll(self):
+		return self.read(self.physicalChannel[0])#dict([(name,self.read(name)) for name in self.physicalChannel])
+	def read(self,name = None):
+		if name is None:
+			name = self.physicalChannel[0]
+		taskHandle = self.taskHandles[name]
+		DAQmxStartTask(taskHandle)
+		data = numpy.zeros((400,), dtype=numpy.float64)
+#        data = AI_data_type()
+		read = int32()
 
-    master_task.timing.ref_trig_src = "Dev1/ai0"
-    #master_task.timing.ref_clk_rate = 10000
-    master_task.timing.cfg_samp_clk_timing(
-        1000, sample_mode=AcquisitionType.CONTINUOUS)
-    #master_task.triggers.sync_type.MASTER = True
+		DAQmxReadAnalogF64(taskHandle,200,10.0,DAQmx_Val_GroupByChannel,data,400,byref(read),None)
+		DAQmxStopTask(taskHandle)
+		return data
 
-    slave_task.timing.ref_clk_src = "PXIe_Clk100"
-    slave_task.timing.ref_clk_rate = 100000000
-    slave_task.timing.cfg_samp_clk_timing(
-        1000, sample_mode=AcquisitionType.CONTINUOUS)
-    slave_task.triggers.sync_type.SLAVE = True
+	def getData(self,DATA_SHIFT=4):
+		#self.configure()
+		start=time.time()
+		data=self.readAll()
+		print("|",time.time()-start)
+		
+		data_ = [data[:(len(data)//2)], data[(len(data)//2):]]
+		#print(data['Dev1/ai0,Dev1/ai2'].shape)
+		d = data_[1][DATA_SHIFT:]
+		r = data_[0][0:-DATA_SHIFT]
+		w = r>r.mean()
+		out = abs(d[w].mean()-d[~w].mean())
 
-    master_task.control(TaskMode.TASK_COMMIT)
+		print("|",time.time()-start,out)
+		return out
 
-    slave_task.triggers.start_trigger.cfg_dig_edge_start_trig(
-        "/PXI1Slot3/ai/StartTrigger")
+def find_shift(data1,data2):
 
-    print('2 Channels 1 Sample Read Loop 10: ')
-    slave_task.start()
-    master_task.start()
+	s=[]
+	for i in range(1,100):
+		s.append([i,abs(sum(data1[:-i]/data2[i:]))])
+	s=np.array(s)
+	figure()
+	plot(s[:,0],s[:,1])
+	show(0)
+	# for local minima
+	m = argrelextrema(s[:,1], np.less)[0]
+	print(">",s[m[0],0],m[0])
+	return s[m[0],0]
 
-    for _ in range(10):
-        master_data = master_task.read(number_of_samples_per_channel=10)
-        slave_data = slave_task.read(number_of_samples_per_channel=10)
-
-        print('Master Task Data: ')
-        pp.pprint(master_data)
-        print('Slave Task Data: ')
-pp.pprint(slave_data)
+if __name__ == '__main__':
+	import time
+	multipleAI = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
+	multipleAI.configure()
+	start=time.time()
+	print("dt:",multipleAI.getData())
+	print(time.time()-start)
+	data=multipleAI.readAll()
+	from pylab import *
+	
+	data_ = [data[:(len(data)//2)], data[(len(data)//2):]]
+	plot(data_[0][:-4],'-b')
+	plot(data_[1][4:]*100,'-r')
+	find_shift(data_[0],data_[1])
+	show()
+	print(data)

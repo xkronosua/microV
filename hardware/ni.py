@@ -13,15 +13,16 @@ def read_ni():
 	try:
 		# DAQmx Configure Code
 		DAQmxCreateTask("",ctypes.byref(taskHandle))
-		DAQmxCreateAIVoltageChan(taskHandle,"Dev1/ai0","",DAQmx_Val_Cfg_Default,-10.0,10.0,DAQmx_Val_Volts,None)
+		
+		DAQmxCreateAIVoltageChan(taskHandle,"Dev1/ai0,Dev1/ai2","",DAQmx_Val_Cfg_Default,-10.0,10.0,DAQmx_Val_Volts,None)
 		DAQmxCfgSampClkTiming(taskHandle,"",10000.0,DAQmx_Val_Rising,DAQmx_Val_FiniteSamps,1000)
-		DAQmxCfgDigEdgeStartTrig(taskHandle, "PFI0", DAQmx_Val_Rising);
+		DAQmxCfgAnlgEdgeRefTrig(taskHandle, "Dev1/ai0", DAQmx_Val_Rising, 1, 100)
 		# DAQmx Start Code
 		DAQmxStartTask(taskHandle)
 
 		# DAQmx Read Code
 		DAQmxReadAnalogF64(taskHandle,1000,10.0,DAQmx_Val_GroupByChannel,data,1000,ctypes.byref(read),None)
-
+		print(data)
 		#print( "Acquired %d points"%read.value)
 	except DAQError as err:
 		print( "DAQmx Error: %s"%err)
@@ -39,7 +40,7 @@ def read_ni():
 		# DAQmx Configure Code
 		DAQmxCreateTask("",ctypes.byref(taskHandle))
 		DAQmxCreateAIVoltageChan(taskHandle,"Dev1/ai1","",DAQmx_Val_Cfg_Default,-10.0,10.0,DAQmx_Val_Volts,None)
-		DAQmxCfgDigEdgeStartTrig(taskHandle, "PFI0", DAQmx_Val_Rising);
+		#DAQmxCfgDigEdgeStartTrig(taskHandle, "PFI0", DAQmx_Val_Rising);
 		DAQmxCfgSampClkTiming(taskHandle,"",10000.0,DAQmx_Val_Rising,DAQmx_Val_FiniteSamps,1000)
 
 		# DAQmx Start Code
@@ -61,6 +62,7 @@ def read_ni():
 def find_shift(show_graph=False):
 
 	res = read_ni()
+	#print(res)
 	s=[]
 	for i in range(1,100):
 		s.append([i,abs(sum(res[0][:-i]/res[1][i:]))])
@@ -75,7 +77,7 @@ def find_shift(show_graph=False):
 
 
 
-def proc_data(DATA_SHIFT=7,show_graph=False):
+def proc_data(DATA_SHIFT=34,show_graph=False):
 	res = read_ni()
 	d = res[1][DATA_SHIFT:]
 	r = res[0][0:-DATA_SHIFT]
@@ -83,13 +85,13 @@ def proc_data(DATA_SHIFT=7,show_graph=False):
 	out = abs(d[w].mean()-d[~w].mean())
 	if show_graph:
 		plt.figure()
-		plt.plot(d*100)
+		plt.plot(d)
 		plt.plot(r)
 		plt.show()
 	return out
 
 if __name__ == "__main__":
 
-	find_shift()
+
 	DATA_SHIFT = int(find_shift(show_graph=True))
 	print(proc_data(DATA_SHIFT=DATA_SHIFT,show_graph=True))

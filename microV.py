@@ -6,19 +6,20 @@ import pyqtgraph as pg
 import numpy as np
 from multiprocessing import Process
 from scipy.signal import medfilt
-
-if sys.argv[1] == 'sim':
-	from hardware.sim.CCS200 import *
-	from hardware.sim.ni import *
-	from hardware.sim.E727 import *
-	from hardware.sim.TDC001 import *
+if len(sys.argv)>1:
+	if sys.argv[1] == 'sim':
+		from hardware.sim.CCS200 import *
+		from hardware.sim.ni import *
+		from hardware.sim.E727 import *
+		from hardware.sim.TDC001 import *
 else:
-	from hardware.ni import *
+	from hardware.ni1 import *
 	from hardware.CCS200 import *
 	from hardware.E727 import *
 	from hardware.TDC001 import *
 
 import matplotlib
+import scipy.misc
 #get_ipython().run_line_magic('matplotlib', 'qt')
 
 
@@ -28,6 +29,7 @@ class microV(QtGui.QMainWindow):
 	piStage = E727()
 	spectrometer = CCS200()
 	HWP = APTMotor(83854487, HWTYPE=31)
+	DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
 	live_integr_spectra = []
 	def __init__(self, parent=None):
@@ -40,11 +42,15 @@ class microV(QtGui.QMainWindow):
 		self.initPiStage()
 		self.initSpectrometer()
 		self.initHWP()
+		self.initDAQmx()
 
 		self.calibrTimer = QtCore.QTimer()
 		self.initUI()
 
 		#self.scan_image()
+	def initDAQmx(self):
+		self.DAQmx.configure()
+
 	def initHWP(self):
 		pos = self.HWP.getPos()
 		self.ui.HWP_angle.setText(str(round(pos,6)))
@@ -124,7 +130,7 @@ class microV(QtGui.QMainWindow):
 
 	def getSpectra(self):
 		self.spectrometer.startScanExtTrg()
-		self.spectrometer.getDeviceStatus()
+		#self.spectrometer.getDeviceStatus()
 		data = self.spectrometer.getScanData()
 		return data
 
@@ -145,7 +151,7 @@ class microV(QtGui.QMainWindow):
 	def onCalibrTimer(self):
 		self.calibrTimer.stop()
 		spectra = self.getSpectra()
-		pmt_val = proc_data()
+		pmt_val = self.DAQmx.getData()
 		self.live_pmt.append(pmt_val)
 		s_from = self.ui.usbSpectr_from.value()
 		s_to = self.ui.usbSpectr_to.value()
@@ -306,19 +312,24 @@ class microV(QtGui.QMainWindow):
 					self.live_pmt = []
 					self.live_integr_spectra = []
 					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
+
+						start=time.time()
+						print('Start',start)
 						if not self.scan3DisAlive: break
 						r = self.piStage.MOV(x,axis=1,waitUntilReady=True)
 						if not r: break
-
+						print(time.time()-start)
 						spectra = self.getSpectra()
-						pmt_val = proc_data()
-
+						print(time.time()-start)
+						pmt_val = self.DAQmx.getData()
+						print(time.time()-start,pmt_val)
 						#spectra = list(medfilt(spectra,5))
 						real_position = [round(p,4) for p in self.piStage.qPOS()]
 						dataSet = real_position +[pmt_val] + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
 							f.write("\t".join([str(round(i,4)) for i in dataSet])+"\n")
+						print(time.time()-start)
 						s_from = self.ui.usbSpectr_from.value()
 						s_to = self.ui.usbSpectr_to.value()
 						print(data_spectra.shape,yi,xi)
@@ -327,22 +338,23 @@ class microV(QtGui.QMainWindow):
 						self.live_pmt.append(pmt_val)
 						self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
 						self.line_pmt.setData(self.live_pmt)
-						self.line_spectra.setData(self.live_integr_spectra)
+						#self.line_spectra.setData(self.live_integr_spectra)
 
 						self.setLine(spectra)
-
+						print(time.time()-start)
 						self.setUiPiPos(real_position)
 						print(real_position)
 						app.processEvents()
 						#time.sleep(0.001)
+						print(time.time()-start)
 					self.setImage(data_spectra)
 					self.setImage1(data_pmt)
 
-				matplotlib.image.imsave(fname+".png",data_spectra)
-				matplotlib.image.imsave(fname+"_pmt.png",data_pmt)
+				scipy.misc.toimage(data_spectra).save(fname+".png")
+				scipy.misc.toimage(data_pmt).save(fname+"_pmt.png")
 		except KeyboardInterrupt:
-			matplotlib.image.imsave(fname+".png",data_spectra)
-			matplotlib.image.imsave(fname+"_pmt.png",data_pmt)
+			scipy.misc.toimage(data_spectra).save(fname+".png")
+			scipy.misc.toimage(data_pmt).save(fname+"_pmt.png")
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
