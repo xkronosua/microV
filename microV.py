@@ -54,26 +54,29 @@ class microV(QtGui.QMainWindow):
 		#self.scan_image()
 	def initDAQmx(self):
 
-		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2")
+		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2", max_val=10, min_val=-10)
 
 		self.DAQmx.timing.cfg_samp_clk_timing(1000000)
 
 		self.DAQmx.control(TaskMode.TASK_COMMIT)
 
 		self.DAQmx.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
-		self.DAQmx.start()
+
 		#self.DAQmx.configure()
 	def readDAQmx(self):
 		start = time.time()
 		try:
-			master_data = self.DAQmx.read(number_of_samples_per_channel=50)
+			self.DAQmx.start()
+			master_data = self.DAQmx.read(number_of_samples_per_channel=200)
+			self.DAQmx.wait_until_done(0.2)
+			self.DAQmx.stop()
 		except:
-			master_data = self.DAQmx.read(number_of_samples_per_channel=50)
+			return -1
 		r,d = master_data
 		r = np.array(r)
 		d = np.array(d)
 		#pp.pprint(master_data)
-		print(time.time()-start)
+		print("readDAQmx(tdiff):\n", time.time()-start)
 		DATA_SHIFT=6
 		w = r>r.mean()
 		out = abs(d[w].mean()-d[~w].mean())
