@@ -20,6 +20,7 @@ else:
 	from hardware.TDC001 import *
 	from nidaqmx.constants import AcquisitionType, TaskMode
 	import nidaqmx
+from scipy.signal import argrelextrema
 
 import matplotlib
 import scipy.misc
@@ -32,9 +33,10 @@ class microV(QtGui.QMainWindow):
 	piStage = E727()
 	spectrometer = CCS200()
 	HWP = APTMotor(83854487, HWTYPE=31)
-	DAQmx = nidaqmx.Task()
+	#DAQmx = nidaqmx.Task()
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
+	live_pmt1 = []
 	live_integr_spectra = []
 	def __init__(self, parent=None):
 		QtGui.QMainWindow.__init__(self, parent)
@@ -46,7 +48,7 @@ class microV(QtGui.QMainWindow):
 		self.initPiStage()
 		self.initSpectrometer()
 		self.initHWP()
-		self.initDAQmx()
+		#self.initDAQmx()
 
 		self.calibrTimer = QtCore.QTimer()
 		self.initUI()
@@ -54,35 +56,106 @@ class microV(QtGui.QMainWindow):
 		#self.scan_image()
 	def initDAQmx(self):
 
-		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2")
+		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
 
-		self.DAQmx.timing.cfg_samp_clk_timing(10000, sample_mode=AcquisitionType.FINITE)
+		self.DAQmx.timing.cfg_samp_clk_timing(10000, sample_mode=AcquisitionType.CONTINUOUS)
 
 		self.DAQmx.control(TaskMode.TASK_COMMIT)
 
-		self.DAQmx.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
-		self.DAQmx.start()
+		self.DAQmx.triggers.start_trigger.cfg_anlg_edge_start_trig("Dev1/ai0",trigger_level=1.5)
+
 		#self.DAQmx.configure()
-	def readDAQmx(self):
+	def readDAQmx(self,preview=False,print_dt=False):
 		start = time.time()
-		if self.DAQmx.is_task_done():
-			self.DAQmx.start()
-		try:
-			master_data = self.DAQmx.read(number_of_samples_per_channel=100)
-		except:
-			self.DAQmx.stop()
-			self.DAQmx.start()
-			return 0
-		r,d = master_data
+		with nidaqmx.Task() as master_task:
+			#master_task = nidaqmx.Task()
+			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3")
+
+			master_task.timing.cfg_samp_clk_timing(
+				100000, sample_mode=AcquisitionType.FINITE)
+
+			master_task.control(TaskMode.TASK_COMMIT)
+
+			master_task.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
+
+
+			master_task.start()
+			#start = time.time()
+			for i in range(100):
+				master_data = master_task.read(number_of_samples_per_channel=1000)
+				if master_task.is_task_done():
+					break
+			r,d,d1 = master_data
+			#pp.pprint(master_data)
+			#print(time.time()-start,master_task.is_task_done())
+		r,d,d1 = master_data
 		r = np.array(r)
 		d = np.array(d)
+		d1 = np.array(d1)
+
+		d = d[int(self.ui.DAQmx_shift.value()):]
+		d1 = d1[int(self.ui.DAQmx_shift.value()):]
+		r = r[0:int(-self.ui.DAQmx_shift.value())]
+		if self.ui.DAQmx_preview.isChecked():
+			self.line_DAQmx_sig.setData(d)
+			self.line_DAQmx_sig1.setData(d1)
+			self.line_DAQmx_ref.setData(r)
+
 		#pp.pprint(master_data)
-		print(time.time()-start)
-		DATA_SHIFT=6
+		if print_dt:
+			print("readDAQmx(tdiff):\n", time.time()-start)
+
 		w = r>r.mean()
 		out = abs(d[w].mean()-d[~w].mean())
+		out1 = abs(d1[w].mean()-d1[~w].mean())
+		print(time.time()-start,i)
 
-		return out
+		return out, out1
+
+	def optimizeDAQmx(self):
+		start = time.time()
+		with nidaqmx.Task() as master_task:
+			#master_task = nidaqmx.Task()
+			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3")
+
+			master_task.timing.cfg_samp_clk_timing(
+				100000, sample_mode=AcquisitionType.FINITE)
+
+			master_task.control(TaskMode.TASK_COMMIT)
+
+			master_task.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
+
+
+			master_task.start()
+			#start = time.time()
+			for i in range(100):
+				master_data = master_task.read(number_of_samples_per_channel=1000)
+				if master_task.is_task_done():
+					break
+			r,d,d1 = master_data
+			#pp.pprint(master_data)
+			#print(time.time()-start,master_task.is_task_done())
+		r = np.array(r)
+		d = np.array(d)
+		data_shift = 0
+		shift_array = []
+		for data_shift in range(len(r)//2):
+			d_ = d[int(data_shift):]
+			r_ = r[0:int(-data_shift)]
+			w = r_>r_.mean()
+			out = abs(d_[w].mean()-d_[~w].mean())
+			shift_array.append(out)
+
+
+		shift_array = np.array(shift_array)
+		self.line_DAQmx_ref.setData(shift_array)
+		m = argrelextrema(shift_array, np.greater)[0]
+		#pp.pprint(master_data)
+		print("optimizeDAQmx(tdiff):\n", time.time()-start,m)
+		self.ui.DAQmx_shift.setValue(m[1])
+
+		return m
+
 
 	def initHWP(self):
 		pos = self.HWP.getPos()
@@ -113,11 +186,11 @@ class microV(QtGui.QMainWindow):
 		print(self.piStage.ConnectUSB())
 		print(self.piStage.qSAI())
 		print(self.piStage.SVO())
-		print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=1,waitUntilReady=True))
+		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=1,waitUntilReady=True))
 		time.sleep(0.2)
-		print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=2,waitUntilReady=True))
-		time.sleep(0.2)
-		print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=3,waitUntilReady=True))
+		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=2,waitUntilReady=True))
+		#time.sleep(0.2)
+		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=3,waitUntilReady=True))
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 		time.sleep(1)
@@ -177,6 +250,7 @@ class microV(QtGui.QMainWindow):
 		if state:
 			self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
 			self.live_pmt = []
+			self.live_pmt1 = []
 			self.live_integr_spectra = []
 		else:
 			self.calibrTimer.stop()
@@ -184,14 +258,16 @@ class microV(QtGui.QMainWindow):
 	def onCalibrTimer(self):
 		self.calibrTimer.stop()
 		spectra = self.getSpectra()
-		pmt_val = self.readDAQmx()
+		pmt_val,pmt_val1 = self.readDAQmx(print_dt=True)
 		self.live_pmt.append(pmt_val)
+		self.live_pmt1.append(pmt_val1)
 		s_from = self.ui.usbSpectr_from.value()
 		s_to = self.ui.usbSpectr_to.value()
 		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
 		self.setLine(spectra)
 		self.line_pmt.setData(self.live_pmt)
-		self.line_spectra.setData(self.live_integr_spectra)
+		self.line_pmt1.setData(self.live_pmt1)
+		#self.line_spectra.setData(self.live_integr_spectra)
 
 		self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
 		app.processEvents()
@@ -202,6 +278,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
 
 		self.ui.usbSpectr_set_integr_time.clicked.connect(self.usbSpectr_set_integr_time)
+
+		self.ui.DAQmx_find_shift.clicked.connect(self.optimizeDAQmx)
 
 		self.ui.HWP_go.clicked.connect(self.HWP_go)
 		self.ui.HWP_go_home.clicked.connect(self.HWP_go_home)
@@ -221,11 +299,21 @@ class microV(QtGui.QMainWindow):
 		self.pw = pg.PlotWidget(name='PlotMain')  ## giving the plots names allows us to link their axes together
 		self.ui.plotView.addWidget(self.pw)
 		self.line0 = self.pw.plot()
+		self.line1 = self.pw.plot(pen=(255,0,0))
+		self.line3 = self.pw.plot(pen=(255,0,255))
+
+		self.pw_DAQmx = pg.PlotWidget(name='DAQmx')  ## giving the plots names allows us to link their axes together
+		self.ui.DAQmx_plot.addWidget(self.pw_DAQmx)
+
+		self.line_DAQmx_sig = self.pw_DAQmx.plot(pen=(255,0,0))
+		self.line_DAQmx_sig1 = self.pw_DAQmx.plot(pen=(255,255,0))
+		self.line_DAQmx_ref = self.pw_DAQmx.plot(pen=(255,0,255))
 
 		self.pw1 = pg.PlotWidget(name='Graph1')  ## giving the plots names allows us to link their axes together
 		self.ui.plotView.addWidget(self.pw1)
 
 		self.line_pmt = self.pw1.plot(pen=(255,0,0))
+		self.line_pmt1 = self.pw1.plot(pen=(255,255,0))
 		self.line_spectra = self.pw1.plot(pen=(0,255,0))
 
 		self.img = pg.ImageView()  ## giving the plots names allows us to link their axes together
@@ -307,7 +395,7 @@ class microV(QtGui.QMainWindow):
 
 				fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 				with open(fname,'a') as f:
-					f.write("#X\tY\tZ\tpmt_signal\tspectra_px[" +
+					f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\tspectra_px[" +
 						str(spectra_range[0]) + ":"+
 						str(spectra_range[1]) +"]\n")
 
@@ -331,6 +419,7 @@ class microV(QtGui.QMainWindow):
 
 				data_spectra = np.zeros((len(Range_yi),len(Range_xi)))
 				data_pmt = np.zeros((len(Range_yi),len(Range_xi)))
+				data_pmt1 = np.zeros((len(Range_yi),len(Range_xi)))
 
 				forward = True
 				for y,yi in zip(Range_y,Range_yi):
@@ -347,54 +436,62 @@ class microV(QtGui.QMainWindow):
 					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 					if not r: break
 					self.live_pmt = []
+					self.live_pmt1 = []
 					self.live_integr_spectra = []
 					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
 
 						start=time.time()
-						print('Start',start)
+						#print('Start',start)
 						if not self.scan3DisAlive: break
 						r = self.piStage.MOV(x,axis=1,waitUntilReady=True)
 						if not r: break
-						print(time.time()-start)
+						#print(time.time()-start)
 						spectra = self.getSpectra()
-						print(time.time()-start)
-						pmt_val = self.readDAQmx()
-						print(time.time()-start,pmt_val)
+						#print(time.time()-start)
+						pmt_val,pmt_val1 = self.readDAQmx()
+						#print(time.time()-start,pmt_val)
 						#spectra = list(medfilt(spectra,5))
 						real_position = [round(p,4) for p in self.piStage.qPOS()]
-						dataSet = real_position +[pmt_val] + spectra[spectra_range[0]:spectra_range[1]]
+						dataSet = real_position +[pmt_val,pmt_val1] + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
 							f.write("\t".join([str(round(i,4)) for i in dataSet])+"\n")
-						print(time.time()-start)
+						#print(time.time()-start)
 						s_from = self.ui.usbSpectr_from.value()
 						s_to = self.ui.usbSpectr_to.value()
-						print(data_spectra.shape,yi,xi)
+						#print(data_spectra.shape,yi,xi)
 						data_spectra[yi,xi] = np.sum(spectra[s_from:s_to])
 						data_pmt[yi,xi] = pmt_val
+						data_pmt1[yi,xi] = pmt_val1
 						self.live_pmt.append(pmt_val)
+						self.live_pmt1.append(pmt_val1)
 						self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
 						if forward:
 							self.line_pmt.setData(self.live_pmt)
+							self.line_pmt1.setData(self.live_pmt1)
 						else:
 							self.line_pmt.setData(self.live_pmt[::-1])
+							self.line_pmt1.setData(self.live_pmt1[::-1])
 						#self.line_spectra.setData(self.live_integr_spectra)
 
 						self.setLine(spectra)
-						print(time.time()-start)
+						#print(time.time()-start)
 						self.setUiPiPos(real_position)
-						print(real_position)
+						print("[\t%.5f\t%.5f\t%.5f\t]\t%.5f"%tuple(real_position+[time.time()-start]))
 						app.processEvents()
-						#time.sleep(0.001)
-						print(time.time()-start)
-					self.setImage(data_spectra)
-					self.setImage1(data_pmt)
+						time.sleep(0.01)
+						#print(time.time()-start)
+					#self.setImage(data_spectra)
+					self.setImage1(data_pmt1)
+					self.setImage(data_pmt)
 
-				scipy.misc.toimage(data_spectra).save(fname+".png")
+				#scipy.misc.toimage(data_spectra).save(fname+".png")
+				scipy.misc.toimage(data_pmt1).save(fname+"_pmt1.png")
 				scipy.misc.toimage(data_pmt).save(fname+"_pmt.png")
 		except KeyboardInterrupt:
-			scipy.misc.toimage(data_spectra).save(fname+".png")
+			#scipy.misc.toimage(data_spectra).save(fname+".png")
 			scipy.misc.toimage(data_pmt).save(fname+"_pmt.png")
+			scipy.misc.toimage(data_pmt1).save(fname+"_pmt1.png")
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
