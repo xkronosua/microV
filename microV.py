@@ -20,6 +20,8 @@ else:
 	from hardware.TDC001 import *
 	from nidaqmx.constants import AcquisitionType, TaskMode
 	import nidaqmx
+	from picoscope import ps3000a
+
 from scipy.signal import argrelextrema
 
 import matplotlib
@@ -48,6 +50,7 @@ class microV(QtGui.QMainWindow):
 		self.initPiStage()
 		self.initSpectrometer()
 		self.initHWP()
+		self.initPico()
 		#self.initDAQmx()
 
 		self.calibrTimer = QtCore.QTimer()
@@ -69,7 +72,7 @@ class microV(QtGui.QMainWindow):
 		start = time.time()
 		with nidaqmx.Task() as master_task:
 			#master_task = nidaqmx.Task()
-			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3")
+			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
 
 			master_task.timing.cfg_samp_clk_timing(
 				100000, sample_mode=AcquisitionType.FINITE)
@@ -116,7 +119,7 @@ class microV(QtGui.QMainWindow):
 		start = time.time()
 		with nidaqmx.Task() as master_task:
 			#master_task = nidaqmx.Task()
-			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3")
+			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
 
 			master_task.timing.cfg_samp_clk_timing(
 				100000, sample_mode=AcquisitionType.FINITE)
@@ -155,6 +158,64 @@ class microV(QtGui.QMainWindow):
 		self.ui.DAQmx_shift.setValue(m[1])
 
 		return m
+
+	def initPico(self):
+		self.ps = ps3000a.PS3000a(connect=False)
+		self.ps.open()
+		self.n_captures = 100
+		self.pico_ranges = [0.02,0.05,0.1,0.2,0.5,1,2,5,10,20]
+		self.pico_Vrange_index = [5,5]
+		self.ps.setChannel("A", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[0]])
+		self.ps.setChannel("B", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[1]])
+		self.ps.setSamplingInterval(200e-9,15e-6)
+		self.ps.setSimpleTrigger(trigSrc="External", threshold_V=0.020, direction='Rising',
+								 timeout_ms=5, enabled=True)
+		self.samples_per_segment = self.ps.memorySegments(self.n_captures)
+		self.ps.setNoOfCaptures(self.n_captures)
+
+
+	def readPico(self):
+		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+		dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+		#t1 = time.time()
+		self.ps.runBlock()
+		self.ps.waitReady()
+		#t2 = time.time()
+		#print("Time to get sweep: " + str(t2 - t1))
+		self.ps.getDataRawBulk(channel='A',data=dataA)
+		self.ps.getDataRawBulk(channel='B',data=dataB)
+		#t3 = time.time()
+		#print("Time to read data: " + str(t3 - t2))
+		dataA = dataA[:, 0:self.ps.noSamples].mean(axis=0)
+		dataB = dataB[:, 0:self.ps.noSamples].mean(axis=0)
+
+		if self.ui.DAQmx_preview.isChecked():
+			self.line_DAQmx_sig.setData(dataA)
+			self.line_DAQmx_sig1.setData(dataB)
+
+		index = self.pico_Vrange_index
+		if dataA.min()<-20000 and index[0]<10:
+			index[0] = index[0] + 1
+		elif dataA.min()>-200 and index[0]>0:
+			index[0] = index[0] - 1
+
+		if dataB.min()<-20000 and index[1]<10:
+			index[1] = index[1] + 1
+		elif dataB.min()>-200 and index[1]>0:
+			index[1] = index[1] - 1
+
+		self.pico_Vrange_index = index
+		self.ps.setChannel("A", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[0]])
+		self.ps.setChannel("B", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[1]])
+
+		dataA = self.ps.rawToV( channel="A", dataRaw=dataA)
+		dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
+
+		dataA_p2p = abs(dataA.max() - dataA.min())
+		dataB_p2p = abs(dataB.max() - dataB.min())
+
+
+		return dataA_p2p, dataB_p2p
 
 
 	def initHWP(self):
@@ -257,8 +318,8 @@ class microV(QtGui.QMainWindow):
 
 	def onCalibrTimer(self):
 		self.calibrTimer.stop()
-		spectra = self.getSpectra()
-		pmt_val,pmt_val1 = self.readDAQmx(print_dt=True)
+		spectra = np.zeros(3648)#self.getSpectra()
+		pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
 		self.live_pmt.append(pmt_val)
 		self.live_pmt1.append(pmt_val1)
 		s_from = self.ui.usbSpectr_from.value()
@@ -343,6 +404,10 @@ class microV(QtGui.QMainWindow):
 			traceback.print_exc()
 		try:
 			self.DAQmx.close()
+		except:
+			traceback.print_exc()
+		try:
+			self.ps.close()
 		except:
 			traceback.print_exc()
 
@@ -446,9 +511,9 @@ class microV(QtGui.QMainWindow):
 						r = self.piStage.MOV(x,axis=1,waitUntilReady=True)
 						if not r: break
 						#print(time.time()-start)
-						spectra = self.getSpectra()
+						spectra = np.zeros(3648)#self.getSpectra()
 						#print(time.time()-start)
-						pmt_val,pmt_val1 = self.readDAQmx()
+						pmt_val,pmt_val1 = self.readPico()#readDAQmx()
 						#print(time.time()-start,pmt_val)
 						#spectra = list(medfilt(spectra,5))
 						real_position = [round(p,4) for p in self.piStage.qPOS()]
