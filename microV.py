@@ -322,6 +322,10 @@ class microV(QtGui.QMainWindow):
 		pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
 		self.live_pmt.append(pmt_val)
 		self.live_pmt1.append(pmt_val1)
+		if len(self.live_pmt)>800:
+			self.live_pmt.pop(0)
+		if len(self.live_pmt1)>800:
+			self.live_pmt1.pop(0)
 		s_from = self.ui.usbSpectr_from.value()
 		s_to = self.ui.usbSpectr_to.value()
 		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
