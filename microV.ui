@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>4</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -46,15 +46,56 @@
          <item>
           <widget class="QToolBox" name="toolBox">
            <property name="currentIndex">
-            <number>1</number>
+            <number>2</number>
            </property>
+           <widget class="QWidget" name="page">
+            <attribute name="label">
+             <string>RotPiezoStage</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_8">
+             <item row="0" column="0">
+              <widget class="QPushButton" name="connect_rotPiezoStage">
+               <property name="text">
+                <string>Connect</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QDoubleSpinBox" name="rotPiezoStage_Step">
+               <property name="minimum">
+                <double>-360.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>360.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>10.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="rotPiezoStage_Angle">
+               <property name="text">
+                <string>nan</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QPushButton" name="rotPiezoStage_Go">
+               <property name="text">
+                <string>Go</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
            <widget class="QWidget" name="HWP">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>386</width>
-              <height>408</height>
+              <width>351</width>
+              <height>420</height>
              </rect>
             </property>
             <attribute name="label">
@@ -125,8 +166,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>389</width>
-              <height>456</height>
+              <width>351</width>
+              <height>420</height>
              </rect>
             </property>
             <attribute name="label">
@@ -419,7 +460,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>389</width>
+              <width>351</width>
               <height>335</height>
              </rect>
             </property>
@@ -1108,6 +1149,11 @@
           </widget>
          </item>
         </layout>
+       </widget>
+       <widget class="QWidget" name="tab">
+        <attribute name="title">
+         <string>ContScan</string>
+        </attribute>
        </widget>
       </widget>
       <widget class="QSplitter" name="splitter_2">
