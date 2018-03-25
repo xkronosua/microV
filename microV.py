@@ -1,18 +1,22 @@
-import sys,time
+import sys,time,os
+os.environ['PYQTGRAPH_QT_LIB'] = 'PyQt5'
 import qdarkstyle
 from pyqtgraph.Qt import QtGui, QtCore, uic
-import traceback
-
 import pyqtgraph as pg
 import numpy as np
-from multiprocessing import Process
 from scipy.signal import medfilt
+from scipy.signal import argrelextrema
+import scipy.misc
+import matplotlib
+
 if len(sys.argv)>1:
 	if sys.argv[1] == 'sim':
 		from hardware.sim.CCS200 import *
 		from hardware.sim.ni import *
 		from hardware.sim.E727 import *
 		from hardware.sim.TDC001 import *
+		from hardware.sim.picoscope import ps3000a
+
 else:
 	from hardware.ni1 import *
 	from hardware.CCS200 import *
@@ -22,11 +26,10 @@ else:
 	import nidaqmx
 	from picoscope import ps3000a
 
-from scipy.signal import argrelextrema
-
-import matplotlib
-import scipy.misc
 #get_ipython().run_line_magic('matplotlib', 'qt')
+
+import traceback
+from multiprocessing import Process
 
 
 class microV(QtGui.QMainWindow):
@@ -40,6 +43,8 @@ class microV(QtGui.QMainWindow):
 	live_pmt = []
 	live_pmt1 = []
 	live_integr_spectra = []
+	pico_VRange_dict = {"Auto":20.0,'20 mV':0.02,'50 mV':0.05,'100 mV':0.1,'200 mV':0.2,'500 mV':0.5,
+					'1 V': 1.0, '2 V': 2.0, '5 V': 5.0, '10 V': 10.0, '20 V': 20.0,}
 	def __init__(self, parent=None):
 		QtGui.QMainWindow.__init__(self, parent)
 		#from mainwindow import Ui_mw
@@ -48,23 +53,28 @@ class microV(QtGui.QMainWindow):
 		self.ui.show()
 		self._want_to_close = False
 		self.initPiStage()
-		self.initSpectrometer()
+		#self.initSpectrometer()
 		self.initHWP()
-		self.initPico()
+		#self.initPico()
 		#self.initDAQmx()
 
 		self.calibrTimer = QtCore.QTimer()
 		self.initUI()
 
 		#self.scan_image()
+	def connect_DAQmx(self,state):
+		if state:
+			self.initDAQmx()
+		else:
+			try:
+				self.DAQmx.close()
+			except:
+				traceback.print_exc()
+
 	def initDAQmx(self):
-
 		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
-
 		self.DAQmx.timing.cfg_samp_clk_timing(10000, sample_mode=AcquisitionType.CONTINUOUS)
-
 		self.DAQmx.control(TaskMode.TASK_COMMIT)
-
 		self.DAQmx.triggers.start_trigger.cfg_anlg_edge_start_trig("Dev1/ai0",trigger_level=1.5)
 
 		#self.DAQmx.configure()
@@ -159,16 +169,37 @@ class microV(QtGui.QMainWindow):
 
 		return m
 
+	def connect_pico(self,state):
+		if state:
+			self.initPico()
+		else:
+			try:
+				self.ps.close()
+			except:
+				traceback.print_exc()
+
+
 	def initPico(self):
 		self.ps = ps3000a.PS3000a(connect=False)
 		self.ps.open()
-		self.n_captures = 100
-		self.pico_ranges = [0.02,0.05,0.1,0.2,0.5,1,2,5,10,20]
-		self.pico_Vrange_index = [5,5]
-		self.ps.setChannel("A", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[0]])
-		self.ps.setChannel("B", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[1]])
+		self.n_captures = self.ui.pico_n_captures.value()
+
+		ChA_VRange = self.ui.pico_ChA_VRange.currentText()
+		ChA_VRange = self.pico_VRange_dict[ChA_VRange]
+
+		ChA_Offset = self.ui.pico_ChA_offset.value()
+
+		ChB_VRange = self.ui.pico_ChB_VRange.currentText()
+		ChB_VRange = self.pico_VRange_dict[ChB_VRange]
+		ChB_Offset = self.ui.pico_ChB_offset.value()
+
+		self.ps.setChannel("A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
+		self.ps.setChannel("B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
 		self.ps.setSamplingInterval(200e-9,15e-6)
-		self.ps.setSimpleTrigger(trigSrc="External", threshold_V=0.020, direction='Rising',
+		trigSrc = self.ui.pico_TrigSource.currentText()
+		threshold_V = self.ui.pico_TrigThreshold.value()
+		direction = self.ui.pico_Trig_mode.currentText()
+		self.ps.setSimpleTrigger(trigSrc=trigSrc, threshold_V=threshold_V, direction=direction,
 								 timeout_ms=5, enabled=True)
 		self.samples_per_segment = self.ps.memorySegments(self.n_captures)
 		self.ps.setNoOfCaptures(self.n_captures)
@@ -189,31 +220,47 @@ class microV(QtGui.QMainWindow):
 		dataA = dataA[:, 0:self.ps.noSamples].mean(axis=0)
 		dataB = dataB[:, 0:self.ps.noSamples].mean(axis=0)
 
-		if self.ui.DAQmx_preview.isChecked():
-			self.line_DAQmx_sig.setData(dataA)
-			self.line_DAQmx_sig1.setData(dataB)
+		if self.ui.raw_data_preview.isChecked():
+			self.line_pico_ChA.setData(dataA)
+			self.line_pico_ChB.setData(dataB)
 
-		index = self.pico_Vrange_index
-		if dataA.min()<-20000 and index[0]<10:
-			index[0] = index[0] + 1
-		elif dataA.min()>-200 and index[0]>0:
-			index[0] = index[0] - 1
+		if self.ui.pico_AutoRange.isChecked():
 
-		if dataB.min()<-20000 and index[1]<10:
-			index[1] = index[1] + 1
-		elif dataB.min()>-200 and index[1]>0:
-			index[1] = index[1] - 1
+			indexChA = self.ui.pico_ChA_VRange.currentIndex()
+			if dataA.min()<self.ui.pico_AutoRange_max.value() and indexChA<8:
+				indexChA += 1
+			elif dataA.min()>self.ui.pico_AutoRange_min.value() and indexChA>0:
+				indexChA -= 1
+			self.ui.pico_ChA_VRange.setCurrentIndex(indexChA)
+			ChA_VRange = self.ui.pico_ChA_VRange.currentText()
+			ChA_VRange = self.pico_VRange_dict[ChA_VRange]
+			#print('AutoA',ChA_VRange)
+			ChA_Offset = self.ui.pico_ChA_offset.value()
+			self.ps.setChannel(channel="A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
 
-		self.pico_Vrange_index = index
-		self.ps.setChannel("A", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[0]])
-		self.ps.setChannel("B", coupling="DC", VRange=self.pico_ranges[self.pico_Vrange_index[1]])
 
-		dataA = self.ps.rawToV( channel="A", dataRaw=dataA)
+
+			indexChB = self.ui.pico_ChB_VRange.currentIndex()
+			#print('ChB',indexChB)
+			if dataB.min()<self.ui.pico_AutoRange_max.value() and indexChB<8:
+				indexChB += 1
+			elif dataB.min()>self.ui.pico_AutoRange_min.value() and indexChB>0:
+				indexChB -= 1
+			self.ui.pico_ChB_VRange.setCurrentIndex(indexChB)
+
+			ChB_VRange = self.ui.pico_ChB_VRange.currentText()
+			ChB_VRange = self.pico_VRange_dict[ChB_VRange]
+			ChB_Offset = self.ui.pico_ChB_offset.value()
+			self.ps.setChannel(channel="B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
+			#print('AutoB',ChB_VRange)
+		dataA = self.ps.rawToV(channel="A", dataRaw=dataA)
 		dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
 
 		dataA_p2p = abs(dataA.max() - dataA.min())
 		dataB_p2p = abs(dataB.max() - dataB.min())
 
+		self.ui.pico_ChA_value.setText(str(round(dataA_p2p,4)))
+		self.ui.pico_ChB_value.setText(str(round(dataB_p2p,4)))
 
 		return dataA_p2p, dataB_p2p
 
@@ -227,6 +274,7 @@ class microV(QtGui.QMainWindow):
 		self.HWP.mAbs(to_angle)
 		pos = self.HWP.getPos()
 		self.ui.HWP_angle.setText(str(round(pos,6)))
+
 	def HWP_go_home(self):
 		self.HWP.go_home()
 		pos = self.HWP.getPos()
@@ -279,6 +327,37 @@ class microV(QtGui.QMainWindow):
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
+	def Pi_scanX(self,param,nextFunc,direction=True):
+		range_ = np.arange(param[0],param[1],param[2])
+		if direction:
+			pass
+		else:
+			range_ = range_[::-1]
+		for pos in range_:
+			self.piStage.MOV(pos,axis=1,waitUntilReady=True)
+			nextFunc()
+	def Pi_scanY(self,param,nextFunc,direction=True):
+		range_ = np.arange(param[0],param[1],param[2])
+		if direction:
+			pass
+		else:
+			range_ = range_[::-1]
+		for pos in range_:
+			self.piStage.MOV(pos,axis=2,waitUntilReady=True)
+			nextFunc()
+	def Pi_scanZ(self,param,nextFunc,direction=True):
+		range_ = np.arange(param[0],param[1],param[2])
+		if direction:
+			pass
+		else:
+			range_ = range_[::-1]
+		for pos in range_:
+			self.piStage.MOV(pos,axis=3,waitUntilReady=True)
+			nextFunc()
+	def collectData(self):
+		pmt_val,pmt_val1 = self.readPico()
+		real_position = [round(p,4) for p in self.piStage.qPOS()]
+
 	def Pi_XYZ_50mkm(self):
 		print(self.piStage.MOV(50,axis=1,waitUntilReady=True))
 		time.sleep(0.2)
@@ -329,7 +408,7 @@ class microV(QtGui.QMainWindow):
 		s_from = self.ui.usbSpectr_from.value()
 		s_to = self.ui.usbSpectr_to.value()
 		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
-		self.setLine(spectra)
+		#setLine(spectra)
 		self.line_pmt.setData(self.live_pmt)
 		self.line_pmt1.setData(self.live_pmt1)
 		#self.line_spectra.setData(self.live_integr_spectra)
@@ -337,96 +416,7 @@ class microV(QtGui.QMainWindow):
 		self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
 		app.processEvents()
 
-	def initUI(self):
-		self.ui.actionExit.triggered.connect(self.closeEvent)
 
-		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
-
-		self.ui.usbSpectr_set_integr_time.clicked.connect(self.usbSpectr_set_integr_time)
-
-		self.ui.DAQmx_find_shift.clicked.connect(self.optimizeDAQmx)
-
-		self.ui.HWP_go.clicked.connect(self.HWP_go)
-		self.ui.HWP_go_home.clicked.connect(self.HWP_go_home)
-		self.ui.HWP_negative_step.clicked.connect(self.HWP_negative_step)
-		self.ui.HWP_positive_step.clicked.connect(self.HWP_positive_step)
-
-		self.ui.Pi_X_go.clicked.connect(self.Pi_X_go)
-		self.ui.Pi_Y_go.clicked.connect(self.Pi_Y_go)
-		self.ui.Pi_Z_go.clicked.connect(self.Pi_Z_go)
-		self.ui.Pi_XYZ_50mkm.clicked.connect(self.Pi_XYZ_50mkm)
-
-		self.ui.start3DScan.toggled[bool].connect(self.start3DScan)
-
-		self.ui.startCalibr.toggled[bool].connect(self.startCalibr)
-		self.calibrTimer.timeout.connect(self.onCalibrTimer)
-
-		self.pw = pg.PlotWidget(name='PlotMain')  ## giving the plots names allows us to link their axes together
-		self.ui.plotView.addWidget(self.pw)
-		self.line0 = self.pw.plot()
-		self.line1 = self.pw.plot(pen=(255,0,0))
-		self.line3 = self.pw.plot(pen=(255,0,255))
-
-		self.pw_DAQmx = pg.PlotWidget(name='DAQmx')  ## giving the plots names allows us to link their axes together
-		self.ui.DAQmx_plot.addWidget(self.pw_DAQmx)
-
-		self.line_DAQmx_sig = self.pw_DAQmx.plot(pen=(255,0,0))
-		self.line_DAQmx_sig1 = self.pw_DAQmx.plot(pen=(255,255,0))
-		self.line_DAQmx_ref = self.pw_DAQmx.plot(pen=(255,0,255))
-
-		self.pw1 = pg.PlotWidget(name='Graph1')  ## giving the plots names allows us to link their axes together
-		self.ui.plotView.addWidget(self.pw1)
-
-		self.line_pmt = self.pw1.plot(pen=(255,0,0))
-		self.line_pmt1 = self.pw1.plot(pen=(255,255,0))
-		self.line_spectra = self.pw1.plot(pen=(0,255,0))
-
-		self.img = pg.ImageView()  ## giving the plots names allows us to link their axes together
-		data = np.zeros((100,100))
-		self.ui.imageView.addWidget(self.img)
-		self.img.setImage(data)
-
-		self.img1 = pg.ImageView()  ## giving the plots names allows us to link their axes together
-		data = np.zeros((100,100))
-		self.ui.imageView.addWidget(self.img1)
-		self.img1.setImage(data)
-
-
-	def closeEvent(self, evnt):
-		print('closeEvent')
-		try:
-			self.piStage.CloseConnection()
-		except:
-			traceback.print_exc()
-		try:
-			self.spectrometer.close()
-		except:
-			traceback.print_exc()
-		try:
-			self.HWP.cleanUpAPT()
-		except:
-			traceback.print_exc()
-		try:
-			self.DAQmx.close()
-		except:
-			traceback.print_exc()
-		try:
-			self.ps.close()
-		except:
-			traceback.print_exc()
-
-
-	def setImage(self,data):
-		self.img.setImage(data.T,levels=(data.min(), data.max()))
-		#app.processEvents()
-
-	def setImage1(self,data):
-		self.img1.setImage(data.T,levels=(data.min(), data.max()))
-		#app.processEvents()
-
-	def setLine(self,data,skip=1):
-		self.line0.setData(data[::skip])
-		#app.processEvents()
 
 	def start3DScan(self, state):
 		print(state)
@@ -453,9 +443,9 @@ class microV(QtGui.QMainWindow):
 		self.ui.scan3D_path.setText(path)
 		spectra_range = [self.ui.usbSpectr_save_from.value(),self.ui.usbSpectr_save_to.value()]
 		try:
-			z_start = float(self.ui.scan3D_config.item(0,0).text())
-			z_end = float(self.ui.scan3D_config.item(0,1).text())
-			z_step = float(self.ui.scan3D_config.item(0,2).text())
+			z_start = float(self.ui.scan3D_config.item(0,1).text())
+			z_end = float(self.ui.scan3D_config.item(0,2).text())
+			z_step = float(self.ui.scan3D_config.item(0,3).text())
 
 			for z in np.arange(z_start,z_end,z_step):
 				if not self.scan3DisAlive: break
@@ -471,17 +461,17 @@ class microV(QtGui.QMainWindow):
 
 
 
-				y_start = float(self.ui.scan3D_config.item(1,0).text())
-				y_end = float(self.ui.scan3D_config.item(1,1).text())
-				y_step = float(self.ui.scan3D_config.item(1,2).text())
+				y_start = float(self.ui.scan3D_config.item(1,1).text())
+				y_end = float(self.ui.scan3D_config.item(1,2).text())
+				y_step = float(self.ui.scan3D_config.item(1,3).text())
 
 				Range_y = np.arange(y_start,y_end,y_step)
 				Range_yi = np.arange(len(Range_y))
 
 
-				x_start = float(self.ui.scan3D_config.item(2,0).text())
-				x_end = float(self.ui.scan3D_config.item(2,1).text())
-				x_step = float(self.ui.scan3D_config.item(2,2).text())
+				x_start = float(self.ui.scan3D_config.item(2,1).text())
+				x_end = float(self.ui.scan3D_config.item(2,2).text())
+				x_step = float(self.ui.scan3D_config.item(2,3).text())
 
 				Range_x = np.arange(x_start,x_end,x_step)
 				Range_xi = np.arange(len(Range_x))
@@ -521,7 +511,7 @@ class microV(QtGui.QMainWindow):
 						#print(time.time()-start,pmt_val)
 						#spectra = list(medfilt(spectra,5))
 						real_position = [round(p,4) for p in self.piStage.qPOS()]
-						dataSet = real_position +[pmt_val,pmt_val1] + spectra[spectra_range[0]:spectra_range[1]]
+						dataSet = real_position +[pmt_val,pmt_val1]# + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
 							f.write("\t".join([str(round(i,4)) for i in dataSet])+"\n")
@@ -543,7 +533,7 @@ class microV(QtGui.QMainWindow):
 							self.line_pmt1.setData(self.live_pmt1[::-1])
 						#self.line_spectra.setData(self.live_integr_spectra)
 
-						self.setLine(spectra)
+						#self.setLine(spectra)
 						#print(time.time()-start)
 						self.setUiPiPos(real_position)
 						print("[\t%.5f\t%.5f\t%.5f\t]\t%.5f"%tuple(real_position+[time.time()-start]))
@@ -567,7 +557,103 @@ class microV(QtGui.QMainWindow):
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
+	def initUI(self):
+		self.ui.actionExit.toggled.connect(self.closeEvent)
 
+		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
+
+		self.ui.usbSpectr_set_integr_time.clicked.connect(self.usbSpectr_set_integr_time)
+
+		self.ui.connect_DAQmx.toggled[bool].connect(self.connect_DAQmx)
+		self.ui.DAQmx_find_shift.clicked.connect(self.optimizeDAQmx)
+
+		self.ui.HWP_go.clicked.connect(self.HWP_go)
+		self.ui.HWP_go_home.clicked.connect(self.HWP_go_home)
+		self.ui.HWP_negative_step.clicked.connect(self.HWP_negative_step)
+		self.ui.HWP_positive_step.clicked.connect(self.HWP_positive_step)
+
+		self.ui.Pi_X_go.clicked.connect(self.Pi_X_go)
+		self.ui.Pi_Y_go.clicked.connect(self.Pi_Y_go)
+		self.ui.Pi_Z_go.clicked.connect(self.Pi_Z_go)
+		self.ui.Pi_XYZ_50mkm.clicked.connect(self.Pi_XYZ_50mkm)
+
+		self.ui.start3DScan.toggled[bool].connect(self.start3DScan)
+
+		self.ui.startCalibr.toggled[bool].connect(self.startCalibr)
+		self.calibrTimer.timeout.connect(self.onCalibrTimer)
+
+		self.ui.connect_pico.toggled[bool].connect(self.connect_pico)
+		########################################################################
+		########################################################################
+		########################################################################
+		self.pw = pg.PlotWidget(name='PlotMain')  ## giving the plots names allows us to link their axes together
+		#self.ui.plotArea.addWidget(self.pw)
+		self.line0 = self.pw.plot()
+		self.line1 = self.pw.plot(pen=(255,0,0))
+		self.line3 = self.pw.plot(pen=(255,0,255))
+
+		self.pw_preview = pg.PlotWidget(name='preview')  ## giving the plots names allows us to link their axes together
+		self.ui.previewArea.addWidget(self.pw_preview)
+
+		self.line_DAQmx_sig = self.pw_preview.plot(pen=(255,0,0))
+		self.line_DAQmx_sig1 = self.pw_preview.plot(pen=(255,255,0))
+		self.line_DAQmx_ref = self.pw_preview.plot(pen=(255,0,255))
+
+		self.line_pico_ChA = self.pw_preview.plot(pen=(255,215,0))
+		self.line_pico_ChB = self.pw_preview.plot(pen=(0,255,255))
+
+		self.pw1 = pg.PlotWidget(name='Graph1')  ## giving the plots names allows us to link their axes together
+		self.ui.plotArea.addWidget(self.pw1)
+
+		self.line_pmt = self.pw1.plot(pen=(255,215,0))
+		self.line_pmt1 = self.pw1.plot(pen=(0,255,255))
+		self.line_spectra = self.pw1.plot(pen=(0,255,0))
+
+		self.img = pg.ImageView()  ## giving the plots names allows us to link their axes together
+		data = np.zeros((100,100))
+		self.ui.imageArea.addWidget(self.img)
+		self.img.setImage(data)
+
+		self.img1 = pg.ImageView()  ## giving the plots names allows us to link their axes together
+		data = np.zeros((100,100))
+		self.ui.imageArea.addWidget(self.img1)
+		self.img1.setImage(data)
+
+
+	def closeEvent(self, evnt):
+		print('closeEvent')
+		try:
+			self.piStage.CloseConnection()
+		except:
+			traceback.print_exc()
+		try:
+			self.spectrometer.close()
+		except:
+			traceback.print_exc()
+		try:
+			self.HWP.cleanUpAPT()
+		except:
+			traceback.print_exc()
+		try:
+			self.DAQmx.close()
+		except:
+			traceback.print_exc()
+		try:
+			self.ps.close()
+		except:
+			traceback.print_exc()
+
+
+	def setImage(self,data):
+		self.img.setImage(data.T,levels=(data.min(), data.max()))
+		#app.processEvents()
+
+	def setImage1(self,data):
+		self.img1.setImage(data.T,levels=(data.min(), data.max()))
+		#app.processEvents()
+
+
+		#app.processEvents()
 
 
 
@@ -575,6 +661,9 @@ if __name__ == '__main__':
 
 
 	app = QtGui.QApplication(sys.argv)
-	app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+	try:
+		app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+	except RuntimeError:
+		app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt())
 	ex = microV()
 	app.exec_()
