@@ -25,6 +25,7 @@ else:
 	from nidaqmx.constants import AcquisitionType, TaskMode
 	import nidaqmx
 	from picoscope import ps3000a
+	from hardware.AG_UC2 import AG_UC2
 
 #get_ipython().run_line_magic('matplotlib', 'qt')
 
@@ -38,6 +39,7 @@ class microV(QtGui.QMainWindow):
 	piStage = E727()
 	spectrometer = CCS200()
 	HWP = APTMotor(83854487, HWTYPE=31)
+	rotPiezoStage = AG_UC2()
 	#DAQmx = nidaqmx.Task()
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
@@ -45,6 +47,8 @@ class microV(QtGui.QMainWindow):
 	live_integr_spectra = []
 	pico_VRange_dict = {"Auto":20.0,'20 mV':0.02,'50 mV':0.05,'100 mV':0.1,'200 mV':0.2,'500 mV':0.5,
 					'1 V': 1.0, '2 V': 2.0, '5 V': 5.0, '10 V': 10.0, '20 V': 20.0,}
+
+
 	def __init__(self, parent=None):
 		QtGui.QMainWindow.__init__(self, parent)
 		#from mainwindow import Ui_mw
@@ -367,6 +371,48 @@ class microV(QtGui.QMainWindow):
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 		time.sleep(1)
+	def connect_rotPiezoStage(self,state):
+		if state:
+			self.rotPiezoStage.connect()
+		else:
+			self.rotPiezoStage.close()
+	def rotPiezoStage_Go(self):
+		toAngle = self.ui.rotPiezoStage_Step.value()
+		wait = self.ui.rotPiezoStage_wait.isChecked()
+		self.rotPiezoStage.move(toAngle,waitUntilReady=wait)
+		self.ui.rotPiezoStage_Angle.setText(str(self.rotPiezoStage.getAngle()))
+	def polarScan(self):
+		fname = self.ui.scan3D_path.text()+"_polar.txt"
+		with open(fname,'a') as f:
+			f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\n")
+		self.rotPiezoStage.move(360)
+		isMoving = self.rotPiezoStage.isMoving()
+		n = 0
+		while isMoving and self.alive:
+			n = n+1
+			if n>50:
+				isMoving = self.rotPiezoStage.isMoving()
+				n = 0
+			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
+			self.live_pmt.append(pmt_val)
+			self.live_pmt1.append(pmt_val1)
+			self.line_pmt.setData(self.live_pmt)
+			self.line_pmt1.setData(self.live_pmt1)
+			app.processEvents()
+			real_position = [round(p,4) for p in self.piStage.qPOS()]
+			dataSet = real_position +[pmt_val,pmt_val1]# + spectra[spectra_range[0]:spectra_range[1]]
+			#print(dataSet[-1])
+			with open(fname,'a') as f:
+				f.write("\t".join([str(round(i,4)) for i in dataSet])+"\n")
+
+	def scanPolar(self,state):
+		if state:
+			self.alive = True
+			p = Process(target=self.polarScan())
+			p.daemon = True
+			p.start()
+		else: self.alive = False
+
 
 	def initSpectrometer(self):
 		print(self.spectrometer.init())
@@ -434,6 +480,7 @@ class microV(QtGui.QMainWindow):
 
 
 	def scan3D(self):
+		wait = self.ui.Pi_wait.isChecked()
 		path = self.ui.scan3D_path.text()
 		if "_" in path:
 			path = "".join(path.split("_")[:-1])#+"_"+str(round(time.time()))
@@ -450,7 +497,7 @@ class microV(QtGui.QMainWindow):
 			for z in np.arange(z_start,z_end,z_step):
 				if not self.scan3DisAlive: break
 				print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
-				time.sleep(1)
+				time.sleep(0.1)
 
 				fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 				with open(fname,'a') as f:
@@ -492,7 +539,7 @@ class microV(QtGui.QMainWindow):
 						Range_x_tmp = Range_x
 						Range_xi_tmp = Range_xi
 						forward = True
-					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
+					r = self.piStage.MOV(y,axis=2,waitUntilReady=wait)
 					if not r: break
 					self.live_pmt = []
 					self.live_pmt1 = []
@@ -502,7 +549,7 @@ class microV(QtGui.QMainWindow):
 						start=time.time()
 						#print('Start',start)
 						if not self.scan3DisAlive: break
-						r = self.piStage.MOV(x,axis=1,waitUntilReady=True)
+						r = self.piStage.MOV(x,axis=1,waitUntilReady=wait)
 						if not r: break
 						#print(time.time()-start)
 						spectra = np.zeros(3648)#self.getSpectra()
@@ -525,12 +572,10 @@ class microV(QtGui.QMainWindow):
 						self.live_pmt.append(pmt_val)
 						self.live_pmt1.append(pmt_val1)
 						self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
-						if forward:
-							self.line_pmt.setData(self.live_pmt)
-							self.line_pmt1.setData(self.live_pmt1)
-						else:
-							self.line_pmt.setData(self.live_pmt[::-1])
-							self.line_pmt1.setData(self.live_pmt1[::-1])
+
+						self.line_pmt.setData(data_pmt[yi,:])
+						self.line_pmt1.setData(data_pmt1[yi,:])
+
 						#self.line_spectra.setData(self.live_integr_spectra)
 
 						#self.setLine(spectra)
@@ -538,7 +583,8 @@ class microV(QtGui.QMainWindow):
 						self.setUiPiPos(real_position)
 						print("[\t%.5f\t%.5f\t%.5f\t]\t%.5f"%tuple(real_position+[time.time()-start]))
 						app.processEvents()
-						time.sleep(0.01)
+						#time.sleep(0.01)
+						wait = self.ui.Pi_wait.isChecked()
 						#print(time.time()-start)
 					#self.setImage(data_spectra)
 					self.setImage1(data_pmt1)
@@ -576,6 +622,10 @@ class microV(QtGui.QMainWindow):
 		self.ui.Pi_Y_go.clicked.connect(self.Pi_Y_go)
 		self.ui.Pi_Z_go.clicked.connect(self.Pi_Z_go)
 		self.ui.Pi_XYZ_50mkm.clicked.connect(self.Pi_XYZ_50mkm)
+
+		self.ui.connect_rotPiezoStage.toggled[bool].connect(self.connect_rotPiezoStage)
+		self.ui.rotPiezoStage_Go.clicked.connect(self.rotPiezoStage_Go)
+		self.ui.scanPolar.toggled[bool].connect(self.scanPolar)
 
 		self.ui.start3DScan.toggled[bool].connect(self.start3DScan)
 
@@ -640,6 +690,10 @@ class microV(QtGui.QMainWindow):
 			traceback.print_exc()
 		try:
 			self.ps.close()
+		except:
+			traceback.print_exc()
+		try:
+			self.rotPiezoStage.close()
 		except:
 			traceback.print_exc()
 

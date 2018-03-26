@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>4</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -49,6 +49,14 @@
             <number>2</number>
            </property>
            <widget class="QWidget" name="page">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>356</width>
+              <height>457</height>
+             </rect>
+            </property>
             <attribute name="label">
              <string>RotPiezoStage</string>
             </attribute>
@@ -57,6 +65,9 @@
               <widget class="QPushButton" name="connect_rotPiezoStage">
                <property name="text">
                 <string>Connect</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
                </property>
               </widget>
              </item>
@@ -87,6 +98,13 @@
                </property>
               </widget>
              </item>
+             <item row="2" column="1">
+              <widget class="QCheckBox" name="rotPiezoStage_wait">
+               <property name="text">
+                <string>WaitUntilReady</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </widget>
            <widget class="QWidget" name="HWP">
@@ -94,8 +112,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>351</width>
-              <height>420</height>
+              <width>255</width>
+              <height>121</height>
              </rect>
             </property>
             <attribute name="label">
@@ -166,8 +184,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>351</width>
-              <height>420</height>
+              <width>356</width>
+              <height>457</height>
              </rect>
             </property>
             <attribute name="label">
@@ -292,6 +310,13 @@
                </property>
               </widget>
              </item>
+             <item row="4" column="2">
+              <widget class="QCheckBox" name="Pi_wait">
+               <property name="text">
+                <string>Wait</string>
+               </property>
+              </widget>
+             </item>
             </layout>
            </widget>
           </widget>
@@ -313,8 +338,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>389</width>
-              <height>287</height>
+              <width>225</width>
+              <height>122</height>
              </rect>
             </property>
             <attribute name="label">
@@ -418,8 +443,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>389</width>
-              <height>287</height>
+              <width>174</width>
+              <height>70</height>
              </rect>
             </property>
             <attribute name="label">
@@ -460,8 +485,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>351</width>
-              <height>335</height>
+              <width>232</width>
+              <height>217</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1154,6 +1179,22 @@
         <attribute name="title">
          <string>ContScan</string>
         </attribute>
+        <widget class="QPushButton" name="scanPolar">
+         <property name="geometry">
+          <rect>
+           <x>170</x>
+           <y>50</y>
+           <width>75</width>
+           <height>23</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Scan_polar</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
        </widget>
       </widget>
       <widget class="QSplitter" name="splitter_2">
@@ -1185,7 +1226,7 @@
      <x>0</x>
      <y>0</y>
      <width>642</width>
-     <height>34</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
