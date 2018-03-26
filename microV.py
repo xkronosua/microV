@@ -16,6 +16,7 @@ if len(sys.argv)>1:
 		from hardware.sim.E727 import *
 		from hardware.sim.TDC001 import *
 		from hardware.sim.picoscope import ps3000a
+		from hardware.sim.AG_UC2 import AG_UC2
 
 else:
 	from hardware.ni1 import *
@@ -66,6 +67,8 @@ class microV(QtGui.QMainWindow):
 		self.initUI()
 
 		#self.scan_image()
+	############################################################################
+	###############################   DAQmx    #################################
 	def connect_DAQmx(self,state):
 		if state:
 			self.initDAQmx()
@@ -82,20 +85,16 @@ class microV(QtGui.QMainWindow):
 		self.DAQmx.triggers.start_trigger.cfg_anlg_edge_start_trig("Dev1/ai0",trigger_level=1.5)
 
 		#self.DAQmx.configure()
+
 	def readDAQmx(self,preview=False,print_dt=False):
 		start = time.time()
 		with nidaqmx.Task() as master_task:
 			#master_task = nidaqmx.Task()
 			master_task.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
-
 			master_task.timing.cfg_samp_clk_timing(
 				100000, sample_mode=AcquisitionType.FINITE)
-
 			master_task.control(TaskMode.TASK_COMMIT)
-
 			master_task.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
-
-
 			master_task.start()
 			#start = time.time()
 			for i in range(100):
@@ -173,6 +172,9 @@ class microV(QtGui.QMainWindow):
 
 		return m
 
+	############################################################################
+	###############################   Picoscope    #############################
+
 	def connect_pico(self,state):
 		if state:
 			self.initPico()
@@ -181,7 +183,6 @@ class microV(QtGui.QMainWindow):
 				self.ps.close()
 			except:
 				traceback.print_exc()
-
 
 	def initPico(self):
 		self.ps = ps3000a.PS3000a(connect=False)
@@ -207,7 +208,6 @@ class microV(QtGui.QMainWindow):
 								 timeout_ms=5, enabled=True)
 		self.samples_per_segment = self.ps.memorySegments(self.n_captures)
 		self.ps.setNoOfCaptures(self.n_captures)
-
 
 	def readPico(self):
 		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
@@ -268,6 +268,8 @@ class microV(QtGui.QMainWindow):
 
 		return dataA_p2p, dataB_p2p
 
+	############################################################################
+	###############################   HWP    ###################################
 
 	def initHWP(self):
 		pos = self.HWP.getPos()
@@ -294,6 +296,9 @@ class microV(QtGui.QMainWindow):
 		self.HWP.mRel(to_angle)
 		pos = self.HWP.getPos()
 		self.ui.HWP_angle.setText(str(round(pos,6)))
+
+	############################################################################
+	###############################   PiNanoCube    ############################
 
 	def initPiStage(self):
 		print(self.piStage.ConnectUSB())
@@ -331,37 +336,6 @@ class microV(QtGui.QMainWindow):
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
-	def Pi_scanX(self,param,nextFunc,direction=True):
-		range_ = np.arange(param[0],param[1],param[2])
-		if direction:
-			pass
-		else:
-			range_ = range_[::-1]
-		for pos in range_:
-			self.piStage.MOV(pos,axis=1,waitUntilReady=True)
-			nextFunc()
-	def Pi_scanY(self,param,nextFunc,direction=True):
-		range_ = np.arange(param[0],param[1],param[2])
-		if direction:
-			pass
-		else:
-			range_ = range_[::-1]
-		for pos in range_:
-			self.piStage.MOV(pos,axis=2,waitUntilReady=True)
-			nextFunc()
-	def Pi_scanZ(self,param,nextFunc,direction=True):
-		range_ = np.arange(param[0],param[1],param[2])
-		if direction:
-			pass
-		else:
-			range_ = range_[::-1]
-		for pos in range_:
-			self.piStage.MOV(pos,axis=3,waitUntilReady=True)
-			nextFunc()
-	def collectData(self):
-		pmt_val,pmt_val1 = self.readPico()
-		real_position = [round(p,4) for p in self.piStage.qPOS()]
-
 	def Pi_XYZ_50mkm(self):
 		print(self.piStage.MOV(50,axis=1,waitUntilReady=True))
 		time.sleep(0.2)
@@ -371,6 +345,10 @@ class microV(QtGui.QMainWindow):
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 		time.sleep(1)
+
+	############################################################################
+	###############################   rotPiezoStage    #########################
+
 	def connect_rotPiezoStage(self,state):
 		if state:
 			self.rotPiezoStage.connect()
@@ -381,38 +359,9 @@ class microV(QtGui.QMainWindow):
 		wait = self.ui.rotPiezoStage_wait.isChecked()
 		self.rotPiezoStage.move(toAngle,waitUntilReady=wait)
 		self.ui.rotPiezoStage_Angle.setText(str(self.rotPiezoStage.getAngle()))
-	def polarScan(self):
-		fname = self.ui.scan3D_path.text()+"_polar.txt"
-		with open(fname,'a') as f:
-			f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\n")
-		self.rotPiezoStage.move(360)
-		isMoving = self.rotPiezoStage.isMoving()
-		n = 0
-		while isMoving and self.alive:
-			n = n+1
-			if n>50:
-				isMoving = self.rotPiezoStage.isMoving()
-				n = 0
-			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
-			self.live_pmt.append(pmt_val)
-			self.live_pmt1.append(pmt_val1)
-			self.line_pmt.setData(self.live_pmt)
-			self.line_pmt1.setData(self.live_pmt1)
-			app.processEvents()
-			real_position = [round(p,4) for p in self.piStage.qPOS()]
-			dataSet = real_position +[pmt_val,pmt_val1]# + spectra[spectra_range[0]:spectra_range[1]]
-			#print(dataSet[-1])
-			with open(fname,'a') as f:
-				f.write("\t".join([str(round(i,4)) for i in dataSet])+"\n")
 
-	def scanPolar(self,state):
-		if state:
-			self.alive = True
-			p = Process(target=self.polarScan())
-			p.daemon = True
-			p.start()
-		else: self.alive = False
-
+	############################################################################
+	###############################   Spectrometer    ##########################
 
 	def initSpectrometer(self):
 		print(self.spectrometer.init())
@@ -426,8 +375,13 @@ class microV(QtGui.QMainWindow):
 		data = self.spectrometer.getScanData()
 		return data
 
+	############################################################################
+	###############################   scan3D    ################################
+
 	def scan3D_path_dialog(self):
 		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.scan3D_path.text())
+		if type(fname)==tuple:
+			fname = fname[0]
 		try:
 			self.ui.scan3D_path.setText(fname)
 		except:
@@ -462,12 +416,12 @@ class microV(QtGui.QMainWindow):
 		self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
 		app.processEvents()
 
-
-
 	def start3DScan(self, state):
 		print(state)
 		if state:
 			try:
+				self.live_pmt = []
+				self.live_pmt1 = []
 				self.scan3DisAlive = True
 				p = Process(target=self.scan3D())
 				p.daemon = True
@@ -476,8 +430,9 @@ class microV(QtGui.QMainWindow):
 			except AttributeError:
 				traceback.print_exc()
 		else:
+			self.live_pmt = []
+			self.live_pmt1 = []
 			self.scan3DisAlive = False
-
 
 	def scan3D(self):
 		wait = self.ui.Pi_wait.isChecked()
@@ -603,8 +558,135 @@ class microV(QtGui.QMainWindow):
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
+
+	############################################################################
+	###############################   scan3D    ################################
+
+	def scan1D_filePath_find(self):
+		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.scan1D_filePath.text())
+		if type(fname)==tuple:
+			fname = fname[0]
+		try:
+			self.ui.scan1D_filePath.setText(fname)
+		except:
+			traceback.print_exc()
+
+	def polarScan(self):
+		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
+		with open(fname,'a') as f:
+			f.write("#X\tY\tZ\tHWP\tpmt_signal\tpmt1_signal\ttime\n")
+		self.rotPiezoStage.move(self.ui.scanPolar_angle.value())
+		isMoving = self.rotPiezoStage.isMoving()
+		n = 0
+		while isMoving and self.alive:
+			print(n)
+			n = n+1
+			if n>50:
+				isMoving = self.rotPiezoStage.isMoving()
+				n = 0
+			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
+			self.live_pmt.append(pmt_val)
+			self.live_pmt1.append(pmt_val1)
+			self.line_pmt.setData(self.live_pmt)
+			self.line_pmt1.setData(self.live_pmt1)
+			app.processEvents()
+			real_position = [round(p,4) for p in self.piStage.qPOS()]
+			HWP_angle = float(self.ui.HWP_angle.text())
+
+			dataSet = real_position +[HWP_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
+			#print(dataSet[-1])
+			with open(fname,'a') as f:
+				f.write("\t".join([str(round(i,6)) for i in dataSet])+"\n")
+			print(n)
+		self.ui.scanPolar.setChecked(False)
+
+	def scanPolar(self,state):
+		if state:
+			print(state)
+			self.live_pmt = []
+			self.live_pmt1 = []
+			self.alive = True
+			p = Process(target=self.polarScan())
+			p.daemon = True
+			p.start()
+		else:
+			self.live_pmt = []
+			self.live_pmt1 = []
+			self.alive = False
+			self.rotPiezoStage.stop()
+
+	def scan1D(self):
+		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
+		with open(fname,'a') as f:
+			f.write("#X\tY\tZ\tHWP\tpmt_signal\tpmt1_signal\ttime\n")
+		axis = self.ui.scan1D_axis.currentText()
+		move_function = None
+		if axis == "X":
+			move_function = lambda pos: self.piStage.MOV(pos,axis=1,waitUntilReady=True)
+		elif axis == "Y":
+			move_function = lambda pos: self.piStage.MOV(pos,axis=2,waitUntilReady=True)
+		elif axis == "Z":
+			move_function = lambda pos: self.piStage.MOV(pos,axis=3,waitUntilReady=True)
+		elif axis == 'HWP':
+			def move_function(pos):
+				self.HWP.mAbs(pos)
+				pos = self.HWP.getPos()
+				self.ui.HWP_angle.setText(str(round(pos,6)))
+
+		steps_range = np.arange(self.ui.scan1D_start.value(),
+								self.ui.scan1D_end.value(),
+								self.ui.scan1D_step.value())
+		for new_pos in steps_range:
+			if not self.alive: break
+			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
+
+			real_position = [round(p,4) for p in self.piStage.qPOS()]
+			HWP_angle = float(self.ui.HWP_angle.text())
+			if axis == 'X':
+				x = real_position[0]
+			if axis == 'Y':
+				x = real_position[1]
+			if axis == 'Z':
+				x = real_position[2]
+			if axis == 'HWP':
+				x = HWP_angle
+
+			self.live_pmt.append([x,pmt_val])
+			self.live_pmt1.append([x,pmt_val1])
+			X,Y = np.array(self.live_pmt).T
+			self.line_pmt.setData(x=X,y=Y)
+			X,Y = np.array(self.live_pmt1).T
+			self.line_pmt1.setData(x=X,y=Y)
+			app.processEvents()
+			dataSet = real_position +[HWP_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
+			#print(dataSet[-1])
+			with open(fname,'a') as f:
+				f.write("\t".join([str(round(i,6)) for i in dataSet])+"\n")
+			move_function(new_pos)
+		self.ui.scan1D_Scan.setChecked(False)
+
+	def scan1D_Scan(self,state):
+		if state:
+			self.live_pmt = []
+			self.live_pmt1 = []
+			self.alive = True
+			p = Process(target=self.scan1D())
+			p.daemon = True
+			p.start()
+		else:
+			self.live_pmt = []
+			self.live_pmt1 = []
+			self.alive = False
+			#self.rotPiezoStage.stop()
+
+	############################################################################
+	##########################   Ui   ##########################################
 	def initUI(self):
 		self.ui.actionExit.toggled.connect(self.closeEvent)
+
+		self.ui.scan1D_filePath_find.clicked.connect(self.scan1D_filePath_find)
+
+
 
 		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
 
@@ -625,7 +707,10 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.connect_rotPiezoStage.toggled[bool].connect(self.connect_rotPiezoStage)
 		self.ui.rotPiezoStage_Go.clicked.connect(self.rotPiezoStage_Go)
+
 		self.ui.scanPolar.toggled[bool].connect(self.scanPolar)
+
+		self.ui.scan1D_Scan.toggled[bool].connect(self.scan1D_Scan)
 
 		self.ui.start3DScan.toggled[bool].connect(self.start3DScan)
 
