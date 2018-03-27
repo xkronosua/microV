@@ -24,7 +24,7 @@ p.setLabel('bottom', 'Index', units='B')
 curveA = p.plot(pen=(255,0,0))
 curveB = p.plot(pen=(0,255,0))
 curves=[]
-n_captures = 10
+n_captures = 100
 for i in range(n_captures):
 	curves.append(p.plot())
 
@@ -36,7 +36,7 @@ for i in range(n_captures):
 ps = ps3000a.PS3000a(connect=False)
 ps.open()
 n_captures = 100
-ps.setChannel("A", coupling="DC", VRange=0.2)
+ps.setChannel("A", coupling="DC", VRange=0.1)
 ps.setChannel("B", coupling="DC", VRange=0.1)
 ps.setSamplingInterval(200e-9,15e-6)
 ps.setSimpleTrigger(trigSrc="External", threshold_V=0.020, direction='Rising',
@@ -49,37 +49,44 @@ dataA = []
 dataB = []
 liveA = []
 liveB = []
-
+tmp_data = []
 def update():
-	global dataA, liveA,dataB, liveB
-	dataA = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
-	dataB = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
-	t1 = time.time()
-	ps.runBlock()
-	ps.waitReady()
-	t2 = time.time()
-	print("Time to get sweep: " + str(t2 - t1))
-	ps.getDataRawBulk(channel='A',data=dataA)
-	ps.getDataRawBulk(channel='B',data=dataB)
-	t3 = time.time()
-	print("Time to read data: " + str(t3 - t2))
-	dataA=dataA[:, 0:ps.noSamples].mean(axis=0)
-	dataB=dataB[:, 0:ps.noSamples].mean(axis=0)
-	#if dataA.min()>-100 :
-	#	ps.setChannel("A", coupling="DC", VRange=2)
-	#print (data.shape)
-	if mode == 'scope':
-		curveA.setData(dataA)
-		curveB.setData(dataB)
-	elif mode == "live":
-		liveA.append(dataA.max()-dataA.min())
-		curveA.setData(liveA)
-		liveB.append(dataB.max()-dataB.min())
-		curveB.setData(liveB)
-	#for i in range(len(data)):
-	#	curves[i].setData(data[i,:])
-	app.processEvents()  ## force complete redraw for every plot
-	#time.sleep(1)
+	try:
+		global dataA, liveA,dataB, liveB, tmp_data
+		dataA = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
+		dataB = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
+		tmp_data = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
+		t1 = time.time()
+		ps.runBlock()
+		#time.sleep(3)
+		ps.waitReady()
+		t2 = time.time()
+		print("Time to get sweep: " + str(t2 - t1))
+		ps.getDataRawBulk(channel='A',data=dataA)
+		ps.getDataRawBulk(channel='B',data=dataB)
+		t3 = time.time()
+		tmp_data = dataA.copy()
+		print("Time to read data: " + str(t3 - t2))
+		dataA=dataA[:, 0:ps.noSamples].mean(axis=0)
+		dataB=dataB[:, 0:ps.noSamples].mean(axis=0)
+		#if dataA.min()>-100 :
+		#	ps.setChannel("A", coupling="DC", VRange=2)
+		#print (data.shape)
+		if mode == 'scope':
+			curveA.setData(dataA)
+			curveB.setData(dataB)
+		elif mode == "live":
+			liveA.append(dataA.max()-dataA.min())
+			curveA.setData(liveA)
+			liveB.append(dataB.max()-dataB.min())
+			curveB.setData(liveB)
+		#for i in range(len(data)):
+		#	curves[i].setData(data[i,:])
+		app.processEvents()  ## force complete redraw for every plot
+		#time.sleep(1)
+	except:
+		ps.close()
+		timer.stop()
 timer = QtCore.QTimer()
 timer.timeout.connect(update)
 timer.start(0)

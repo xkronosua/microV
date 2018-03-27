@@ -3,11 +3,11 @@ import ctypes# give location of dll
 from ctypes import c_int, c_bool, c_void_p, c_float, c_double, c_char, c_char_p, c_ulong, byref, create_string_buffer
 import time, re, os, sys
 
-"""  Открыть Com-порт 
-function SMD_OpenComPort(AComNmbr: integer): boolean; stdcall; 
-Функция открывает COM-порт, и устанавливает заданный номер порта. 
-Вход:  AComNmbr - номер COM-порта. Целое число > 0. 
-Выход:  TRUE – если операция выполнена, FALSE – еслиимеются ошибки. 
+"""  Открыть Com-порт
+function SMD_OpenComPort(AComNmbr: integer): boolean; stdcall;
+Функция открывает COM-порт, и устанавливает заданный номер порта.
+Вход:  AComNmbr - номер COM-порта. Целое число > 0.
+Выход:  TRUE – если операция выполнена, FALSE – еслиимеются ошибки.
 """
 
 class E727():
@@ -26,7 +26,7 @@ class E727():
 		#print(self.libDLL)
 		PI_EnumerateUSB = self.libDLL['PI_EnumerateUSB']
 		PI_EnumerateUSB.argtypes = (c_char_p,c_int,c_char_p)
-		c=create_string_buffer(len(b"PI E-727"),b"PI E-727")	
+		c=create_string_buffer(len(b"PI E-727"),b"PI E-727")
 		r = PI_EnumerateUSB(self.szUsbController, 1024, c)
 		print(c.value,r,self.szUsbController.value)
 		usb_id = self.szUsbController.value.split(b'\n')
@@ -39,7 +39,7 @@ class E727():
 
 		print("#",self.szUsbController.value)
 		return self.szUsbController.value
-	
+
 	def ConnectUSB(self):
 		#/////////////////////////////////////////
 		#// connect to the controller over USB. //
@@ -110,15 +110,14 @@ class E727():
 		return self.szAxes#.value
 
 	def SVO(self):
-		
+		bFlags = (c_bool*3)()
+		bFlags[0] = c_bool(True)
+		bFlags[1] = c_bool(True)
+		bFlags[2] = c_bool(True)
+		PI_SVO = self.libDLL['PI_SVO']
+		PI_SVO.argtypes = (c_int,c_char_p, ctypes.POINTER(c_bool))
+		PI_SVO.restype = c_bool
 		for axis in range(1,4):
-			bFlags = (c_bool*3)()
-			bFlags[0] = c_bool(True)
-			bFlags[1] = c_bool(True)
-			bFlags[2] = c_bool(True)
-			PI_SVO = self.libDLL['PI_SVO']
-			PI_SVO.argtypes = (c_int,c_char_p, ctypes.POINTER(c_bool))
-			PI_SVO.restype = c_bool
 			r = PI_SVO(self.ID, str(axis).encode(), bFlags)
 			if not r:
 				iError = self.GetError()
@@ -129,13 +128,41 @@ class E727():
 				pass
 		return r
 
+	'''
+	BOOL PI_ATC (int ID, const int* piChannels, const int* piValueArray, int iArraySize)
+Automatic calibration
+32
+BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const BOOL* pbUseDefaultArray )
+	'''
+	def ATZ(self):
+		pdLowVoltageArray = (c_double*3)()
+		PI_ATZ = self.libDLL['PI_ATZ']
+		PI_ATZ.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double),ctypes.POINTER(c_bool))
+		PI_ATZ.restype = c_bool
+		res = 0
+		print('PI_ATZ')
+		r = PI_ATZ(self.ID, b'', pdLowVoltageArray,c_bool(True))
+		time.sleep(5)
+		iError = self.GetError()
+		k = 0
+		while iError==61:
+			print('ATZ',iError)
+			iError = self.GetError()
+			time.sleep(0.5)
+			k+=1
+			if k==1000:
+				self.CloseConnection()
+				break
+		print('PI_ATZ:Done')
+		return r
+
 	def MOV(self, dPos,axis=1, waitUntilReady=False):
-		
+
 		PI_MOV = self.libDLL['PI_MOV']
 		PI_MOV.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
 		PI_MOV.restype = c_bool
 		dPos_ = c_double(dPos)
-		
+
 		r = PI_MOV(self.ID, str(axis).encode(), dPos_)
 		if not r:
 			iError = self.GetError()
@@ -184,11 +211,12 @@ class E727():
 		return [v for v in val]
 
 if __name__ == "__main__":
-	e = E727()	
+	e = E727()
 	print(e.ConnectUSBWithBaudRate())
 	print(e.qSAI())
 	print(e.SVO())
 	time.sleep(5)
+	print(e.ATZ())
 	print('X')
 	print(e.MOV(100,axis=1, waitUntilReady=True))
 	print(e.qPOS())
@@ -204,5 +232,7 @@ if __name__ == "__main__":
 	print(e.qPOS())
 	print(e.MOV(0,axis=3, waitUntilReady=True))
 	print(e.qPOS())
-	
+	print(e.MOV(65,axis=1, waitUntilReady=True))
+	print(e.MOV(40,axis=2, waitUntilReady=True))
+	print(e.MOV(40,axis=3, waitUntilReady=True))
 	print(e.CloseConnection())
