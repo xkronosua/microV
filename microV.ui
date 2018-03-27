@@ -20,7 +20,7 @@
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QTabWidget" name="tabWidget">
+      <widget class="QTabWidget" name="configTabWidget">
        <property name="maximumSize">
         <size>
          <width>400</width>
@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>4</number>
+        <number>2</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -1395,7 +1395,7 @@
   </action>
  </widget>
  <tabstops>
-  <tabstop>tabWidget</tabstop>
+  <tabstop>configTabWidget</tabstop>
   <tabstop>Pi_X_On</tabstop>
   <tabstop>Pi_X_move_to</tabstop>
   <tabstop>Pi_X_go</tabstop>

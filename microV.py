@@ -68,7 +68,7 @@ class microV(QtGui.QMainWindow):
 
 		#self.scan_image()
 	############################################################################
-	###############################   DAQmx    #################################
+	###############################   DAQmx	#################################
 	def connect_DAQmx(self,state):
 		if state:
 			self.initDAQmx()
@@ -173,7 +173,7 @@ class microV(QtGui.QMainWindow):
 		return m
 
 	############################################################################
-	###############################   Picoscope    #############################
+	###############################   Picoscope	#############################
 
 	def connect_pico(self,state):
 		if state:
@@ -269,7 +269,7 @@ class microV(QtGui.QMainWindow):
 		return dataA_p2p, dataB_p2p
 
 	############################################################################
-	###############################   HWP    ###################################
+	###############################   HWP	###################################
 
 	def initHWP(self):
 		pos = self.HWP.getPos()
@@ -298,7 +298,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.HWP_angle.setText(str(round(pos,6)))
 
 	############################################################################
-	###############################   PiNanoCube    ############################
+	###############################   PiNanoCube	############################
 
 	def initPiStage(self):
 		print(self.piStage.ConnectUSB())
@@ -347,7 +347,7 @@ class microV(QtGui.QMainWindow):
 		time.sleep(1)
 
 	############################################################################
-	###############################   rotPiezoStage    #########################
+	###############################   rotPiezoStage	#########################
 
 	def connect_rotPiezoStage(self,state):
 		if state:
@@ -361,7 +361,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.rotPiezoStage_Angle.setText(str(self.rotPiezoStage.getAngle()))
 
 	############################################################################
-	###############################   Spectrometer    ##########################
+	###############################   Spectrometer	##########################
 
 	def initSpectrometer(self):
 		print(self.spectrometer.init())
@@ -376,7 +376,7 @@ class microV(QtGui.QMainWindow):
 		return data
 
 	############################################################################
-	###############################   scan3D    ################################
+	###############################   scan3D	################################
 
 	def scan3D_path_dialog(self):
 		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.scan3D_path.text())
@@ -448,11 +448,29 @@ class microV(QtGui.QMainWindow):
 			z_start = float(self.ui.scan3D_config.item(0,1).text())
 			z_end = float(self.ui.scan3D_config.item(0,2).text())
 			z_step = float(self.ui.scan3D_config.item(0,3).text())
+			Range_z = np.arange(z_start,z_end,z_step)
+			Range_zi = np.arange(len(Range_z))
+			y_start = float(self.ui.scan3D_config.item(1,1).text())
+			y_end = float(self.ui.scan3D_config.item(1,2).text())
+			y_step = float(self.ui.scan3D_config.item(1,3).text())
 
-			for z in np.arange(z_start,z_end,z_step):
+			Range_y = np.arange(y_start,y_end,y_step)
+			Range_yi = np.arange(len(Range_y))
+
+
+			x_start = float(self.ui.scan3D_config.item(2,1).text())
+			x_end = float(self.ui.scan3D_config.item(2,2).text())
+			x_step = float(self.ui.scan3D_config.item(2,3).text())
+
+			Range_x = np.arange(x_start,x_end,x_step)
+			Range_xi = np.arange(len(Range_x))
+			data_pmt = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+			data_pmt1 = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+			layerIndex = 0
+			for z,zi in zip(Range_z,Range_zi):
 				if not self.scan3DisAlive: break
 				print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
-				time.sleep(0.1)
+				#time.sleep(0.1)
 
 				fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 				with open(fname,'a') as f:
@@ -462,25 +480,8 @@ class microV(QtGui.QMainWindow):
 
 
 
-
-				y_start = float(self.ui.scan3D_config.item(1,1).text())
-				y_end = float(self.ui.scan3D_config.item(1,2).text())
-				y_step = float(self.ui.scan3D_config.item(1,3).text())
-
-				Range_y = np.arange(y_start,y_end,y_step)
-				Range_yi = np.arange(len(Range_y))
-
-
-				x_start = float(self.ui.scan3D_config.item(2,1).text())
-				x_end = float(self.ui.scan3D_config.item(2,2).text())
-				x_step = float(self.ui.scan3D_config.item(2,3).text())
-
-				Range_x = np.arange(x_start,x_end,x_step)
-				Range_xi = np.arange(len(Range_x))
-
 				data_spectra = np.zeros((len(Range_yi),len(Range_xi)))
-				data_pmt = np.zeros((len(Range_yi),len(Range_xi)))
-				data_pmt1 = np.zeros((len(Range_yi),len(Range_xi)))
+
 
 				forward = True
 				for y,yi in zip(Range_y,Range_yi):
@@ -522,14 +523,14 @@ class microV(QtGui.QMainWindow):
 						s_to = self.ui.usbSpectr_to.value()
 						#print(data_spectra.shape,yi,xi)
 						data_spectra[yi,xi] = np.sum(spectra[s_from:s_to])
-						data_pmt[yi,xi] = pmt_val
-						data_pmt1[yi,xi] = pmt_val1
+						data_pmt[zi,xi,yi] = pmt_val
+						data_pmt1[zi,xi,yi] = pmt_val1
 						self.live_pmt.append(pmt_val)
 						self.live_pmt1.append(pmt_val1)
 						self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
 
-						self.line_pmt.setData(data_pmt[yi,:])
-						self.line_pmt1.setData(data_pmt1[yi,:])
+						self.line_pmt.setData(data_pmt[zi,:,yi])
+						self.line_pmt1.setData(data_pmt1[zi,:,yi])
 
 						#self.line_spectra.setData(self.live_integr_spectra)
 
@@ -542,16 +543,23 @@ class microV(QtGui.QMainWindow):
 						wait = self.ui.Pi_wait.isChecked()
 						#print(time.time()-start)
 					#self.setImage(data_spectra)
-					self.setImage1(data_pmt1)
-					self.setImage(data_pmt)
+
+					self.img.setImage(data_pmt,pos=(Range_x.min(),Range_y.min()),
+					scale=(x_step,y_step),xvals=Range_z)
+					self.img1.setImage(data_pmt1,pos=(Range_x.min(),Range_y.min()),
+					scale=(x_step,y_step),xvals=Range_z)
+					self.img.setCurrentIndex(layerIndex)
+					self.img1.setCurrentIndex(layerIndex)
 
 				#scipy.misc.toimage(data_spectra).save(fname+".png")
-				scipy.misc.toimage(data_pmt1).save(fname+"_pmt1.png")
-				scipy.misc.toimage(data_pmt).save(fname+"_pmt.png")
+				scipy.misc.toimage(data_pmt1[zi,:,:]).save(fname+"_pmt1.png")
+				scipy.misc.toimage(data_pmt[zi,:,:]).save(fname+"_pmt.png")
+				layerIndex+=1
+
 		except KeyboardInterrupt:
 			#scipy.misc.toimage(data_spectra).save(fname+".png")
-			scipy.misc.toimage(data_pmt).save(fname+"_pmt.png")
-			scipy.misc.toimage(data_pmt1).save(fname+"_pmt1.png")
+			scipy.misc.toimage(data_pmt[zi,:,:]).save(fname+"_pmt.png")
+			scipy.misc.toimage(data_pmt1[zi,:,:]).save(fname+"_pmt1.png")
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
@@ -560,7 +568,7 @@ class microV(QtGui.QMainWindow):
 		#print(self.piStage.CloseConnection())
 
 	############################################################################
-	###############################   scan3D    ################################
+	###############################   scan3D	################################
 
 	def scan1D_filePath_find(self):
 		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.scan1D_filePath.text())
@@ -721,6 +729,16 @@ class microV(QtGui.QMainWindow):
 		########################################################################
 		########################################################################
 		########################################################################
+
+		self.tabColors = {
+			0: 'green',
+			1: 'red',
+			2: 'wine',
+			3: 'orange',
+			4: 'blue',
+		}
+		self.ui.configTabWidget.tabBar().currentChanged.connect(self.styleTabs)
+
 		self.pw = pg.PlotWidget(name='PlotMain')  ## giving the plots names allows us to link their axes together
 		#self.ui.plotArea.addWidget(self.pw)
 		self.line0 = self.pw.plot()
@@ -748,12 +766,28 @@ class microV(QtGui.QMainWindow):
 		data = np.zeros((100,100))
 		self.ui.imageArea.addWidget(self.img)
 		self.img.setImage(data)
+		colors = [(0, 0, 0),(255, 214, 112)]
+		cmap = pg.ColorMap(pos=[0.,1.], color=colors)
+		self.img.setColorMap(cmap)
+		g = pg.GridItem()
+		self.img.addItem(g)
 
 		self.img1 = pg.ImageView()  ## giving the plots names allows us to link their axes together
 		data = np.zeros((100,100))
 		self.ui.imageArea.addWidget(self.img1)
 		self.img1.setImage(data)
+		colors = [(0, 0, 0),(204, 255, 255)]
+		cmap = pg.ColorMap(pos=[0.,1.], color=colors)
+		self.img1.setColorMap(cmap)
+		g1 = pg.GridItem()
+		self.img1.addItem(g1)
+		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
 
+	def styleTabs(self, index):
+		self.ui.configTabWidget.setStyleSheet('''
+			QTabBar::tab {{}}
+			QTabBar::tab:selected {{background-color: {color};}}
+			'''.format(color=self.tabColors[index]))
 
 	def closeEvent(self, evnt):
 		print('closeEvent')
