@@ -8,6 +8,7 @@ from scipy.signal import medfilt
 from scipy.signal import argrelextrema
 import scipy.misc
 import matplotlib
+from skimage.external.tifffile import imsave
 
 if len(sys.argv)>1:
 	if sys.argv[1] == 'sim':
@@ -27,6 +28,7 @@ else:
 	import nidaqmx
 	from picoscope import ps3000a
 	from hardware.AG_UC2 import AG_UC2
+	from hardware.pico_radar import fastScan
 
 #get_ipython().run_line_magic('matplotlib', 'qt')
 
@@ -41,6 +43,7 @@ class microV(QtGui.QMainWindow):
 	spectrometer = CCS200()
 	HWP = APTMotor(83854487, HWTYPE=31)
 	rotPiezoStage = AG_UC2()
+	ps = ps3000a.PS3000a(connect=False)
 	#DAQmx = nidaqmx.Task()
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
@@ -185,7 +188,7 @@ class microV(QtGui.QMainWindow):
 				traceback.print_exc()
 
 	def initPico(self):
-		self.ps = ps3000a.PS3000a(connect=False)
+
 		self.ps.open()
 		self.n_captures = self.ui.pico_n_captures.value()
 
@@ -345,6 +348,10 @@ class microV(QtGui.QMainWindow):
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 		time.sleep(1)
+	def Pi_autoZero(self):
+		print(self.piStage.ATZ())
+		pos = self.piStage.qPOS()
+		self.setUiPiPos(pos=pos)
 
 	############################################################################
 	###############################   rotPiezoStage	#########################
@@ -551,21 +558,77 @@ class microV(QtGui.QMainWindow):
 					self.img.setCurrentIndex(layerIndex)
 					self.img1.setCurrentIndex(layerIndex)
 
-				#scipy.misc.toimage(data_spectra).save(fname+".png")
-				scipy.misc.toimage(data_pmt1[zi,:,:]).save(fname+"_pmt1.png")
-				scipy.misc.toimage(data_pmt[zi,:,:]).save(fname+"_pmt.png")
+
+
+				#imsave(fname+"_pmt.tif",data_pmt1.astype(np.int16))
+				#imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int16))
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			#scipy.misc.toimage(data_spectra).save(fname+".png")
-			scipy.misc.toimage(data_pmt[zi,:,:]).save(fname+"_pmt.png")
-			scipy.misc.toimage(data_pmt1[zi,:,:]).save(fname+"_pmt1.png")
+			data_pmt = data_pmt.astype(np.int16)
+			data_pmt1 = data_pmt1.astype(np.int16)
+			imsave(fname+"_pmt.tif",data_pmt)
+			imsave(fname+"_pmt1.tif",data_pmt1)
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 		self.ui.start3DScan.setChecked(False)
+		data_pmt = data_pmt.astype(np.int32)
+		data_pmt1 = data_pmt1.astype(np.int32)
+		print(data_pmt.shape,type(data_pmt))
+		imsave(fname+"_pmt.tif",data_pmt)
+		imsave(fname+"_pmt1.tif",data_pmt1)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
+	def start_fast3DScan(self,state):
+		if state:
+			self.fast3DScan_process = Process(target=self.fast3DScan())
+			self.fast3DScan_process.daemon = True
+			self.fast3DScan_process.start()
+			self.ui.fast3DScan.setChecked(False)
+		else:
+			self.fast3DScan_process.terminate()
+
+
+	def fast3DScan(self):
+		z_start = float(self.ui.scan3D_config.item(0,1).text())
+		z_end = float(self.ui.scan3D_config.item(0,2).text())
+		z_step = float(self.ui.scan3D_config.item(0,3).text())
+		Range_z = np.arange(z_start,z_end,z_step)
+
+		y_start = float(self.ui.scan3D_config.item(1,1).text())
+		y_end = float(self.ui.scan3D_config.item(1,2).text())
+		y_step = float(self.ui.scan3D_config.item(1,3).text())
+
+		Range_y = np.arange(y_start,y_end,y_step)
+
+
+
+		x_start = float(self.ui.scan3D_config.item(2,1).text())
+		x_end = float(self.ui.scan3D_config.item(2,2).text())
+		x_step = float(self.ui.scan3D_config.item(2,3).text())
+
+		Range_x = np.arange(x_start,x_end,x_step)
+
+		start0=time.time()
+		data_pmt,data_pmt1=fastScan(self.piStage,self.ps,x_range=Range_x,y_range=Range_y,z_range=Range_z)
+		print('TotalTime:',time.time()-start0)
+		self.img.setImage(data_pmt,pos=(Range_x.min(),Range_y.min()),
+		scale=(x_step,y_step),xvals=Range_z)
+		self.img1.setImage(data_pmt1,pos=(Range_x.min(),Range_y.min()),
+		scale=(x_step,y_step),xvals=Range_z)
+		path = self.ui.scan3D_path.text()
+		if "_" in path:
+			path = "".join(path.split("_")[:-1])#+"_"+str(round(time.time()))
+		else:
+			path = path #+ "_"+str(round(time.time()))
+		t = round(time.time())
+		print(data_pmt.shape,type(data_pmt))
+		imsave(path+"_fastScan_"+str(t)+'.tif',data_pmt)
+		imsave(path+"_fastScan1_"+str(t)+'.tif',data_pmt1)
+		self.ps.close()
+		self.initPico()
+
 
 	############################################################################
 	###############################   scan3D	################################
@@ -712,6 +775,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.Pi_Y_go.clicked.connect(self.Pi_Y_go)
 		self.ui.Pi_Z_go.clicked.connect(self.Pi_Z_go)
 		self.ui.Pi_XYZ_50mkm.clicked.connect(self.Pi_XYZ_50mkm)
+		self.ui.Pi_autoZero.clicked.connect(self.Pi_autoZero)
 
 		self.ui.connect_rotPiezoStage.toggled[bool].connect(self.connect_rotPiezoStage)
 		self.ui.rotPiezoStage_Go.clicked.connect(self.rotPiezoStage_Go)
@@ -721,6 +785,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.scan1D_Scan.toggled[bool].connect(self.scan1D_Scan)
 
 		self.ui.start3DScan.toggled[bool].connect(self.start3DScan)
+
+		self.ui.fast3DScan.toggled[bool].connect(self.start_fast3DScan)
 
 		self.ui.startCalibr.toggled[bool].connect(self.startCalibr)
 		self.calibrTimer.timeout.connect(self.onCalibrTimer)
