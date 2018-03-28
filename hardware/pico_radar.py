@@ -5,13 +5,13 @@ import time
 import sys
 from scipy.signal import resample
 from picoscope import ps3000a
-from multiprocessing import Process
-
-get_ipython().run_line_magic('matplotlib', 'qt')
+from multiprocessing import Process, Queue
 
 
 
-def fastScan(piStage,ps,x_range=np.arange(0,100,1),y_range=np.arange(0,100,1),z_range=np.arange(0,100,1),q=None):
+
+
+def fastScan(piStage,ps,x_range=np.arange(0,100,1),y_range=np.arange(0,100,1),z_range=np.arange(0,100,1),q=Queue()):
 	n_captures = 710
 	direction = True
 	piStage.MOV(x_range.min(),axis=1, waitUntilReady=True)
@@ -24,7 +24,7 @@ def fastScan(piStage,ps,x_range=np.arange(0,100,1),y_range=np.arange(0,100,1),z_
 	piStage.MOV(x_range.min(),axis=1, waitUntilReady=True)
 	t2=time.time()
 	dt = mean([t2-t1,t1-t0])
-	k = dt/0.08
+	k = dt/0.06
 	n_captures = int(n_captures*k)
 	samples_per_segment = ps.memorySegments(n_captures)
 	ps.setNoOfCaptures(n_captures)
@@ -41,27 +41,29 @@ def fastScan(piStage,ps,x_range=np.arange(0,100,1),y_range=np.arange(0,100,1),z_
 			t_start = time.time()
 			dataA = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
 			dataB = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
-			tmp_data = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
 
 			for y in y_range:
 				t1 = time.time()
 				piStage.MOV(y,axis=2, waitUntilReady=True)
-				ps.runBlock()
 				t2 = time.time()
+				ps.runBlock()
+				t3 = time.time()
 				if direction:
 					piStage.MOV(x_range.max(),axis=1, waitUntilReady=True)
 				else:
 					piStage.MOV(x_range.min(),axis=1, waitUntilReady=True)
-				t3 = time.time()
+				t4 = time.time()
 				ps.waitReady()
+				t5 = time.time()
+				k = (t4-t3)/(t5-t2)
 				#print("Time to get sweep: " + str(t2 - t1))
 				ps.getDataRawBulk(channel='A',data=dataA)
 				ps.getDataRawBulk(channel='B',data=dataB)
-				t4 = time.time()
+				t6 = time.time()
 				#tmp_data = dataA.copy()
 				#print("Time to read data: " + str(t3 - t2))
-				dataA1=dataA[:, 0:ps.noSamples]
-				dataB1=dataB[:, 0:ps.noSamples]
+				dataA1=dataA[:int(len(dataA)*k), 0:ps.noSamples]
+				dataB1=dataB[:int(len(dataB)*k), 0:ps.noSamples]
 
 				scanA = abs(dataA1.max(axis=1) - dataA1.min(axis=1))
 				scanB = abs(dataB1.max(axis=1) - dataB1.min(axis=1))
@@ -77,8 +79,8 @@ def fastScan(piStage,ps,x_range=np.arange(0,100,1),y_range=np.arange(0,100,1),z_
 					dataxyB.append(scanB[::-1])
 					direction = True
 				#t_list.append(time.time()-t_start)
-				t5 = time.time()
-				print('Y',y,time.time()-t5,t5-t4,t4-t3,t3-t2,t2-t1)
+				t7 = time.time()
+				print('\tZ: %.3f\tY: %.3f\tk: %.3f'%(z,y,k))#time.time()-t5,t5-t4,t4-t3,t3-t2,t2-t1)
 			print("xyScan:", time.time()-t_start)
 			t_start = time.time()
 			data_out.append([np.array(dataxyA).T[::-1][::-1],np.array(dataxyB).T[::-1][::-1]])
@@ -93,12 +95,12 @@ def fastScan(piStage,ps,x_range=np.arange(0,100,1),y_range=np.arange(0,100,1),z_
 		dataB_out.append(d[1])
 	a = np.array(dataA_out,dtype=np.int16)
 	b = np.array(dataB_out,dtype=np.int16)
-	if not q is None:
-		q.put((a,b))
+	q.put((a,b))
 	return a,b
 
 
 if __name__=='__main__':
+	get_ipython().run_line_magic('matplotlib', 'qt')
 	from skimage.external.tifffile import imsave
 	from E727 import *
 	import traceback

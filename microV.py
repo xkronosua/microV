@@ -28,12 +28,12 @@ else:
 	import nidaqmx
 	from picoscope import ps3000a
 	from hardware.AG_UC2 import AG_UC2
-	from hardware.pico_radar import fastScan
+from hardware.pico_radar import fastScan
 
 #get_ipython().run_line_magic('matplotlib', 'qt')
 
 import traceback
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 
 
 class microV(QtGui.QMainWindow):
@@ -52,7 +52,7 @@ class microV(QtGui.QMainWindow):
 	pico_VRange_dict = {"Auto":20.0,'20 mV':0.02,'50 mV':0.05,'100 mV':0.1,'200 mV':0.2,'500 mV':0.5,
 					'1 V': 1.0, '2 V': 2.0, '5 V': 5.0, '10 V': 10.0, '20 V': 20.0,}
 
-
+	processOut = Queue()
 	def __init__(self, parent=None):
 		QtGui.QMainWindow.__init__(self, parent)
 		#from mainwindow import Ui_mw
@@ -187,9 +187,7 @@ class microV(QtGui.QMainWindow):
 			except:
 				traceback.print_exc()
 
-	def initPico(self):
-
-		self.ps.open()
+	def pico_set(self):
 		self.n_captures = self.ui.pico_n_captures.value()
 
 		ChA_VRange = self.ui.pico_ChA_VRange.currentText()
@@ -203,7 +201,11 @@ class microV(QtGui.QMainWindow):
 
 		self.ps.setChannel("A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
 		self.ps.setChannel("B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
-		self.ps.setSamplingInterval(200e-9,15e-6)
+
+		sampleInterval = float(self.ui.pico_sampleInterval.text())
+		samplingDuration = float(self.ui.pico_samplingDuration.text())
+		self.ps.setSamplingInterval(sampleInterval,samplingDuration)
+
 		trigSrc = self.ui.pico_TrigSource.currentText()
 		threshold_V = self.ui.pico_TrigThreshold.value()
 		direction = self.ui.pico_Trig_mode.currentText()
@@ -211,6 +213,11 @@ class microV(QtGui.QMainWindow):
 								 timeout_ms=5, enabled=True)
 		self.samples_per_segment = self.ps.memorySegments(self.n_captures)
 		self.ps.setNoOfCaptures(self.n_captures)
+
+	def initPico(self):
+
+		self.ps.open()
+		self.pico_set()
 
 	def readPico(self):
 		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
@@ -422,6 +429,13 @@ class microV(QtGui.QMainWindow):
 
 		self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
 		app.processEvents()
+	def test(self,q):
+		for i in range(100):
+			real_position = [round(p,4) for p in self.piStage.qPOS()]
+			q.put(real_position)
+			print()
+			time.sleep(0.1)
+		print('done')
 
 	def start3DScan(self, state):
 		print(state)
@@ -430,9 +444,10 @@ class microV(QtGui.QMainWindow):
 				self.live_pmt = []
 				self.live_pmt1 = []
 				self.scan3DisAlive = True
-				p = Process(target=self.scan3D())
-				p.daemon = True
-				p.start()
+				self.scan3D()
+				#p = Process(target=self.test,args=(self.processOut))
+				#p.daemon = True
+				#p.start()
 
 			except AttributeError:
 				traceback.print_exc()
@@ -565,29 +580,23 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmt = data_pmt.astype(np.int16)
-			data_pmt1 = data_pmt1.astype(np.int16)
-			imsave(fname+"_pmt.tif",data_pmt)
-			imsave(fname+"_pmt1.tif",data_pmt1)
+			imsave(fname+"_pmt_.tif",data_pmt.astype(np.int16))
+			imsave(fname+"_pmt1_.tif",data_pmt1.astype(np.int16))
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 		self.ui.start3DScan.setChecked(False)
-		data_pmt = data_pmt.astype(np.int32)
-		data_pmt1 = data_pmt1.astype(np.int32)
-		print(data_pmt.shape,type(data_pmt))
-		imsave(fname+"_pmt.tif",data_pmt)
-		imsave(fname+"_pmt1.tif",data_pmt1)
+
+		imsave(fname+"_pmt.tif",data_pmt.astype(np.int32))
+		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int32))
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
 	def start_fast3DScan(self,state):
 		if state:
-			self.fast3DScan_process = Process(target=self.fast3DScan())
-			self.fast3DScan_process.daemon = True
-			self.fast3DScan_process.start()
+			self.fast3DScan()
 			self.ui.fast3DScan.setChecked(False)
 		else:
-			self.fast3DScan_process.terminate()
+			pass
 
 
 	def fast3DScan(self):
@@ -602,8 +611,6 @@ class microV(QtGui.QMainWindow):
 
 		Range_y = np.arange(y_start,y_end,y_step)
 
-
-
 		x_start = float(self.ui.scan3D_config.item(2,1).text())
 		x_end = float(self.ui.scan3D_config.item(2,2).text())
 		x_step = float(self.ui.scan3D_config.item(2,3).text())
@@ -611,7 +618,15 @@ class microV(QtGui.QMainWindow):
 		Range_x = np.arange(x_start,x_end,x_step)
 
 		start0=time.time()
-		data_pmt,data_pmt1=fastScan(self.piStage,self.ps,x_range=Range_x,y_range=Range_y,z_range=Range_z)
+		#data_pmt,data_pmt1=
+		q = Queue()
+		#fastScan(self.piStage,self.ps,x_range=Range_x,y_range=Range_y,z_range=Range_z)
+		p = Process(target=fastScan,args=(self.piStage,self.ps,Range_x,Range_y,Range_z,q,))
+		p.start()
+		while q.empty():
+			app.processEvents()
+			time.sleep(0.1)
+		data_pmt, data_pmt1 = q.get()
 		print('TotalTime:',time.time()-start0)
 		self.img.setImage(data_pmt,pos=(Range_x.min(),Range_y.min()),
 		scale=(x_step,y_step),xvals=Range_z)
@@ -652,7 +667,7 @@ class microV(QtGui.QMainWindow):
 		while isMoving and self.alive:
 			print(n)
 			n = n+1
-			if n>50:
+			if n>10:
 				isMoving = self.rotPiezoStage.isMoving()
 				n = 0
 			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
@@ -677,9 +692,8 @@ class microV(QtGui.QMainWindow):
 			self.live_pmt = []
 			self.live_pmt1 = []
 			self.alive = True
-			p = Process(target=self.polarScan())
-			p.daemon = True
-			p.start()
+			self.polarScan()
+
 		else:
 			self.live_pmt = []
 			self.live_pmt1 = []
@@ -741,9 +755,8 @@ class microV(QtGui.QMainWindow):
 			self.live_pmt = []
 			self.live_pmt1 = []
 			self.alive = True
-			p = Process(target=self.scan1D())
-			p.daemon = True
-			p.start()
+			self.scan1D()
+
 		else:
 			self.live_pmt = []
 			self.live_pmt1 = []
@@ -792,6 +805,7 @@ class microV(QtGui.QMainWindow):
 		self.calibrTimer.timeout.connect(self.onCalibrTimer)
 
 		self.ui.connect_pico.toggled[bool].connect(self.connect_pico)
+		self.ui.pico_set.clicked.connect(self.pico_set)
 		########################################################################
 		########################################################################
 		########################################################################
