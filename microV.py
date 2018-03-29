@@ -18,7 +18,7 @@ if len(sys.argv)>1:
 		from hardware.sim.TDC001 import *
 		from hardware.sim.picoscope import ps3000a
 		from hardware.sim.AG_UC2 import AG_UC2
-
+		#from hardware.sim.PM100 import visa
 else:
 	from hardware.ni1 import *
 	from hardware.CCS200 import *
@@ -28,6 +28,9 @@ else:
 	import nidaqmx
 	from picoscope import ps3000a
 	from hardware.AG_UC2 import AG_UC2
+	import visa
+	from ThorlabsPM100 import ThorlabsPM100
+
 from hardware.pico_radar import fastScan
 
 #get_ipython().run_line_magic('matplotlib', 'qt')
@@ -44,6 +47,9 @@ class microV(QtGui.QMainWindow):
 	HWP = APTMotor(83854487, HWTYPE=31)
 	rotPiezoStage = AG_UC2()
 	ps = ps3000a.PS3000a(connect=False)
+	n_captures = None
+	#inst = visa.instrument('USB0::0x0000::0x0000::DG5Axxxxxxxxx::INSTR', term_chars='\n', timeout=1)
+	power_meter = None#ThorlabsPM100(inst=inst)
 	#DAQmx = nidaqmx.Task()
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
@@ -213,6 +219,7 @@ class microV(QtGui.QMainWindow):
 								 timeout_ms=5, enabled=True)
 		self.samples_per_segment = self.ps.memorySegments(self.n_captures)
 		self.ps.setNoOfCaptures(self.n_captures)
+		print(self.n_captures)
 
 	def initPico(self):
 
@@ -292,6 +299,29 @@ class microV(QtGui.QMainWindow):
 		self.ui.pico_ChB_value.setText(str(round(dataB_p2p,4)))
 
 		return dataA_p2p, dataB_p2p
+
+	############################################################################
+	###############################   Powermeter     ###########################
+	###############################   Thorlabs PM100 ###########################
+
+	def connect_powermeter(self,state):
+		if state:
+			self.initPowermeter()
+		else:
+			try:
+				self.ps.close()
+			except:
+				traceback.print_exc()
+
+	def powermeter_set(self):
+		pass
+
+	def initPowermeter(self):
+		pass
+		#self.pico_set()
+
+	def readPower(self):
+		pass
 
 	############################################################################
 	###############################   HWP	###################################
@@ -592,15 +622,17 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
+			#self.img.export(fname+'_pmt.tif')
 			imsave(fname+"_pmt_.tif",data_pmt.astype(np.int16))
 			imsave(fname+"_pmt1_.tif",data_pmt1.astype(np.int16))
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
-		self.ui.start3DScan.setChecked(False)
+
 
 		imsave(fname+"_pmt.tif",data_pmt.astype(np.int16))
 		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int16))
+		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
 	def start_fast3DScan(self,state):
