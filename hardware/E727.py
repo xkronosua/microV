@@ -175,13 +175,13 @@ BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const 
 		if waitUntilReady:
 			m = self.IsMoving()
 			#print(m)
-			N_max = 1000
+			N_max = 1000000
 			n = 0
 			while sum(m)!=0 or n>N_max:
 				n=n+1
 				m = self.IsMoving()
 				#print(m)
-				#time.sleep(0.001)
+				time.sleep(0.001)
 		return r
 
 

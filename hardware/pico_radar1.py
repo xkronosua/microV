@@ -6,6 +6,7 @@ import sys
 from scipy.signal import resample
 from picoscope import ps3000a
 from multiprocessing import Process, Queue
+from scipy.signal import medfilt
 
 
 
@@ -26,15 +27,14 @@ def fastScan(piStage,ps,n_captures=643,x_range=np.arange(0,100,1),y_range=np.ara
 		dt += (time.time() - t1)/2
 	dt = dt/n_calibr
 	k = dt/0.09000015258789062
-	n_captures = int(n_captures*k)
+	#n_captures = int(n_captures*k)
 	print(n_captures, dt,k)
-	max_samples_per_segment = ps.memorySegments(n_captures)
 
-	samples_per_segment = ps.noSamples
-	ps.setNoOfCaptures(n_captures)
 
-	data_out = []
+	data_out_A = []
+	data_out_B = []
 	start0 = time.time()
+
 	for z in z_range:
 		try:
 			piStage.MOV(z,axis=3, waitUntilReady=True)
@@ -43,94 +43,76 @@ def fastScan(piStage,ps,n_captures=643,x_range=np.arange(0,100,1),y_range=np.ara
 			dataxyA = []
 			dataxyB = []
 			t_start = time.time()
+			data_tmp = []
+			t_read0 = time.time()
+			t_read1 = 0
+			samples_per_segment = ps.memorySegments(n_captures)
+			ps.setNoOfCaptures(n_captures)
+			ps.runBlock()
 			dataA = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
 			dataB = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
-
 			for y in y_range:
-				t1 = time.time()
+				print(y)
 
 				piStage.MOV(y,axis=2, waitUntilReady=True)
-				t2 = time.time()
-				ps.runBlock()
-				t3 = time.time()
 				if direction:
-					piStage.MOV(x_range.max(),axis=1, waitUntilReady=0)
-				else:
-					piStage.MOV(x_range.min(),axis=1, waitUntilReady=0)
-
-				t4 = time.time()
-				dt1 = -1
-				dt2 = -1
-				for i in range(10000):
-					isMoving = sum(piStage.IsMoving())
-					isReading = ps.isReady()
-					if isMoving == 0 and dt1==-1:
-						dt1=time.time()-t4
-					if isReading and dt2==-1:
-						dt2=time.time()-t4
-						if dt1==-1:
-							for i in range(100):
-								isMoving = sum(piStage.IsMoving())
-								if isMoving == 0:
-									dt1=time.time()-t4
-									break
-						break
-					time.sleep(0.0001)
-				#ps.waitReady()
-				t5 = time.time()
-				#k = (t4-t3)/(t5-t2)
-				k = dt1/dt2
-				#print("Time to get sweep: ",k, dt2, dt1)
-				ps.getDataRawBulk(channel='A',data=dataA)
-				ps.getDataRawBulk(channel='B',data=dataB)
-				t6 = time.time()
-				#tmp_data = dataA.copy()
-				#print("Time to read data: " + str(t3 - t2))
-				dataA1=dataA[:, 0:ps.noSamples]
-				dataB1=dataB[:, 0:ps.noSamples]
-
-				scanA = abs(dataA1.max(axis=1) - dataA1.min(axis=1))
-				scanB = abs(dataB1.max(axis=1) - dataB1.min(axis=1))
-
-				L = len(scanA)
-				#if k<=1 and k>0:
-				#	scanA=scanA[:int(L*k)]
-				#	scanB=scanB[:int(L*k)]
-				#elif k>1 and k<1.5:
-				#	scanA = np.hstack((scanA,np.zeros((int(L*k)-L)//3)))
-				#	scanB = np.hstack((scanB,np.zeros((int(L*k)-L)//3)))
-				#else: pass
-				scanA = resample(scanA,len(x_range))
-				scanB = resample(scanB,len(x_range))
-				if direction:
-					dataxyA.append(scanA)
-					dataxyB.append(scanB)
+					piStage.MOV(x_range.max(),axis=1, waitUntilReady=True)
 					direction = False
 				else:
-					dataxyA.append(scanA[::-1])
-					dataxyB.append(scanB[::-1])
+					piStage.MOV(x_range.min(),axis=1, waitUntilReady=True)
 					direction = True
-				#t_list.append(time.time()-t_start)
-				t7 = time.time()
-				print('\tZ: %.3f\tY: %.3f\tk: %.3f'%(z,y,k))#time.time()-t5,t5-t4,t4-t3,t3-t2,t2-t1)
-			print("xyScan:", time.time()-t_start)
+				if ps.isReady():
+					t_read1 = time.time()
+					ps.getDataRawBulk(channel='A',data=dataA)
+					ps.getDataRawBulk(channel='B',data=dataB)
+					dataA1=dataA[:, 0:ps.noSamples]
+					dataB1=dataB[:, 0:ps.noSamples]
+
+					dataxyA.append(dataA1)
+					dataxyB.append(dataB1)
+
+					ps.runBlock()
+					samples_per_segment = ps.memorySegments(n_captures)
+					ps.setNoOfCaptures(n_captures)
+
+
+			dt_move = time.time() - t_read0
+			dt_read = t_read1 - t_read0
+
+			dataxyA=np.vstack(dataxyA)
+			dataxyB=np.vstack(dataxyB)
+
+			scanA=abs(dataxyA.max(axis=1)-dataxyA.min(axis=1))
+			scanB=abs(dataxyB.max(axis=1)-dataxyB.min(axis=1))
+			k=dt_read/dt_move
+			print("total blocks:",len(dataxyA), k,scanA.shape, dataxyA.shape)
+
+			L=len(scanA)-int(len(scanA)*k)
+			#scanA = np.hstack((scanA,np.zeros(L)))
+			#scanB = np.hstack((scanB,np.zeros(L)))
+			print(scanA.shape, len(x_range)*len(y_range))
+			scanA = resample(scanA,len(x_range)*len(y_range))
+			scanB = resample(scanB,len(x_range)*len(y_range))
+
+			scanA = scanA.reshape((len(y_range),len(x_range)))
+			scanB = scanB.reshape((len(y_range),len(x_range)))
+			#scanA[::2,:] = scanA[::2,::-1]
+			#scanB[::2,:] = scanB[::2,::-1]
+			data_out_A.append(scanA)
+			data_out_B.append(scanB)
+
+			print("xyScan:", time.time()-t_start,dt_read,dt_move)
 			t_start = time.time()
-			data_out.append([np.array(dataxyA).T[::-1][::-1],np.array(dataxyB).T[::-1][::-1]])
+			#data_out.append([np.array(dataxyA).T[::-1][::-1],np.array(dataxyB).T[::-1][::-1]])
 			if not app is None:
 				app.processEvents()
 		except KeyboardInterrupt:
 			break
 			ps.close()
 			piStage.CloseConnection()
-	dataA_out=[]
-	dataB_out=[]
-	for d in data_out:
-		dataA_out.append(d[0])
-		dataB_out.append(d[1])
-	a = np.array(dataA_out,dtype=np.int16)
-	b = np.array(dataB_out,dtype=np.int16)
-	#q.put((a,b))
-	return a,b
+	dataA = np.array(data_out_A,dtype=np.int16)
+	dataB = np.array(data_out_B,dtype=np.int16)
+	return dataA, dataB
 
 
 if __name__=='__main__':
@@ -143,9 +125,7 @@ if __name__=='__main__':
 
 	ps.setChannel("A", coupling="DC", VRange=0.02)
 	ps.setChannel("B", coupling="DC", VRange=0.02)
-	capture_duration = 15e-6
-	sample_interval = 200e-9
-	ps.setSamplingInterval(sample_interval, capture_duration)
+	ps.setSamplingInterval(200e-9,15e-6)
 	ps.setSimpleTrigger(trigSrc="External", threshold_V=0.020, direction='Rising',
 							 timeout_ms=5, enabled=True)
 
@@ -169,11 +149,14 @@ if __name__=='__main__':
 	start0=time.time()
 	a=[]
 	b=[]
+	x_range=np.arange(0,100,1)
+	y_range=np.arange(0,100,1)
+	z_range=np.arange(40,43,3)
 	try:
-		a,b=fastScan(piStage,ps,n_captures=710,
-			x_range=np.arange(0,100,1),
-			y_range=np.arange(0,100,1),
-			z_range=np.arange(48,50,2))
+		a,b =fastScan(piStage,ps,n_captures=3000,
+			x_range=x_range,
+			y_range=y_range,
+			z_range=z_range)
 
 		print('TotalTime:',time.time()-start0)
 

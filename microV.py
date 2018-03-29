@@ -267,6 +267,21 @@ class microV(QtGui.QMainWindow):
 			ChB_Offset = self.ui.pico_ChB_offset.value()
 			self.ps.setChannel(channel="B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
 			#print('AutoB',ChB_VRange)
+		'''
+		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+		dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+		#t1 = time.time()
+		self.ps.runBlock()
+		self.ps.waitReady()
+		#t2 = time.time()
+		#print("Time to get sweep: " + str(t2 - t1))
+		self.ps.getDataRawBulk(channel='A',data=dataA)
+		self.ps.getDataRawBulk(channel='B',data=dataB)
+		#t3 = time.time()
+		#print("Time to read data: " + str(t3 - t2))
+		dataA = dataA[:, 0:self.ps.noSamples].mean(axis=0)
+		dataB = dataB[:, 0:self.ps.noSamples].mean(axis=0)
+		'''
 		dataA = self.ps.rawToV(channel="A", dataRaw=dataA)
 		dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
 
@@ -445,11 +460,8 @@ class microV(QtGui.QMainWindow):
 				self.live_pmt1 = []
 				self.scan3DisAlive = True
 				self.scan3D()
-				#p = Process(target=self.test,args=(self.processOut))
-				#p.daemon = True
-				#p.start()
 
-			except AttributeError:
+			except:
 				traceback.print_exc()
 		else:
 			self.live_pmt = []
@@ -587,8 +599,8 @@ class microV(QtGui.QMainWindow):
 			return
 		self.ui.start3DScan.setChecked(False)
 
-		imsave(fname+"_pmt.tif",data_pmt.astype(np.int32))
-		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int32))
+		imsave(fname+"_pmt.tif",data_pmt.astype(np.int16))
+		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int16))
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
 	def start_fast3DScan(self,state):
@@ -618,15 +630,16 @@ class microV(QtGui.QMainWindow):
 		Range_x = np.arange(x_start,x_end,x_step)
 
 		start0=time.time()
-		#data_pmt,data_pmt1=
-		q = Queue()
-		#fastScan(self.piStage,self.ps,x_range=Range_x,y_range=Range_y,z_range=Range_z)
-		p = Process(target=fastScan,args=(self.piStage,self.ps,Range_x,Range_y,Range_z,q,))
-		p.start()
-		while q.empty():
-			app.processEvents()
-			time.sleep(0.1)
-		data_pmt, data_pmt1 = q.get()
+		#
+		#q = Queue()
+		n_captures = self.ui.fastScan_n_captures.value()
+		data_pmt,data_pmt1 = fastScan(self.piStage,self.ps,n_captures=n_captures, x_range=Range_x,y_range=Range_y,z_range=Range_z,app=app)
+		#p = Process(target=fastScan,args=(self.piStage,self.ps,Range_x,Range_y,Range_z,q,))
+		#p.start()
+		#while q.empty():
+		#	app.processEvents()
+		#	time.sleep(0.1)
+		#data_pmt, data_pmt1 = q.get()
 		print('TotalTime:',time.time()-start0)
 		self.img.setImage(data_pmt,pos=(Range_x.min(),Range_y.min()),
 		scale=(x_step,y_step),xvals=Range_z)
