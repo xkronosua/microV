@@ -358,7 +358,8 @@ class microV(QtGui.QMainWindow):
 	def initPiStage(self):
 		print(self.piStage.ConnectUSB())
 		print(self.piStage.qSAI())
-		print(self.piStage.SVO())
+		print(self.piStage.SVO(b'1 2 3', [True, True, True]))
+
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=1,waitUntilReady=True))
 		time.sleep(0.2)
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=2,waitUntilReady=True))
@@ -577,11 +578,11 @@ class microV(QtGui.QMainWindow):
 						pmt_val,pmt_val1 = self.readPico()#readDAQmx()
 						#print(time.time()-start,pmt_val)
 						#spectra = list(medfilt(spectra,5))
-						real_position = [round(p,4) for p in self.piStage.qPOS()]
+						real_position = [round(p,6) for p in self.piStage.qPOS()]
 						dataSet = real_position +[pmt_val,pmt_val1]# + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
-							f.write("\t".join([str(round(i,4)) for i in dataSet])+"\n")
+							f.write("\t".join([str(i) for i in dataSet])+"\n")
 						#print(time.time()-start)
 						s_from = self.ui.usbSpectr_from.value()
 						s_to = self.ui.usbSpectr_to.value()
@@ -615,23 +616,25 @@ class microV(QtGui.QMainWindow):
 					self.img.setCurrentIndex(layerIndex)
 					self.img1.setCurrentIndex(layerIndex)
 
-
+					#print(sum(data_pmt),sum(data_pmt1))
 
 				#imsave(fname+"_pmt.tif",data_pmt1.astype(np.int16))
 				#imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int16))
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			#self.img.export(fname+'_pmt.tif')
-			imsave(fname+"_pmt_.tif",data_pmt.astype(np.int16))
-			imsave(fname+"_pmt1_.tif",data_pmt1.astype(np.int16))
+			data_pmt_16 = data_pmt/data_pmt.max()*65536
+			data_pmt1_16 = data_pmt1/data_pmt1.max()*65536
+			imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
+			imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 
-
-		imsave(fname+"_pmt.tif",data_pmt.astype(np.int16))
-		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int16))
+		data_pmt_16 = data_pmt/data_pmt.max()*65536
+		data_pmt1_16 = data_pmt1/data_pmt1.max()*65536
+		imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
+		imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())

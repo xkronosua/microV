@@ -1,20 +1,16 @@
 # -*- coding: utf-8 -*-
-import ctypes# give location of dll
-from ctypes import c_int, c_bool, c_void_p, c_float, c_double, c_char, c_char_p, c_ulong, byref, create_string_buffer
+from piWrapper import *
 import time, re, os, sys
+import traceback
 
-"""  Открыть Com-порт
-function SMD_OpenComPort(AComNmbr: integer): boolean; stdcall;
-Функция открывает COM-порт, и устанавливает заданный номер порта.
-Вход:  AComNmbr - номер COM-порта. Целое число > 0.
-Выход:  TRUE – если операция выполнена, FALSE – еслиимеются ошибки.
-"""
+
+
 
 class E727():
 
-	libDLL = ctypes.windll.LoadLibrary( os.path.abspath(__file__).split('E727.py')[0]+'PI_GCS2_DLL_x64.dll')
+
 	szUsbController = create_string_buffer(1024)
-	szAxes = create_string_buffer(17)
+	szAxes = create_string_buffer(512)
 	bFlags = create_string_buffer(3);
 	szErrorMesage = create_string_buffer(1024)
 	ID = 0
@@ -24,8 +20,7 @@ class E727():
 		pass
 	def EnumerateUSB(self):
 		#print(self.libDLL)
-		PI_EnumerateUSB = self.libDLL['PI_EnumerateUSB']
-		PI_EnumerateUSB.argtypes = (c_char_p,c_int,c_char_p)
+
 		c=create_string_buffer(len(b"PI E-727"),b"PI E-727")
 		r = PI_EnumerateUSB(self.szUsbController, 1024, c)
 		print(c.value,r,self.szUsbController.value)
@@ -45,9 +40,7 @@ class E727():
 		#// connect to the controller over USB. //
 		#/////////////////////////////////////////
 		self.EnumerateUSB()
-		PI_ConnectUSB = self.libDLL['PI_ConnectUSB']
-		PI_ConnectUSB.argtypes = (c_char_p,)
-		PI_ConnectUSB.restype = c_int
+
 		self.ID = PI_ConnectUSB(self.szUsbController)
 		print(self.ID)
 		if self.ID<0:
@@ -61,9 +54,7 @@ class E727():
 		#// connect to the controller over USB. //
 		#/////////////////////////////////////////
 		self.EnumerateUSB()
-		PI_ConnectUSBWithBaudRate = self.libDLL['PI_ConnectUSBWithBaudRate']
-		PI_ConnectUSBWithBaudRate.argtypes = (c_char_p, c_int)
-		PI_ConnectUSBWithBaudRate.restype = c_int
+
 		self.ID = PI_ConnectUSBWithBaudRate(self.szUsbController,iBaudRate)
 		print(self.ID)
 		if self.ID<0:
@@ -73,33 +64,58 @@ class E727():
 		return self.ID
 
 	def CloseConnection(self):
-		PI_CloseConnection = self.libDLL['PI_CloseConnection']
-		PI_CloseConnection.argtypes = (c_int,)
-		PI_CloseConnection.restype = c_void_p
+
 		PI_CloseConnection(self.ID)
 	def GetError(self):
-		PI_GetError = self.libDLL['PI_GetError']
-		PI_GetError.argtypes = (c_int,)
-		PI_GetError.restype = c_int
+
 		self.iError = PI_GetError(self.ID)
 		return self.iError
 	def TranslateError(self, iError):
-		PI_TranslateError = self.libDLL['PI_TranslateError']
-		PI_TranslateError.argtypes = (c_int,c_char_p,c_int)
-		PI_TranslateError.restype = c_bool
+
 		r = PI_TranslateError(iError, self.szErrorMesage, 1024)
 		return self.szErrorMesage.value
+	'''
+	def EAX(self,axis=b'1 2 3',flags=[True,True,True]):
+		if type(axis)==bytes:
+			bFlags = (c_bool*len(flags))()
+			for i in range(len(flags)):
+				bFlags[i] = c_bool(flags[i])
+		else:
+			axis=str(axis).encode()
+			bFlags = c_bool(flags)
+
+		r = PI_EAX(self.ID, axis, bFlags)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("EAX> ERROR ",iError, szErrorMesage)
+			#self.CloseConnection()
+		else:
+			pass
+		return r
+
+	def qEAX(self):
+		val = (c_bool*3)()
+		axis = b''
+		r = PI_qEAX(self.ID, axis, val)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("qEAX> ERROR ",iError, szErrorMesage)
+			#self.CloseConnection()
+		else:
+			pass
+		return [v for v in val]
+	'''
 
 	def qSAI(self):
 		#/////////////////////////////////////////
 		#// Get the name of the connected axis. //
 		#/////////////////////////////////////////
-		PI_qSAI = self.libDLL['PI_qSAI']
-		PI_qSAI.argtypes = (c_int,c_char_p, c_int)
-		PI_qSAI.restype = c_bool
-		r = PI_qSAI(self.ID, self.szAxes, 16)
+
+		r = PI_qSAI(self.ID, self.szAxes, 512)
 		tmp = self.szAxes.value
-		self.szAxes = tmp.replace(b'\n',b'')
+		self.szAxes = tmp#.replace(b'\n',b'')
 		if not r:
 			iError = self.GetError()
 			szErrorMesage=self.TranslateError(iError)
@@ -109,16 +125,11 @@ class E727():
 			pass
 		return self.szAxes#.value
 
-	def SVO(self):
-		bFlags = (c_bool*3)()
-		bFlags[0] = c_bool(True)
-		bFlags[1] = c_bool(True)
-		bFlags[2] = c_bool(True)
-		PI_SVO = self.libDLL['PI_SVO']
-		PI_SVO.argtypes = (c_int,c_char_p, ctypes.POINTER(c_bool))
-		PI_SVO.restype = c_bool
-		for axis in range(1,4):
-			r = PI_SVO(self.ID, str(axis).encode(), bFlags)
+	def SVO(self,axis=b'1 2 3',flags=[True,True,True]):
+
+		ax = axis.split(b' ')
+		for i in range(len(flags)):
+			r = PI_SVO(self.ID, ax[i], c_bool(flags[i]))
 			if not r:
 				iError = self.GetError()
 				szErrorMesage=self.TranslateError(iError)
@@ -128,17 +139,88 @@ class E727():
 				pass
 		return r
 
+	def qSVO(self,axis=b'1 2 3'):
+		val = (c_bool*3)()
+		val[0] = c_bool(False)
+		val[1] = c_bool(False)
+		val[2] = c_bool(False)
+		out = []
+		ax = axis.split(b' ')
+		for i in range(len(ax)):
+			r = PI_qSVO(self.ID, ax[i], val)
+			out.append(val[0])
+			if not r:
+				iError = self.GetError()
+				szErrorMesage=self.TranslateError(iError)
+				print("qSVO> ERROR ",iError, szErrorMesage)
+				self.CloseConnection()
+			else:
+				pass
+		return out
+
+	def CMO(self,axis=b'1 2 3',mode=[True,True,True]):
+		if type(axis)==bytes:
+			mode_ = (c_bool*len(mode))()
+			for i in range(len(mode)):
+				mode_[i] = c_bool(mode[i])
+		else:
+			axis=str(axis).encode()
+			mode_ = c_bool(mode)
+
+		r = PI_CMO(self.ID, axis, mode_)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("CMO> ERROR ",iError, szErrorMesage)
+			self.CloseConnection()
+		else:
+			pass
+		return r
 	'''
-	BOOL PI_ATC (int ID, const int* piChannels, const int* piValueArray, int iArraySize)
-Automatic calibration
-32
-BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const BOOL* pbUseDefaultArray )
+	def qCMO(self):
+		val = (c_int*3)()
+		axis = b''
+		r = PI_qCMO(self.ID, axis, val)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("qCMO> ERROR ",iError, szErrorMesage)
+			self.CloseConnection()
+		else:
+			pass
+		return [v for v in val]
+
+	def BRA(self,axis=b'1 2 3',flags=[True]):
+
+		bFlags = (c_bool*len(flags))()
+		for i in range(len(flags)):
+			bFlags[i] = c_bool(flags[i])
+
+		r = PI_BRA(self.ID, axis, bFlags)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("BRA> ERROR ",iError, szErrorMesage)
+			self.CloseConnection()
+		else:
+			pass
+		return r
+
+	def qBRA(self):
+
+		szBuffer = create_string_buffer(17)
+		r = PI_qBRA(self.ID, szBuffer, 16)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("qBRA> ERROR ",iError, szErrorMesage)
+			self.CloseConnection()
+		return szBuffer.value
 	'''
+
 	def ATZ(self):
 		pdLowVoltageArray = (c_double*3)()
-		PI_ATZ = self.libDLL['PI_ATZ']
-		PI_ATZ.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double),ctypes.POINTER(c_bool))
-		PI_ATZ.restype = c_bool
+
 		res = 0
 		print('PI_ATZ')
 		r = PI_ATZ(self.ID, b'', pdLowVoltageArray,c_bool(True))
@@ -156,14 +238,16 @@ BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const 
 		print('PI_ATZ:Done')
 		return r
 
-	def MOV(self, dPos,axis=1, waitUntilReady=False):
+	def MOV(self, dPos=[50.0,50.0,50.0],axis=b'1 2 3', waitUntilReady=False):
+		if type(axis)==bytes:
+			dPos_ = (c_double*len(dPos))()
+			for i in range(len(dPos)):
+				dPos_[i] = c_double(dPos[i])
+		else:
+			axis=str(axis).encode()
+			dPos_ = c_double(dPos)
 
-		PI_MOV = self.libDLL['PI_MOV']
-		PI_MOV.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
-		PI_MOV.restype = c_bool
-		dPos_ = c_double(dPos)
-
-		r = PI_MOV(self.ID, str(axis).encode(), dPos_)
+		r = PI_MOV(self.ID, axis, dPos_)
 		if not r:
 			iError = self.GetError()
 			szErrorMesage=self.TranslateError(iError)
@@ -184,12 +268,8 @@ BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const 
 				time.sleep(0.001)
 		return r
 
-
-	def qPOS(self,axis=b""):
+	def qPOS(self,axis=b"1 2 3"):
 		val = (c_double*3)()
-		PI_qPOS = self.libDLL['PI_qPOS']
-		PI_qPOS.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
-		PI_qPOS.restype = c_bool
 		r = PI_qPOS(self.ID, axis, val)
 		if not r:
 			iError = self.GetError()
@@ -197,11 +277,10 @@ BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const 
 			print("qPOS> ERROR ",iError, szErrorMesage)
 			self.CloseConnection()
 		return [v for v in val]
+
 	def IsMoving(self,axis=b""):
 		val = (c_bool*3)()
-		PI_IsMoving = self.libDLL['PI_IsMoving']
-		PI_IsMoving.argtypes = (c_int,c_char_p, ctypes.POINTER(c_bool))
-		PI_IsMoving.restype = c_bool
+
 		r = PI_IsMoving(self.ID, axis, val)
 		if not r:
 			iError = self.GetError()
@@ -213,26 +292,38 @@ BOOL PI_ATZ (int ID, const char* szAxes, const double* pdLowVoltageArray, const 
 if __name__ == "__main__":
 	e = E727()
 	print(e.ConnectUSBWithBaudRate())
-	print(e.qSAI())
-	print(e.SVO())
-	time.sleep(5)
-	print(e.ATZ())
-	print('X')
-	print(e.MOV(100,axis=1, waitUntilReady=True))
-	print(e.qPOS())
-	print(e.MOV(0,axis=1, waitUntilReady=True))
-	print(e.qPOS())
-	print('Y')
-	print(e.MOV(100,axis=2, waitUntilReady=True))
-	print(e.qPOS())
-	print(e.MOV(0,axis=2, waitUntilReady=True))
-	print(e.qPOS())
-	print('Z')
-	print(e.MOV(100,axis=3, waitUntilReady=True))
-	print(e.qPOS())
-	print(e.MOV(0,axis=3, waitUntilReady=True))
-	print(e.qPOS())
-	print(e.MOV(65,axis=1, waitUntilReady=True))
-	print(e.MOV(40,axis=2, waitUntilReady=True))
-	print(e.MOV(40,axis=3, waitUntilReady=True))
-	print(e.CloseConnection())
+	try:
+		print(e.qSAI())
+		print("SVO:",e.qSVO(b'1 2 3'))
+		print(e.SVO(b'1 2 3',[True, True, True]))
+		print("SVO:",e.qSVO(b'1 2 3'))
+		time.sleep(1)
+		#print(e.ATZ())
+		print('X')
+		#print(e.BRA(b'1 2 3',[True, True, True]))
+		#print(e.CMO())
+		#print(e.qCMO())
+		print(e.MOV(dPos=100,axis=1, waitUntilReady=True))
+		print(e.qPOS())
+		print(e.MOV(0,axis=1, waitUntilReady=True))
+		print(e.qPOS())
+		print('Y')
+		print(e.MOV(100,axis=2, waitUntilReady=True))
+		print(e.qPOS())
+		print(e.MOV(0,axis=2, waitUntilReady=True))
+		print(e.qPOS())
+		print('Z')
+		print(e.MOV(100,axis=3, waitUntilReady=True))
+		print(e.qPOS())
+		print(e.MOV(0,axis=3, waitUntilReady=True))
+		print(e.qPOS())
+
+
+		print(e.MOV(dPos=[50,50,50],axis=b"1 2 3", waitUntilReady=True))
+		print(e.qPOS())
+		e.SVO(b'1 2 3', flags=[False, False, False])
+		print(e.CloseConnection())
+
+	except:
+		traceback.print_exc()
+		print(e.CloseConnection())
