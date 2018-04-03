@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from piWrapper import *
+from .E727Wrapper import *
 import time, re, os, sys
 import traceback
 
@@ -289,6 +289,35 @@ class E727():
 			#self.CloseConnection()
 		return [v for v in val]
 
+	def VEL(self, dVel=[1000,1000,1000],axis=b'1 2 3'):
+		if type(axis)==bytes:
+			dVel_ = (c_double*len(dVel))()
+			for i in range(len(dVel)):
+				dVel_[i] = c_double(dVel[i])
+		else:
+			axis=str(axis).encode()
+			dVel_ = c_double(dVel)
+
+		r = PI_VEL(self.ID, axis, dVel_)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("VEL> ERROR ",iError, szErrorMesage)
+			self.CloseConnection()
+		else:
+			pass
+
+		return r
+	def qVEL(self,axis=b"1 2 3"):
+		val = (c_double*3)()
+		r = PI_qVEL(self.ID, axis, val)
+		if not r:
+			iError = self.GetError()
+			szErrorMesage=self.TranslateError(iError)
+			print("qVEL> ERROR ",iError, szErrorMesage)
+			self.CloseConnection()
+		return [v for v in val]
+
 if __name__ == "__main__":
 	e = E727()
 	print(e.ConnectUSBWithBaudRate())
@@ -303,6 +332,8 @@ if __name__ == "__main__":
 		#print(e.BRA(b'1 2 3',[True, True, True]))
 		#print(e.CMO())
 		#print(e.qCMO())
+		print(e.VEL([1000,1000,1000],b'1 2 3'))
+		print(e.qVEL())
 		print(e.MOV(dPos=100,axis=1, waitUntilReady=True))
 		print(e.qPOS())
 		print(e.MOV(0,axis=1, waitUntilReady=True))

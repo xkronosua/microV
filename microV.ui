@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>4</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -192,6 +192,87 @@
              <string>PI</string>
             </attribute>
             <layout class="QGridLayout" name="gridLayout">
+             <item row="4" column="2">
+              <widget class="QDoubleSpinBox" name="Pi_Velocity">
+               <property name="toolTip">
+                <string>Velocity</string>
+               </property>
+               <property name="minimum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>1000.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>10.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>1000.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QLabel" name="Pi_XPos">
+               <property name="text">
+                <string>nan</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="QLabel" name="Pi_ZPos">
+               <property name="text">
+                <string>nan</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="3">
+              <widget class="QDoubleSpinBox" name="Pi_Y_move_to">
+               <property name="decimals">
+                <number>3</number>
+               </property>
+               <property name="maximum">
+                <double>100.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>50.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="4">
+              <widget class="QToolButton" name="Pi_X_go">
+               <property name="text">
+                <string>Go</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="4">
+              <widget class="QToolButton" name="Pi_Y_go">
+               <property name="text">
+                <string>Go</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="4">
+              <widget class="QToolButton" name="Pi_Z_go">
+               <property name="text">
+                <string>Go</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="2">
+              <widget class="QCheckBox" name="Pi_wait">
+               <property name="text">
+                <string>Wait</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="3">
+              <widget class="QPushButton" name="Pi_autoZero">
+               <property name="text">
+                <string>AutoZero</string>
+               </property>
+              </widget>
+             </item>
              <item row="0" column="1">
               <widget class="QCheckBox" name="Pi_X_On">
                <property name="text">
@@ -262,65 +343,10 @@
                </property>
               </widget>
              </item>
-             <item row="0" column="2">
-              <widget class="QLabel" name="Pi_XPos">
+             <item row="5" column="2">
+              <widget class="QPushButton" name="Pi_Set">
                <property name="text">
-                <string>nan</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="2">
-              <widget class="QLabel" name="Pi_ZPos">
-               <property name="text">
-                <string>nan</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="3">
-              <widget class="QDoubleSpinBox" name="Pi_Y_move_to">
-               <property name="decimals">
-                <number>3</number>
-               </property>
-               <property name="maximum">
-                <double>100.000000000000000</double>
-               </property>
-               <property name="value">
-                <double>50.000000000000000</double>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="4">
-              <widget class="QToolButton" name="Pi_X_go">
-               <property name="text">
-                <string>Go</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="4">
-              <widget class="QToolButton" name="Pi_Y_go">
-               <property name="text">
-                <string>Go</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="4">
-              <widget class="QToolButton" name="Pi_Z_go">
-               <property name="text">
-                <string>Go</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="2">
-              <widget class="QCheckBox" name="Pi_wait">
-               <property name="text">
-                <string>Wait</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="3">
-              <widget class="QPushButton" name="Pi_autoZero">
-               <property name="text">
-                <string>AutoZero</string>
+                <string>Set</string>
                </property>
               </widget>
              </item>
@@ -345,7 +371,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>225</width>
+              <width>229</width>
               <height>122</height>
              </rect>
             </property>

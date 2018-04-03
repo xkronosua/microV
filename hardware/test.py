@@ -14,6 +14,8 @@ class Pico_recorder(multiprocessing.Process):
 	def __init__(self):
 		super(Pico_recorder, self).__init__()
 
+
+	def run(self):
 		ps = ps3000a.PS3000a(connect=False)
 		ps.open()
 		n_captures = 1
@@ -27,17 +29,16 @@ class Pico_recorder(multiprocessing.Process):
 		max_samples_per_segment = ps.memorySegments(n_captures)
 		samples_per_segment = int(capture_duration / sample_interval)
 		ps.setNoOfCaptures(n_captures)
-		ps.close()
-		self.ps = ps
-	def run(self):
-		self.ps.open()
+
 		print('start')
 		for i in range(10):
-			self.ps.flashLed(1)
+			ps.flashLed(1)
 			time.sleep(1)
 		print('End')
 
 if __name__ == "__main__":
+	__spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
+
 	number = 7
 	result = None
 

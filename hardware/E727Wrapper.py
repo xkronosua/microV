@@ -2,7 +2,7 @@ import ctypes# give location of dll
 from ctypes import c_int, c_bool, c_void_p, c_float, c_double, c_char, c_char_p, c_ulong, byref, create_string_buffer
 import os
 
-libDLL = ctypes.windll.LoadLibrary( os.path.abspath(__file__).split('piWrapper.py')[0]+'PI_GCS2_DLL_x64.dll')
+libDLL = ctypes.windll.LoadLibrary( os.path.abspath(__file__).split('E727Wrapper.py')[0]+'PI_GCS2_DLL_x64.dll')
 
 
 #BOOL PI_GcsCommandset (int ID, const char* szCommand)
@@ -89,6 +89,21 @@ PI_qCMO.restype = c_bool
 BOOL PI_qCTV (int ID, const char* szAxes, double* pdValueArray)
 Get Target Values
 '''
+
+'''BOOL PI_VEL (int ID, const char* szAxes, const double* pdValueArray)
+Set Closed-Loop Velocity
+'''
+PI_VEL = libDLL['PI_VEL']
+PI_VEL.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
+PI_VEL.restype = c_bool
+
+'''BOOL PI_qVEL (int ID, const char* szAxes, double* pdValueArray)
+Get Closed-Loop Velocity
+'''
+PI_qVEL = libDLL['PI_qVEL']
+PI_qVEL.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
+PI_qVEL.restype = c_bool
+
 PI_qCTV = libDLL['PI_qCTV']
 PI_qCTV.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
 PI_qCTV.restype = c_bool

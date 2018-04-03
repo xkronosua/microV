@@ -406,6 +406,10 @@ class microV(QtGui.QMainWindow):
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
+	def Pi_Set(self):
+		vel = self.ui.Pi_Velocity.value()
+		self.piStage.VEL([vel]*3,b'1 2 3')
+		print('VEL:',self.piStage.qVEL())
 	############################################################################
 	###############################   rotPiezoStage	#########################
 
@@ -513,7 +517,10 @@ class microV(QtGui.QMainWindow):
 			z_start = float(self.ui.scan3D_config.item(0,1).text())
 			z_end = float(self.ui.scan3D_config.item(0,2).text())
 			z_step = float(self.ui.scan3D_config.item(0,3).text())
-			Range_z = np.arange(z_start,z_end,z_step)
+			if z_step == 0:
+				Range_z = np.array([z_start]*1000)
+			else:
+				Range_z = np.arange(z_start,z_end,z_step)
 			Range_zi = np.arange(len(Range_z))
 			y_start = float(self.ui.scan3D_config.item(1,1).text())
 			y_end = float(self.ui.scan3D_config.item(1,2).text())
@@ -570,7 +577,7 @@ class microV(QtGui.QMainWindow):
 						start=time.time()
 						#print('Start',start)
 						if not self.scan3DisAlive: break
-						r = self.piStage.MOV(x,axis=1,waitUntilReady=wait)
+						r = self.piStage.MOV([x,y,z],axis=b'1 2 3',waitUntilReady=wait)
 						if not r: break
 						#print(time.time()-start)
 						spectra = np.zeros(3648)#self.getSpectra()
@@ -854,6 +861,9 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.connect_pico.toggled[bool].connect(self.connect_pico)
 		self.ui.pico_set.clicked.connect(self.pico_set)
+
+		self.ui.Pi_Set.clicked.connect(self.Pi_Set)
+
 		########################################################################
 		########################################################################
 		########################################################################
