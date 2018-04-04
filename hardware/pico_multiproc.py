@@ -150,11 +150,11 @@ class Pico_view(QtGui.QMainWindow):
 					self.liveT+= np.linspace(data[5],data[4],len(data[0])).tolist()
 				dataA = data[2]
 				dataB = data[3]
-				#if len(self.liveA)>500:
+				if len(self.liveA)>500:
 
-					#self.liveA = self.liveA[L:]
-					#self.liveB = self.liveB[L:]
-					#self.liveT = self.liveT[L:]
+					self.liveA = self.liveA[L:]
+					self.liveB = self.liveB[L:]
+					self.liveT = self.liveT[L:]
 				self.curveA.setData(dataA)
 				self.curveB.setData(dataB)
 				self.curveA1.setData(x=self.liveT,y=self.liveA)
