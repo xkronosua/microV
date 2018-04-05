@@ -2,7 +2,7 @@
 import ctypes# give location of dll
 from ctypes import c_int, c_bool, c_void_p, c_float, c_double, c_char, c_char_p, c_ulong, byref, create_string_buffer
 import time, re, os, sys
-
+import numpy as np
 """  Открыть Com-порт
 function SMD_OpenComPort(AComNmbr: integer): boolean; stdcall;
 Функция открывает COM-порт, и устанавливает заданный номер порта.
@@ -19,7 +19,7 @@ class E727():
 	szErrorMesage = create_string_buffer(1024)
 	ID = 0
 	iError = None
-	pos = [0,0,0]
+	pos = np.array([0,0,0])
 
 	def __init__(self):
 		pass
@@ -141,9 +141,17 @@ class E727():
 				pass
 		'''
 		return 1
+	def qSVO(self,ax=b''):
+		return 1
+	def VEL(self,vel=[],ax=b''):
+		self.vel = vel
+		return 1
+	def qVEL(self):
+		return self.vel
 
 	def MOV(self, dPos,axis=1, waitUntilReady=False):
-		self.pos[axis-1] = dPos
+		self.prev_pos = self.pos
+		self.pos=np.array(dPos)
 		'''
 		PI_MOV = self.libDLL['PI_MOV']
 		PI_MOV.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
@@ -158,7 +166,7 @@ class E727():
 			self.CloseConnection()
 		else:
 			pass
-
+		'''
 		if waitUntilReady:
 			m = self.IsMoving()
 			#print(m)
@@ -169,8 +177,8 @@ class E727():
 				m = self.IsMoving()
 				#print(m)
 				#time.sleep(0.001)
-		'''
-		time.sleep(0.1)
+
+
 		return 1
 
 
@@ -202,7 +210,12 @@ class E727():
 			print("IsMoving> ERROR ",iError, szErrorMesage)
 			#self.CloseConnection()
 		'''
-		return [v for v in val]
+		dr = np.sqrt(sum((self.prev_pos-self.pos)**2))
+		t = dr/100/self.vel[0]
+		print(">>>>>",t,dr)
+		time.sleep(t)
+
+		return [0,0,0]
 
 if __name__ == "__main__":
 	e = E727()

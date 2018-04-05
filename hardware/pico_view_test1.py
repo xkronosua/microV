@@ -6,7 +6,7 @@ import numpy as np
 import pyqtgraph as pg
 import time
 import sys
-
+import traceback
 from picoscope import ps3000a
 
 mode = 'live'
@@ -35,11 +35,11 @@ for i in range(n_captures):
 #p.addItem(lr)
 ps = ps3000a.PS3000a(connect=False)
 ps.open()
-n_captures = 2
+n_captures = 20
 ps.setChannel("A", coupling="DC", VRange=0.5)
 ps.setChannel("B", coupling="DC", VRange=0.5)
 ps.setSamplingInterval(0.00001,0.003)
-ps.setSimpleTrigger(trigSrc="B", threshold_V=-0.320, direction='Falling',
+ps.setSimpleTrigger(trigSrc="B", threshold_V=-0.350, direction='Falling',
 						 timeout_ms=10, enabled=True,delay=120)
 samples_per_segment = ps.memorySegments(n_captures)
 ps.setNoOfCaptures(n_captures)
@@ -81,15 +81,16 @@ def update():
 			curveA.setData(dataA1.mean(axis=0))
 			curveB.setData(dataB1.mean(axis=0))
 		elif mode == "live":
-			liveA.append(scanA)
+			liveA+=scanA.tolist()
 			curveA.setData(liveA)
-			liveB.append(scanB)
+			liveB+=scanB.tolist()
 			curveB.setData(liveB)
 		#for i in range(len(data)):
 		#	curves[i].setData(data[i,:])
 		app.processEvents()  ## force complete redraw for every plot
 		#time.sleep(1)
 	except:
+		traceback.print_exc()
 		ps.close()
 		timer.stop()
 timer = QtCore.QTimer()

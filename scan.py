@@ -3,6 +3,8 @@ import numpy as np
 import pyqtgraph as pg
 import time
 import sys
+if len(sys.argv[1])>0:
+	mode = sys.argv[1]
 
 from picoscope import ps3000a
 import multiprocessing
@@ -10,9 +12,16 @@ from multiprocessing import Queue
 import time
 import traceback
 from scipy.interpolate import interp1d
-from hardware.E727 import E727
 from scipy.interpolate import griddata
+
+if mode == 'sim':
+	from hardware.sim.E727 import E727
+else:
+	from hardware.E727 import E727
+
 t_start = time.time()
+
+
 class Pico_recorder(multiprocessing.Process):
 	ps = None
 	alive = True
@@ -96,16 +105,21 @@ class Pico_recorder(multiprocessing.Process):
 
 def tableXYZ(X,Y,Z):
 	for z in Z:
-		for y in Y:
-			for x in X:
-				yield [x,y,z]
+		for x,y in zip(X,Y):
+			 yield [x,y,z]
 
 
 class Pico_view(QtGui.QMainWindow):
 	timer = QtCore.QTimer()
 	q = Queue()
-	ps = ps3000a.PS3000a(connect=False)
-	pico = Pico_recorder(q=q)
+	#ps = ps3000a.PS3000a(connect=False)
+	#pico = Pico_recorder(q=q)
+	pico = Pico_recorder(q=q,n_captures=1000,
+					ChA_VRange=0.5,ChA_Offset=0.0,
+					ChB_VRange=0.5,ChB_Offset=0.0,
+					sampleInterval=0.00001, samplingDuration=0.003,
+					trigSrc="B", threshold_V=-0.350, direction='Falling',
+											 timeout_ms=10, delay=120)
 	liveA = []
 	liveB = []
 	liveT = []
@@ -168,12 +182,13 @@ class Pico_view(QtGui.QMainWindow):
 		print(self.piStage.qVEL())
 
 
-		self.timer.start(0.5)
-		self.pico.start()
 
+		self.pico.start()
+		time.sleep(3)
+		self.timer.start(0.5)
 		#while self.q.empty():
 		#	time.sleep(0.5)
-		#time.sleep(2)
+		#
 		self.timer.timeout.connect(self.update)
 		#self.pico.join()
 		#self.actionExit.toggled.connect(self.closeEvent)
@@ -185,11 +200,13 @@ class Pico_view(QtGui.QMainWindow):
 			self.timer.stop()
 			self.liveA = []
 			self.liveT = []
-
+			dataA = []
+			dataB = []
+			print('update')
 			try:
-				N = 10
-				X = [0,100]*N
-				Y = np.linspace(0,100,N*2)
+				N = 5
+				X = [0,100,100,0]*N
+				Y = np.repeat(np.linspace(0,100,N*2),2)
 				Z = [50]
 
 				self.posTable = tableXYZ(X,Y,Z)
@@ -199,7 +216,7 @@ class Pico_view(QtGui.QMainWindow):
 				for zz in range(len(X)*len(Y)):
 					try:
 						target = next(self.posTable)
-						print(target)
+						#print(target)
 						self.piStage.MOV(dPos=target,axis=b"1 2 3", waitUntilReady=True)
 						t.append(time.time()-t_start)
 						real_position = self.piStage.qPOS()
@@ -231,13 +248,13 @@ class Pico_view(QtGui.QMainWindow):
 				while self.q.qsize()>0:
 					data_q.append(self.q.get_nowait())
 					print(self.q.qsize())
-
-				for data in data_q:
-					self.liveA+= data[0].tolist()
-					self.liveB+= data[1].tolist()
-					self.liveT+= np.linspace(data[4],data[5],len(data[0])).tolist()
-				dataA = data[2]
-				dataB = data[3]
+				if len(data_q)>0:
+					for data in data_q:
+						self.liveA+= data[0].tolist()
+						self.liveB+= data[1].tolist()
+						self.liveT+= np.linspace(data[4],data[5],len(data[0])).tolist()
+					dataA = data[2]
+					dataB = data[3]
 				T_interp = interp1d(self.liveT,self.liveA,bounds_error=False,fill_value=0)
 				pmt = T_interp(t)
 				xi = np.linspace(min(x),max(x),N*2)
@@ -266,6 +283,7 @@ class Pico_view(QtGui.QMainWindow):
 				app.processEvents()
 				#self.timer.start(0.5)
 			except:
+				traceback.print_exc()
 				pass
 
 	def closeEvent(self, evnt=None):
