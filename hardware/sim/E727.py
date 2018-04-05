@@ -212,7 +212,7 @@ class E727():
 		'''
 		dr = np.sqrt(sum((self.prev_pos-self.pos)**2))
 		t = dr/100/self.vel[0]
-		print(">>>>>",t,dr)
+		#print(">>>>>",t,dr)
 		time.sleep(t)
 
 		return [0,0,0]
