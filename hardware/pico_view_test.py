@@ -35,11 +35,11 @@ for i in range(n_captures):
 #p.addItem(lr)
 ps = ps3000a.PS3000a(connect=False)
 ps.open()
-n_captures = 100
-ps.setChannel("A", coupling="DC", VRange=0.1)
-ps.setChannel("B", coupling="DC", VRange=0.1)
+n_captures = 1000
+ps.setChannel("A", coupling="DC", VRange=0.5)
+ps.setChannel("B", coupling="DC", VRange=0.5)
 ps.setSamplingInterval(200e-9,15e-6)
-ps.setSimpleTrigger(trigSrc="External", threshold_V=0.020, direction='Rising',
+ps.setSimpleTrigger(trigSrc="External", threshold_V=0.030, direction='Rising',
 						 timeout_ms=5, enabled=True)
 samples_per_segment = ps.memorySegments(n_captures)
 ps.setNoOfCaptures(n_captures)
@@ -89,7 +89,7 @@ def update():
 		timer.stop()
 timer = QtCore.QTimer()
 timer.timeout.connect(update)
-timer.start(0)
+timer.start(0.1)
 
 
 

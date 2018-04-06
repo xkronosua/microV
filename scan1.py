@@ -3,7 +3,8 @@ import numpy as np
 
 import time
 import sys
-if len(sys.argv[1])>0:
+mode = ''
+if len(sys.argv)>1:
 	mode = sys.argv[1]
 
 from picoscope import ps3000a
@@ -17,14 +18,14 @@ from scipy.interpolate import griddata
 if mode == 'sim':
 	from hardware.sim.E727 import E727
 else:
-	pass
-	#from hardware.E727 import E727
+	#pass
+	from hardware.E727 import E727
 
 t_start = time.time()
 
 
 class Pico_recorder(multiprocessing.Process):
-	kill_counter_N = 100
+	kill_counter_N = 500
 	def __init__(self,input_q, output_q, n_captures=200,
 					ChA_VRange=0.05,ChA_Offset=0.0,
 					ChB_VRange=0.05,ChB_Offset=0.0,
@@ -140,9 +141,9 @@ class Pico_recorder(multiprocessing.Process):
 				scanB=abs(dataB1.max(axis=1)-dataB1.min(axis=1))
 				scanT = np.linspace(t0_,t1,len(scanA))
 				self.output_q.put([scanT,scanA,scanB,dataA1.mean(axis=0),dataB1.mean(axis=0)])
-				self.output_q.put([np.array([scanT[-1]]),np.array([0]),np.array([0]),0,0])
+				#self.output_q.put([np.array([scanT[-1]]),np.array([0]),np.array([0]),0,0])
 				#time.sleep(1)
-				print("<<",time.time(),kill_counter)#, t1-t0_)
+				print("<<",time.time(),kill_counter,'>>>>>>>>>',t0-t0_)#, t1-t0_)
 				#i+=1
 				#if i == 10:
 				#	self.close()
@@ -188,16 +189,19 @@ if __name__ == '__main__':
 	#out = ex.out
 	input_q = Queue()
 	output_q = Queue()
-	pico = Pico_recorder(input_q, output_q, n_captures=10,
-					ChA_VRange=0.5,ChA_Offset=0.0,
-					ChB_VRange=0.5,ChB_Offset=0.0,
-					sampleInterval=0.000001, samplingDuration=0.003,
-					trigSrc="B", threshold_V=-0.350, direction='Falling',
-											 timeout_ms=10, delay=120)
-
+	pico = Pico_recorder(input_q, output_q, n_captures=5000,
+					ChA_VRange=1,ChA_Offset=0.0,
+					ChB_VRange=1,ChB_Offset=0.0,
+					#sampleInterval=0.000001, samplingDuration=0.003,
+					#trigSrc="B", threshold_V=-0.350, direction='Falling',
+					#						 timeout_ms=10, delay=120)
+					)
 
 	piStage = E727()
-	piStage.VEL([30,30,30],b'1 2 3')
+	print(piStage.ConnectUSBWithBaudRate())
+	print(piStage.qSAI())
+	piStage.qSVO(b'1 2 3')
+	piStage.VEL([100,100,100],b'1 2 3')
 	pico.start()
 
 	while not pico.isReady():
@@ -222,12 +226,14 @@ if __name__ == '__main__':
 		x.append(real_position[0])
 		y.append(real_position[1])
 		t.append(time.time())
-		piStage.MOV(target,b'1 2 3',waitUntilReady=True)
-		real_position = piStage.qPOS()
-		x.append(real_position[0])
-		y.append(real_position[1])
-		t.append(time.time())
-		print(output_q.qsize(),x[-1],y[-1],t[-1]-t[-2])
+		piStage.MOV(target,b'1 2 3',waitUntilReady=0)
+		while sum(piStage.IsMoving()):
+			real_position = piStage.qPOS()
+			x.append(real_position[0])
+			y.append(real_position[1])
+			t.append(time.time())
+
+		print(output_q.qsize(),x[-1],y[-1])
 		#time.sleep(1)
 		#pico.update()
 
@@ -239,7 +245,7 @@ if __name__ == '__main__':
 	scanT,scanA,scanB,dataA,dataB = pico.getData()
 	sm_step_x = interp1d(t,x)
 	sm_step_y = interp1d(t,y)
-	t1 = np.linspace(min(t),max(t),len(t)*5)
+	t1 = np.linspace(min(t),max(t),len(t))
 	x1 = sm_step_x(t1)
 	y1 = sm_step_y(t1)
 
@@ -260,5 +266,6 @@ if __name__ == '__main__':
 	plt.show(0)
 	plt.figure()
 
-	plt.contourf(xi,yi,data)
+	plt.contourf(xi,yi,data,20)
+	plt.plot(X,Y,'r')
 	plt.show(0)
