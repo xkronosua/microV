@@ -38,7 +38,7 @@ ps.open()
 n_captures = 20
 ps.setChannel("A", coupling="DC", VRange=0.5)
 ps.setChannel("B", coupling="DC", VRange=0.5)
-ps.setSamplingInterval(0.00001,0.003)
+ps.setSamplingInterval(0.000001,0.0035)
 ps.setSimpleTrigger(trigSrc="B", threshold_V=-0.350, direction='Falling',
 						 timeout_ms=10, enabled=True,delay=120)
 samples_per_segment = ps.memorySegments(n_captures)
@@ -47,8 +47,8 @@ ps.setNoOfCaptures(n_captures)
 
 dataA = []
 dataB = []
-liveA = []
-liveB = []
+liveA = np.array([0])
+liveB = np.array([0])
 tmp_data = []
 dataA = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
 dataB = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
@@ -58,19 +58,20 @@ def update():
 
 		#tmp_data = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
 		t1 = time.time()
-
+		while not ps.isReady():
+			time.sleep(0.001)
 		#time.sleep(3)
-		ps.waitReady()
+		#ps.waitReady()
 		t2 = time.time()
 		print("Time to get sweep: " + str(t2 - t1))
 		ps.getDataRawBulk(channel='A',data=dataA)
 		ps.getDataRawBulk(channel='B',data=dataB)
 		ps.runBlock()
 		t3 = time.time()
-		tmp_data = dataA.copy()
+
 		print("Time to read data: " + str(t3 - t2))
-		dataA1=dataA[:, 0:ps.noSamples]#.mean(axis=0)
-		dataB1=dataB[:, 0:ps.noSamples]#.mean(axis=0)
+		dataA1=dataA[:, 0:ps.noSamples].copy()#.mean(axis=0)
+		dataB1=dataB[:, 0:ps.noSamples].copy()#.mean(axis=0)
 		#if dataA.min()>-100 :
 		#	ps.setChannel("A", coupling="DC", VRange=2)
 		#print (data.shape)
@@ -81,12 +82,14 @@ def update():
 			curveA.setData(dataA1.mean(axis=0))
 			curveB.setData(dataB1.mean(axis=0))
 		elif mode == "live":
-			liveA+=scanA.tolist()
+			liveA = np.hstack((liveA,scanA))
 			curveA.setData(liveA)
-			liveB+=scanB.tolist()
+			#liveB+=scanB.tolist()
+			liveB = np.hstack((liveB,scanB))
 			curveB.setData(liveB)
 		#for i in range(len(data)):
 		#	curves[i].setData(data[i,:])
+		print("Time to plot data: " + str(time.time()-t3))
 		app.processEvents()  ## force complete redraw for every plot
 		#time.sleep(1)
 	except:

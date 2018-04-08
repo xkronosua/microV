@@ -7,7 +7,7 @@ mode = ''
 if len(sys.argv)>1:
 	mode = sys.argv[1]
 
-from picoscope import ps3000a
+from hardware.picoscope import ps3000a
 import multiprocessing
 from multiprocessing import Queue
 import time
@@ -59,7 +59,7 @@ class Pico_recorder(multiprocessing.Process):
 
 		self.ps.setChannel("A", coupling="DC", VRange=self.ChA_VRange, VOffset=self.ChA_Offset)
 		self.ps.setChannel("B", coupling="DC", VRange=self.ChB_VRange, VOffset=self.ChB_Offset)
-		self.ps.setSamplingInterval(self.sampleInterval,self.samplingDuration)
+		self.ps.setSamplingInterval(self.sampleInterval,self.samplingDuration,oversample=4)
 		self.ps.setSimpleTrigger(trigSrc=self.trigSrc, threshold_V=self.threshold_V,
 			direction=self.direction, timeout_ms=self.timeout_ms, enabled=True,delay=self.delay)
 		max_samples_per_segment = self.ps.memorySegments(self.n_captures)
@@ -118,25 +118,29 @@ class Pico_recorder(multiprocessing.Process):
 		print('start')
 		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
 		dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+
 		self.ps.runBlock()
 
 		t0 = time.time()
 		i = 0
 		t0_ = 0
 		kill_counter = self.kill_counter_N
+
 		try:
 			while status != 'kill' and kill_counter>0:
 				#self.ps.runBlock()
-
-				self.ps.waitReady()
+				while not self.ps.isReady():
+					time.sleep(0.001)
+				#self.ps.waitReady()
 				t1 = time.time()
-				self.ps.getDataRawBulk(channel='A',data=dataA)
-				self.ps.getDataRawBulk(channel='B',data=dataB)
+				self.ps.getDataRawBulk(channel='A',data=dataA,downSampleRatio=4)
+				self.ps.getDataRawBulk(channel='B',data=dataB,downSampleRatio=4)
 				t0_ = t0
+
 				self.ps.runBlock()
 				t0 = time.time()
-				dataA1=dataA[:, 0:self.ps.noSamples]#.mean(axis=0)
-				dataB1=dataB[:, 0:self.ps.noSamples]#.mean(axis=0)
+				dataA1=dataA[:, 0:self.ps.noSamples].copy()#.mean(axis=0)
+				dataB1=dataB[:, 0:self.ps.noSamples].copy()#.mean(axis=0)
 				scanA=abs(dataA1.max(axis=1)-dataA1.min(axis=1))
 				scanB=abs(dataB1.max(axis=1)-dataB1.min(axis=1))
 				scanT = np.linspace(t0_,t1,len(scanA))
@@ -163,8 +167,11 @@ class Pico_recorder(multiprocessing.Process):
 						kill_counter -=1
 
 				kill_counter -= 1
+
 		except:
 			traceback.print_exc()
+		if kill_counter == 0:
+			print('watchdog...')
 		print('pico: KILL')
 		self.ps.close()
 
@@ -189,6 +196,7 @@ if __name__ == '__main__':
 	#out = ex.out
 	input_q = Queue()
 	output_q = Queue()
+	'''
 	pico = Pico_recorder(input_q, output_q, n_captures=5000,
 					ChA_VRange=1,ChA_Offset=0.0,
 					ChB_VRange=1,ChB_Offset=0.0,
@@ -196,12 +204,20 @@ if __name__ == '__main__':
 					#trigSrc="B", threshold_V=-0.350, direction='Falling',
 					#						 timeout_ms=10, delay=120)
 					)
+	'''
+	pico = Pico_recorder(input_q, output_q, n_captures=1000,
+					ChA_VRange=0.5,ChA_Offset=0.0,
+					ChB_VRange=0.5,ChB_Offset=0.0,
+					sampleInterval=0.000001, samplingDuration=0.003,
+					trigSrc="B", threshold_V=-0.350, direction='Falling',
+											 timeout_ms=10, delay=150)
+
 
 	piStage = E727()
 	print(piStage.ConnectUSBWithBaudRate())
 	print(piStage.qSAI())
 	piStage.qSVO(b'1 2 3')
-	piStage.VEL([100,100,100],b'1 2 3')
+	piStage.VEL([10,10,10],b'1 2 3')
 	pico.start()
 
 	while not pico.isReady():
@@ -245,7 +261,7 @@ if __name__ == '__main__':
 	scanT,scanA,scanB,dataA,dataB = pico.getData()
 	sm_step_x = interp1d(t,x)
 	sm_step_y = interp1d(t,y)
-	t1 = np.linspace(min(t),max(t),len(t))
+	t1 = np.linspace(min(t),max(t),len(t)*2)
 	x1 = sm_step_x(t1)
 	y1 = sm_step_y(t1)
 
@@ -260,12 +276,12 @@ if __name__ == '__main__':
 	pico.join()
 	import matplotlib.pyplot as plt
 	plt.figure()
-	plt.plot(t1,x1,'r')
-	plt.plot(t1,y1,'g')
+	plt.plot(t1,x1*10,'r')
+	plt.plot(t1,y1*10,'g')
 	plt.plot(scanT,scanA,'m')
 	plt.show(0)
 	plt.figure()
 
 	plt.contourf(xi,yi,data,20)
 	plt.plot(X,Y,'r')
-	plt.show(0)
+	plt.show()
