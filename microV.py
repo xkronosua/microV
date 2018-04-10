@@ -54,6 +54,8 @@ class microV(QtGui.QMainWindow):
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
 	live_pmt1 = []
+	live_x = []
+	live_y = []
 	live_integr_spectra = []
 	pico_VRange_dict = {"Auto":20.0,'20 mV':0.02,'50 mV':0.05,'100 mV':0.1,'200 mV':0.2,'500 mV':0.5,
 					'1 V': 1.0, '2 V': 2.0, '5 V': 5.0, '10 V': 10.0, '20 V': 20.0,}
@@ -231,7 +233,8 @@ class microV(QtGui.QMainWindow):
 		dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
 		#t1 = time.time()
 		self.ps.runBlock()
-		self.ps.waitReady()
+		while not self.ps.isReady():
+			time.sleep(0.001)
 		#t2 = time.time()
 		#print("Time to get sweep: " + str(t2 - t1))
 		self.ps.getDataRawBulk(channel='A',data=dataA)
@@ -455,6 +458,9 @@ class microV(QtGui.QMainWindow):
 			self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
 			self.live_pmt = []
 			self.live_pmt1 = []
+			self.live_x = []
+			self.live_y = []
+
 			self.live_integr_spectra = []
 		else:
 			self.calibrTimer.stop()
@@ -493,6 +499,9 @@ class microV(QtGui.QMainWindow):
 			try:
 				self.live_pmt = []
 				self.live_pmt1 = []
+				self.live_x = []
+				self.live_y = []
+
 				self.scan3DisAlive = True
 				self.scan3D()
 
@@ -501,6 +510,9 @@ class microV(QtGui.QMainWindow):
 		else:
 			self.live_pmt = []
 			self.live_pmt1 = []
+			self.live_x = []
+			self.live_y = []
+
 			self.scan3DisAlive = False
 
 	def scan3D(self):
@@ -567,25 +579,31 @@ class microV(QtGui.QMainWindow):
 						Range_x_tmp = Range_x
 						Range_xi_tmp = Range_xi
 						forward = True
-					r = self.piStage.MOV(y,axis=2,waitUntilReady=wait)
+					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 					if not r: break
 					self.live_pmt = []
 					self.live_pmt1 = []
+					self.live_x = []
+					self.live_y = []
+
 					self.live_integr_spectra = []
 					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
 
 						start=time.time()
 						#print('Start',start)
 						if not self.scan3DisAlive: break
-						r = self.piStage.MOV([x,y,z],axis=b'1 2 3',waitUntilReady=wait)
+						r = self.piStage.MOV([x],axis=b'1',waitUntilReady=wait)
 						if not r: break
-						#print(time.time()-start)
-						spectra = np.zeros(3648)#self.getSpectra()
-						#print(time.time()-start)
-						pmt_val,pmt_val1 = self.readPico()#readDAQmx()
-						#print(time.time()-start,pmt_val)
-						#spectra = list(medfilt(spectra,5))
+
+						real_position0 = [round(p,6) for p in self.piStage.qPOS()]
+						pmt_val, pmt_val1 = self.readPico()
 						real_position = [round(p,6) for p in self.piStage.qPOS()]
+						self.live_pmt.append(pmt_val)
+						self.live_pmt1.append(pmt_val1)
+						self.live_x.append(np.mean([real_position0[0],real_position[0]]))
+						self.live_y.append(np.mean([real_position0[1],real_position[1]]))
+
+						spectra = np.zeros(3648)
 						dataSet = real_position +[pmt_val,pmt_val1]# + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
@@ -594,15 +612,25 @@ class microV(QtGui.QMainWindow):
 						s_from = self.ui.usbSpectr_from.value()
 						s_to = self.ui.usbSpectr_to.value()
 						#print(data_spectra.shape,yi,xi)
-						data_spectra[yi,xi] = np.sum(spectra[s_from:s_to])
-						data_pmt[zi,xi,yi] = pmt_val
-						data_pmt1[zi,xi,yi] = pmt_val1
-						self.live_pmt.append(pmt_val)
-						self.live_pmt1.append(pmt_val1)
-						self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
+						if wait:
+							xi_ = xi
+							yi_ = yi
+						else:
+							xi_ = int(round((self.live_x[-1]-Range_x[0])*len(Range_xi_tmp)/(Range_x_tmp.max()-Range_x_tmp.min())))
+							yi_ = int(round((self.live_y[-1]-Range_y[0])*len(Range_yi)/(Range_y.max()-Range_y.min())))
+							#data_spectra[yi_,xi_] = np.sum(spectra[s_from:s_to])
+							if xi_>= len(Range_xi_tmp):
+								xi_ = len(Range_xi_tmp)-1
+							if yi_>= len(Range_yi):
+								yi_ = len(Range_yi)-1
+						data_pmt[zi,xi_,yi_] = pmt_val
+						data_pmt1[zi,xi_,yi_] = pmt_val1
+						print(self.live_x[-1], x, xi_,xi, yi_, yi)
 
-						self.line_pmt.setData(data_pmt[zi,:,yi])
-						self.line_pmt1.setData(data_pmt1[zi,:,yi])
+						#self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
+
+						self.line_pmt.setData(x=self.live_x,y=self.live_pmt)
+						self.line_pmt1.setData(x=self.live_x,y=self.live_pmt1)
 
 						#self.line_spectra.setData(self.live_integr_spectra)
 

@@ -196,10 +196,10 @@ if __name__ == '__main__':
 	#out = ex.out
 	input_q = Queue()
 	output_q = Queue()
-	'''
-	pico = Pico_recorder(input_q, output_q, n_captures=5000,
-					ChA_VRange=1,ChA_Offset=0.0,
-					ChB_VRange=1,ChB_Offset=0.0,
+
+	pico = Pico_recorder(input_q, output_q, n_captures=50,
+					ChA_VRange=0.02,ChA_Offset=0.0,
+					ChB_VRange=0.02,ChB_Offset=0.0,
 					#sampleInterval=0.000001, samplingDuration=0.003,
 					#trigSrc="B", threshold_V=-0.350, direction='Falling',
 					#						 timeout_ms=10, delay=120)
@@ -211,13 +211,13 @@ if __name__ == '__main__':
 					sampleInterval=0.000001, samplingDuration=0.003,
 					trigSrc="B", threshold_V=-0.350, direction='Falling',
 											 timeout_ms=10, delay=150)
-
+	'''
 
 	piStage = E727()
 	print(piStage.ConnectUSBWithBaudRate())
 	print(piStage.qSAI())
 	piStage.qSVO(b'1 2 3')
-	piStage.VEL([10,10,10],b'1 2 3')
+	piStage.VEL([1000,1000,1000],b'1 2 3')
 	pico.start()
 
 	while not pico.isReady():

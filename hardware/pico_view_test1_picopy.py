@@ -42,7 +42,18 @@ for i in range(n_captures):
 #p.addItem(lr)
 ps = picopy.Pico3k()
 
-n_captures = 50
+n_captures = 50000
+
+ps.setChannel("A", coupling="DC", VRange='50mV')
+ps.setChannel("B", coupling="DC", VRange='50mV')
+(sampleInterval, noSamples, maxSamples) = ps.setSamplingInterval(2e-7,15e-6)
+
+#trigger = picopy.EdgeTrigger(channel='B', threshold=-0.35, direction='FALLING')
+#ps.set_trigger(trigger)
+ps.setSimpleTrigger(trigSrc="ext", threshold_V=0.020, direction='RISING',
+						 timeout_ms=10, enabled=True,delay=0)
+
+'''
 ps.setChannel("A", coupling="DC", VRange='500mV')
 ps.setChannel("B", coupling="DC", VRange='500mV')
 (sampleInterval, noSamples, maxSamples) = ps.setSamplingInterval(0.000001,0.0035)
@@ -52,7 +63,7 @@ ps.setChannel("B", coupling="DC", VRange='500mV')
 ps.setSimpleTrigger(trigSrc="B", threshold_V=-0.350, direction='FALLING',
 						 timeout_ms=10, enabled=True,delay=300)
 
-
+'''
 
 dataA = []
 dataB = []
