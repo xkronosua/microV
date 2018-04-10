@@ -59,7 +59,7 @@ class Pico_recorder(multiprocessing.Process):
 
 		self.ps.setChannel("A", coupling="DC", VRange=self.ChA_VRange, VOffset=self.ChA_Offset)
 		self.ps.setChannel("B", coupling="DC", VRange=self.ChB_VRange, VOffset=self.ChB_Offset)
-		self.ps.setSamplingInterval(self.sampleInterval,self.samplingDuration,oversample=4)
+		self.ps.setSamplingInterval(self.sampleInterval,self.samplingDuration,oversample=0)
 		self.ps.setSimpleTrigger(trigSrc=self.trigSrc, threshold_V=self.threshold_V,
 			direction=self.direction, timeout_ms=self.timeout_ms, enabled=True,delay=self.delay)
 		max_samples_per_segment = self.ps.memorySegments(self.n_captures)
@@ -133,8 +133,8 @@ class Pico_recorder(multiprocessing.Process):
 					time.sleep(0.001)
 				#self.ps.waitReady()
 				t1 = time.time()
-				self.ps.getDataRawBulk(channel='A',data=dataA,downSampleRatio=4)
-				self.ps.getDataRawBulk(channel='B',data=dataB,downSampleRatio=4)
+				self.ps.getDataRawBulk(channel='A',data=dataA,downSampleRatio=1)
+				self.ps.getDataRawBulk(channel='B',data=dataB,downSampleRatio=1)
 				t0_ = t0
 
 				self.ps.runBlock()
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 					#						 timeout_ms=10, delay=120)
 					)
 	'''
-	pico = Pico_recorder(input_q, output_q, n_captures=1000,
+	pico = Pico_recorder(input_q, output_q, n_captures=100,
 					ChA_VRange=0.5,ChA_Offset=0.0,
 					ChB_VRange=0.5,ChB_Offset=0.0,
 					sampleInterval=0.000001, samplingDuration=0.003,

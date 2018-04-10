@@ -7,7 +7,14 @@ import pyqtgraph as pg
 import time
 import sys
 import traceback
-from picoscope import ps3000a
+
+import picopy
+import picopy.pico_status as status
+
+import copy
+import math
+
+
 
 mode = 'live'
 if len(sys.argv)>1:
@@ -33,48 +40,33 @@ for i in range(n_captures):
 
 #lr = pg.LinearRegionItem([100, 4900])
 #p.addItem(lr)
-ps = ps3000a.PS3000a(connect=False)
-ps.open()
+ps = picopy.Pico3k()
+
 n_captures = 50
-ps.setChannel("A", coupling="DC", VRange=0.5)
-ps.setChannel("B", coupling="DC", VRange=0.5)
-ps.setSamplingInterval(0.000001,0.0035)
-ps.setSimpleTrigger(trigSrc="B", threshold_V=-0.350, direction='Falling',
-						 timeout_ms=10, enabled=True,delay=120)
-samples_per_segment = ps.memorySegments(n_captures)
-ps.setNoOfCaptures(n_captures)
+ps.setChannel("A", coupling="DC", VRange='500mV')
+ps.setChannel("B", coupling="DC", VRange='500mV')
+(sampleInterval, noSamples, maxSamples) = ps.setSamplingInterval(0.000001,0.0035)
+
+#trigger = picopy.EdgeTrigger(channel='B', threshold=-0.35, direction='FALLING')
+#ps.set_trigger(trigger)
+ps.setSimpleTrigger(trigSrc="B", threshold_V=-0.350, direction='FALLING',
+						 timeout_ms=10, enabled=True,delay=300)
+
 
 
 dataA = []
 dataB = []
 liveA = np.array([0])
 liveB = np.array([0])
-tmp_data = []
-dataA = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
-dataB = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
+
 def update():
 	try:
-		global dataA, liveA,dataB, liveB, tmp_data
-
-		#tmp_data = np.zeros((n_captures, samples_per_segment), dtype=np.int16)
-		t1 = time.time()
-		while not ps.isReady():
-			time.sleep(0.01)
-		#time.sleep(3)
-		#ps.waitReady()
-		t2 = time.time()
-		print("Time to get sweep: " + str(t2 - t1))
-		ps.getDataRawBulk(channel='A',data=dataA)
-		ps.getDataRawBulk(channel='B',data=dataB)
-		ps.runBlock()
-		t3 = time.time()
-
-		print("Time to read data: " + str(t3 - t2))
-		dataA1=dataA[:, 0:ps.noSamples].copy()#.mean(axis=0)
-		dataB1=dataB[:, 0:ps.noSamples].copy()#.mean(axis=0)
-		#if dataA.min()>-100 :
-		#	ps.setChannel("A", coupling="DC", VRange=2)
-		#print (data.shape)
+		global dataA, liveA,dataB, liveB, tmp_data, n_captures
+		t0 = time.time()
+		r = ps.capture_prep_block( number_of_frames=n_captures, downsample=2, downsample_mode='NONE',
+			return_scaled_array=0)
+		dataA1 = r[0]['A']
+		dataB1 = r[0]['B']
 		scanA=abs(dataA1.max(axis=1)-dataA1.min(axis=1))
 		scanB=abs(dataB1.max(axis=1)-dataB1.min(axis=1))
 
@@ -89,8 +81,7 @@ def update():
 			curveB.setData(liveB)
 		#for i in range(len(data)):
 		#	curves[i].setData(data[i,:])
-		print("Time to plot data: " + str(time.time()-t3))
-		print("Time of cycle: " + str(time.time()-t1))
+		print("Time of cycle: " + str(time.time()-t0), r[-1])
 		app.processEvents()  ## force complete redraw for every plot
 		#time.sleep(1)
 	except:
@@ -100,7 +91,7 @@ def update():
 timer = QtCore.QTimer()
 timer.timeout.connect(update)
 timer.start(0)
-ps.runBlock()
+
 
 
 
