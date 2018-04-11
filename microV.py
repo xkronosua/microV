@@ -243,19 +243,19 @@ class microV(QtGui.QMainWindow):
 		#self.ps.runBlock()
 		r = self.ps.capture_prep_block( pre_trigger=self.pico_pretrig, number_of_frames=self.n_captures, downsample=2, downsample_mode='NONE',
 			return_scaled_array=1)
-		dataA = r[0]['A']
-		dataB = r[0]['B']
+		dataA = r[0]['A'].mean(axis=0)
+		dataB = r[0]['B'].mean(axis=0)
 		scanT = r[1]
 
 
 		if self.ui.raw_data_preview.isChecked():
-			self.line_pico_ChA.setData(dataA.mean(axis=0))
-			self.line_pico_ChB.setData(dataB.mean(axis=0))
+			self.line_pico_ChA.setData(dataA)
+			self.line_pico_ChB.setData(dataB)
 
 		if self.ui.pico_AutoRange.isChecked():
 
 			indexChA = self.ui.pico_ChA_VRange.currentIndex()
-			ChA_VRange = pico_VRange_dict[self.ui.pico_ChA_VRange.currentText()]
+			ChA_VRange = self.pico_VRange_dict[self.ui.pico_ChA_VRange.currentText()]
 			if abs(dataA.min())> ChA_VRange*0.9 and indexChA<8:
 				indexChA += 1
 
@@ -268,7 +268,7 @@ class microV(QtGui.QMainWindow):
 
 
 			indexChB = self.ui.pico_ChB_VRange.currentIndex()
-			ChB_VRange = pico_VRange_dict[self.ui.pico_ChB_VRange.currentText()]
+			ChB_VRange = self.pico_VRange_dict[self.ui.pico_ChB_VRange.currentText()]
 			if abs(dataB.min())> ChB_VRange*0.9 and indexChB<8:
 				indexChB += 1
 
@@ -645,16 +645,16 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmt_16 = data_pmt/data_pmt.max()*32768
-			data_pmt1_16 = data_pmt1/data_pmt1.max()*32768
+			data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
+			data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
 			imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
 			imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 
-		data_pmt_16 = data_pmt/data_pmt.max()*32768
-		data_pmt1_16 = data_pmt1/data_pmt1.max()*32768
+		data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
+		data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
 		imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
 		imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
 		self.ui.start3DScan.setChecked(False)
