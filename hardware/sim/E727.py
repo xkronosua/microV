@@ -121,7 +121,7 @@ class E727():
 		'''
 		return self.szAxes#.value
 
-	def SVO(self):
+	def SVO(self,a,b):
 		'''
 		for axis in range(1,4):
 			bFlags = (c_bool*3)()

@@ -18,6 +18,7 @@ if len(sys.argv)>1:
 		from hardware.sim.TDC001 import *
 		from hardware.sim.picoscope import ps3000a
 		from hardware.sim.AG_UC2 import AG_UC2
+		import picopy
 		#from hardware.sim.PM100 import visa
 else:
 	from hardware.ni1 import *
@@ -30,6 +31,7 @@ else:
 	from hardware.AG_UC2 import AG_UC2
 	import visa
 	from ThorlabsPM100 import ThorlabsPM100
+	import picopy
 
 from hardware.pico_radar import fastScan
 
@@ -46,7 +48,8 @@ class microV(QtGui.QMainWindow):
 	spectrometer = CCS200()
 	HWP = APTMotor(83854487, HWTYPE=31)
 	rotPiezoStage = AG_UC2()
-	ps = ps3000a.PS3000a(connect=False)
+	#ps = ps3000a.PS3000a(connect=False)
+	ps = None
 	n_captures = None
 	#inst = visa.instrument('USB0::0x0000::0x0000::DG5Axxxxxxxxx::INSTR', term_chars='\n', timeout=1)
 	power_meter = None#ThorlabsPM100(inst=inst)
@@ -57,8 +60,9 @@ class microV(QtGui.QMainWindow):
 	live_x = []
 	live_y = []
 	live_integr_spectra = []
-	pico_VRange_dict = {"Auto":20.0,'20 mV':0.02,'50 mV':0.05,'100 mV':0.1,'200 mV':0.2,'500 mV':0.5,
-					'1 V': 1.0, '2 V': 2.0, '5 V': 5.0, '10 V': 10.0, '20 V': 20.0,}
+	pico_VRange_dict = {"Auto":20.0,'20mV':0.02,'50mV':0.05,'100mV':0.1,
+			'200mV':0.2,'500mV':0.5,'1V': 1.0, '2V': 2.0,
+			'5V': 5.0, '10V': 10.0, '20V': 20.0,}
 
 	processOut = Queue()
 	def __init__(self, parent=None):
@@ -199,12 +203,12 @@ class microV(QtGui.QMainWindow):
 		self.n_captures = self.ui.pico_n_captures.value()
 
 		ChA_VRange = self.ui.pico_ChA_VRange.currentText()
-		ChA_VRange = self.pico_VRange_dict[ChA_VRange]
+		#ChA_VRange = self.pico_VRange_dict[ChA_VRange]
 
 		ChA_Offset = self.ui.pico_ChA_offset.value()
 
 		ChB_VRange = self.ui.pico_ChB_VRange.currentText()
-		ChB_VRange = self.pico_VRange_dict[ChB_VRange]
+		#ChB_VRange = self.pico_VRange_dict[ChB_VRange]
 		ChB_Offset = self.ui.pico_ChB_offset.value()
 
 		self.ps.setChannel("A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
@@ -215,49 +219,48 @@ class microV(QtGui.QMainWindow):
 		self.ps.setSamplingInterval(sampleInterval,samplingDuration)
 
 		trigSrc = self.ui.pico_TrigSource.currentText()
+		if trigSrc == 'External':
+			trigSrc = 'ext'
 		threshold_V = self.ui.pico_TrigThreshold.value()
-		direction = self.ui.pico_Trig_mode.currentText()
+		direction = self.ui.pico_Trig_mode.currentText().upper()
+		self.pico_pretrig = float(self.ui.pico_pretrig.text())
 		self.ps.setSimpleTrigger(trigSrc=trigSrc, threshold_V=threshold_V, direction=direction,
 								 timeout_ms=5, enabled=True)
-		self.samples_per_segment = self.ps.memorySegments(self.n_captures)
-		self.ps.setNoOfCaptures(self.n_captures)
-		print(self.n_captures)
+		#self.samples_per_segment = self.ps.memorySegments(self.n_captures)
+		#self.ps.setNoOfCaptures(self.n_captures)
+		#print(self.n_captures)
 
 	def initPico(self):
 
-		self.ps.open()
+		#self.ps.open()
+		self.ps = picopy.Pico3k()
 		self.pico_set()
 
 	def readPico(self):
-		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
-		dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+		#dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
+		#dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
 		#t1 = time.time()
-		self.ps.runBlock()
-		while not self.ps.isReady():
-			time.sleep(0.001)
-		#t2 = time.time()
-		#print("Time to get sweep: " + str(t2 - t1))
-		self.ps.getDataRawBulk(channel='A',data=dataA)
-		self.ps.getDataRawBulk(channel='B',data=dataB)
-		#t3 = time.time()
-		#print("Time to read data: " + str(t3 - t2))
-		dataA = dataA[:, 0:self.ps.noSamples].mean(axis=0)
-		dataB = dataB[:, 0:self.ps.noSamples].mean(axis=0)
+		#self.ps.runBlock()
+		r = self.ps.capture_prep_block( pre_trigger=self.pico_pretrig, number_of_frames=self.n_captures, downsample=2, downsample_mode='NONE',
+			return_scaled_array=1)
+		dataA = r[0]['A']
+		dataB = r[0]['B']
+		scanT = r[1]
+
 
 		if self.ui.raw_data_preview.isChecked():
-			self.line_pico_ChA.setData(dataA)
-			self.line_pico_ChB.setData(dataB)
+			self.line_pico_ChA.setData(dataA.mean(axis=0))
+			self.line_pico_ChB.setData(dataB.mean(axis=0))
 
 		if self.ui.pico_AutoRange.isChecked():
 
 			indexChA = self.ui.pico_ChA_VRange.currentIndex()
-			if dataA.min()<self.ui.pico_AutoRange_max.value() and indexChA<8:
+			ChA_VRange = pico_VRange_dict[self.ui.pico_ChA_VRange.currentText()]
+			if abs(dataA.min())> ChA_VRange*0.9 and indexChA<8:
 				indexChA += 1
-			elif dataA.min()>self.ui.pico_AutoRange_min.value() and indexChA>0:
-				indexChA -= 1
+
 			self.ui.pico_ChA_VRange.setCurrentIndex(indexChA)
 			ChA_VRange = self.ui.pico_ChA_VRange.currentText()
-			ChA_VRange = self.pico_VRange_dict[ChA_VRange]
 			#print('AutoA',ChA_VRange)
 			ChA_Offset = self.ui.pico_ChA_offset.value()
 			self.ps.setChannel(channel="A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
@@ -265,41 +268,25 @@ class microV(QtGui.QMainWindow):
 
 
 			indexChB = self.ui.pico_ChB_VRange.currentIndex()
-			#print('ChB',indexChB)
-			if dataB.min()<self.ui.pico_AutoRange_max.value() and indexChB<8:
+			ChB_VRange = pico_VRange_dict[self.ui.pico_ChB_VRange.currentText()]
+			if abs(dataB.min())> ChB_VRange*0.9 and indexChB<8:
 				indexChB += 1
-			elif dataB.min()>self.ui.pico_AutoRange_min.value() and indexChB>0:
-				indexChB -= 1
+
 			self.ui.pico_ChB_VRange.setCurrentIndex(indexChB)
 
 			ChB_VRange = self.ui.pico_ChB_VRange.currentText()
-			ChB_VRange = self.pico_VRange_dict[ChB_VRange]
+			#ChB_VRange = self.pico_VRange_dict[ChB_VRange]
 			ChB_Offset = self.ui.pico_ChB_offset.value()
 			self.ps.setChannel(channel="B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
-			#print('AutoB',ChB_VRange)
-		'''
-		dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
-		dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
-		#t1 = time.time()
-		self.ps.runBlock()
-		self.ps.waitReady()
-		#t2 = time.time()
-		#print("Time to get sweep: " + str(t2 - t1))
-		self.ps.getDataRawBulk(channel='A',data=dataA)
-		self.ps.getDataRawBulk(channel='B',data=dataB)
-		#t3 = time.time()
-		#print("Time to read data: " + str(t3 - t2))
-		dataA = dataA[:, 0:self.ps.noSamples].mean(axis=0)
-		dataB = dataB[:, 0:self.ps.noSamples].mean(axis=0)
-		'''
-		dataA = self.ps.rawToV(channel="A", dataRaw=dataA)
-		dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
+
+		#dataA = self.ps.rawToV(channel="A", dataRaw=dataA)
+		#dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
 
 		dataA_p2p = abs(dataA.max() - dataA.min())
 		dataB_p2p = abs(dataB.max() - dataB.min())
 
-		self.ui.pico_ChA_value.setText(str(round(dataA_p2p,4)))
-		self.ui.pico_ChB_value.setText(str(round(dataB_p2p,4)))
+		self.ui.pico_ChA_value.setText(str(round(dataA_p2p,8)))
+		self.ui.pico_ChB_value.setText(str(round(dataB_p2p,8)))
 
 		return dataA_p2p, dataB_p2p
 
@@ -658,16 +645,16 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmt_16 = data_pmt/data_pmt.max()*65536
-			data_pmt1_16 = data_pmt1/data_pmt1.max()*65536
+			data_pmt_16 = data_pmt/data_pmt.max()*32768
+			data_pmt1_16 = data_pmt1/data_pmt1.max()*32768
 			imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
 			imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 
-		data_pmt_16 = data_pmt/data_pmt.max()*65536
-		data_pmt1_16 = data_pmt1/data_pmt1.max()*65536
+		data_pmt_16 = data_pmt/data_pmt.max()*32768
+		data_pmt1_16 = data_pmt1/data_pmt1.max()*32768
 		imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
 		imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
 		self.ui.start3DScan.setChecked(False)
