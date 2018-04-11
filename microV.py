@@ -517,7 +517,7 @@ class microV(QtGui.QMainWindow):
 			z_end = float(self.ui.scan3D_config.item(0,2).text())
 			z_step = float(self.ui.scan3D_config.item(0,3).text())
 			if z_step == 0:
-				Range_z = np.array([z_start]*1000)
+				Range_z = np.array([z_start]*100)
 			else:
 				Range_z = np.arange(z_start,z_end,z_step)
 			Range_zi = np.arange(len(Range_z))
@@ -545,13 +545,11 @@ class microV(QtGui.QMainWindow):
 
 				fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 				with open(fname,'a') as f:
-					f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\tspectra_px[" +
-						str(spectra_range[0]) + ":"+
-						str(spectra_range[1]) +"]\n")
+					f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\ttime\n")
 
 
 
-				data_spectra = np.zeros((len(Range_yi),len(Range_xi)))
+				#data_spectra = np.zeros((len(Range_yi),len(Range_xi)))
 
 
 				forward = True
@@ -568,10 +566,10 @@ class microV(QtGui.QMainWindow):
 						forward = True
 					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 					if not r: break
-					self.live_pmt = []
-					self.live_pmt1 = []
-					self.live_x = []
-					self.live_y = []
+					self.live_pmt = np.array([])
+					self.live_pmt1 = np.array([])
+					self.live_x = np.array([])
+					self.live_y = np.array([])
 
 					self.live_integr_spectra = []
 					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
@@ -585,19 +583,22 @@ class microV(QtGui.QMainWindow):
 						real_position0 = [round(p,6) for p in self.piStage.qPOS()]
 						pmt_val, pmt_val1 = self.readPico()
 						real_position = [round(p,6) for p in self.piStage.qPOS()]
-						self.live_pmt.append(pmt_val)
-						self.live_pmt1.append(pmt_val1)
-						self.live_x.append(np.mean([real_position0[0],real_position[0]]))
-						self.live_y.append(np.mean([real_position0[1],real_position[1]]))
+						self.live_pmt = np.hstack((self.live_pmt, pmt_val))
+						self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
+						x_real = np.mean([real_position0[0], real_position[0]])
+						y_real = np.mean([real_position0[1], real_position[1]])
 
-						spectra = np.zeros(3648)
-						dataSet = real_position +[pmt_val,pmt_val1]# + spectra[spectra_range[0]:spectra_range[1]]
+						self.live_x = np.hstack((self.live_x,x_real))
+						self.live_y = np.hstack((self.live_y,y_real))
+
+						#spectra = np.zeros(3648)
+						dataSet = real_position +[pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
 							f.write("\t".join([str(i) for i in dataSet])+"\n")
 						#print(time.time()-start)
-						s_from = self.ui.usbSpectr_from.value()
-						s_to = self.ui.usbSpectr_to.value()
+						#s_from = self.ui.usbSpectr_from.value()
+						#s_to = self.ui.usbSpectr_to.value()
 						#print(data_spectra.shape,yi,xi)
 						if wait:
 							xi_ = xi
@@ -612,7 +613,7 @@ class microV(QtGui.QMainWindow):
 								yi_ = len(Range_yi)-1
 						data_pmt[zi,xi_,yi_] = pmt_val
 						data_pmt1[zi,xi_,yi_] = pmt_val1
-						print(self.live_x[-1], x, xi_,xi, yi_, yi)
+						#print(self.live_x[-1], x, xi_,xi, yi_, yi)
 
 						#self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
 
@@ -645,18 +646,25 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
-			data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
-			imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
-			imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
+			data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)==0]
+			data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)==0]
+
+			imsave(fname+"_pmt.tif",data_pmt.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			imsave(fname+"_pmt1.tif",data_pmt1.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 
-		data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
-		data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
-		imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16))
-		imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16))
+		data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)==0]
+		data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)==0]
+		#data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
+		#data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
+		#imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16), imagej=True)
+		#imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16), imagej=True)
+		imsave(fname+"_pmt.tif",data_pmt.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.float32), imagej=True,resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
@@ -741,8 +749,9 @@ class microV(QtGui.QMainWindow):
 				isMoving = self.rotPiezoStage.isMoving()
 				n = 0
 			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
-			self.live_pmt.append(pmt_val)
-			self.live_pmt1.append(pmt_val1)
+			self.live_pmt = np.hstack((self.live_pmt, pmt_val))
+			self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
+
 			self.line_pmt.setData(self.live_pmt)
 			self.line_pmt1.setData(self.live_pmt1)
 			app.processEvents()
@@ -759,14 +768,16 @@ class microV(QtGui.QMainWindow):
 	def scanPolar(self,state):
 		if state:
 			print(state)
-			self.live_pmt = []
-			self.live_pmt1 = []
+			self.live_pmt = np.array([])
+			self.live_pmt1 = np.array([])
+			self.live_x = np.array([])
 			self.alive = True
 			self.polarScan()
 
 		else:
-			self.live_pmt = []
-			self.live_pmt1 = []
+			self.live_pmt = np.array([])
+			self.live_pmt1 = np.array([])
+			self.live_x = np.array([])
 			self.alive = False
 			self.rotPiezoStage.stop()
 
@@ -806,30 +817,33 @@ class microV(QtGui.QMainWindow):
 			if axis == 'HWP':
 				x = HWP_angle
 
-			self.live_pmt.append([x,pmt_val])
-			self.live_pmt1.append([x,pmt_val1])
-			X,Y = np.array(self.live_pmt).T
-			self.line_pmt.setData(x=X,y=Y)
-			X,Y = np.array(self.live_pmt1).T
-			self.line_pmt1.setData(x=X,y=Y)
+			self.live_pmt = np.hstack((self.live_pmt, pmt_val))
+			self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
+			self.live_x = np.hstack((self.live_x, x))
+
+			self.line_pmt.setData(x=self.live_x,y=self.live_pmt)
+			self.line_pmt1.setData(x=self.live_x,y=self.live_pmt1)
+
 			app.processEvents()
 			dataSet = real_position +[HWP_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
 			#print(dataSet[-1])
 			with open(fname,'a') as f:
-				f.write("\t".join([str(round(i,6)) for i in dataSet])+"\n")
+				f.write("\t".join([str(round(i,10)) for i in dataSet])+"\n")
 			move_function(new_pos)
 		self.ui.scan1D_Scan.setChecked(False)
 
 	def scan1D_Scan(self,state):
 		if state:
-			self.live_pmt = []
-			self.live_pmt1 = []
+			self.live_pmt = np.array([])
+			self.live_pmt1 = np.array([])
+			self.live_x = np.array([])
 			self.alive = True
 			self.scan1D()
 
 		else:
-			self.live_pmt = []
-			self.live_pmt1 = []
+			self.live_pmt = np.array([])
+			self.live_pmt1 = np.array([])
+			self.live_x = np.array([])
 			self.alive = False
 			#self.rotPiezoStage.stop()
 
@@ -919,21 +933,43 @@ class microV(QtGui.QMainWindow):
 		data = np.zeros((100,100))
 		self.ui.imageArea.addWidget(self.img)
 		self.img.setImage(data)
+		self.img.view.invertY(False)
+
 		colors = [(0, 0, 0),(255, 214, 112)]
 		cmap = pg.ColorMap(pos=[0.,1.], color=colors)
 		self.img.setColorMap(cmap)
 		g = pg.GridItem()
 		self.img.addItem(g)
+		x_arrow = pg.ArrowItem(angle=180, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='r')
+		x_arrow.setPos(40,0)
+		self.img.addItem(x_arrow)
+		t1 = pg.TextItem('X')
+		self.img.addItem(t1)
+		t1.setPos(40,-10)
+		t2 = pg.TextItem('Y')
+		self.img.addItem(t2)
+		t2.setPos(-10,40)
+
+		y_arrow = pg.ArrowItem(angle=90, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='g')
+		y_arrow.setPos(0,40)
+		self.img.addItem(y_arrow)
+
+
 
 		self.img1 = pg.ImageView()  ## giving the plots names allows us to link their axes together
 		data = np.zeros((100,100))
 		self.ui.imageArea.addWidget(self.img1)
 		self.img1.setImage(data)
+		self.img1.view.invertY(False)
+
 		colors = [(0, 0, 0),(204, 255, 255)]
 		cmap = pg.ColorMap(pos=[0.,1.], color=colors)
 		self.img1.setColorMap(cmap)
 		g1 = pg.GridItem()
 		self.img1.addItem(g1)
+
+
+
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
 
 	def styleTabs(self, index):
