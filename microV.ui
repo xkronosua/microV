@@ -53,8 +53,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>244</width>
-              <height>164</height>
+              <width>196</width>
+              <height>115</height>
              </rect>
             </property>
             <attribute name="label">
@@ -112,8 +112,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>294</width>
-              <height>159</height>
+              <width>255</width>
+              <height>121</height>
              </rect>
             </property>
             <attribute name="label">
@@ -184,8 +184,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>298</width>
-              <height>300</height>
+              <width>241</width>
+              <height>197</height>
              </rect>
             </property>
             <attribute name="label">
@@ -371,8 +371,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>265</width>
-              <height>178</height>
+              <width>229</width>
+              <height>122</height>
              </rect>
             </property>
             <attribute name="label">
@@ -476,8 +476,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>186</width>
-              <height>94</height>
+              <width>174</width>
+              <height>70</height>
              </rect>
             </property>
             <attribute name="label">
@@ -518,8 +518,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>351</width>
-              <height>541</height>
+              <width>356</width>
+              <height>602</height>
              </rect>
             </property>
             <attribute name="label">
@@ -850,14 +850,14 @@
                <item row="0" column="0">
                 <widget class="QLabel" name="label_8">
                  <property name="text">
-                  <string>sInterv., ms</string>
+                  <string>sInterv., s</string>
                  </property>
                 </widget>
                </item>
                <item row="0" column="1">
                 <widget class="QLabel" name="label_9">
                  <property name="text">
-                  <string>duration, ms</string>
+                  <string>duration, s</string>
                  </property>
                 </widget>
                </item>
@@ -874,7 +874,7 @@
                   <set>Qt::ImhPreferNumbers</set>
                  </property>
                  <property name="text">
-                  <string>200e-9</string>
+                  <string>2e-9</string>
                  </property>
                 </widget>
                </item>
@@ -884,7 +884,7 @@
                   <set>Qt::ImhPreferNumbers</set>
                  </property>
                  <property name="text">
-                  <string>15e-6</string>
+                  <string>15e-9</string>
                  </property>
                 </widget>
                </item>
@@ -911,7 +911,7 @@
                <item row="2" column="0">
                 <widget class="QLabel" name="label_14">
                  <property name="text">
-                  <string>pretrig., ms</string>
+                  <string>pretrig., s</string>
                  </property>
                 </widget>
                </item>
@@ -1456,7 +1456,7 @@
      <x>0</x>
      <y>0</y>
      <width>966</width>
-     <height>34</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

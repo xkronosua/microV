@@ -580,9 +580,9 @@ class microV(QtGui.QMainWindow):
 						r = self.piStage.MOV([x],axis=b'1',waitUntilReady=wait)
 						if not r: break
 
-						real_position0 = [round(p,6) for p in self.piStage.qPOS()]
+						real_position0 = self.piStage.qPOS()
 						pmt_val, pmt_val1 = self.readPico()
-						real_position = [round(p,6) for p in self.piStage.qPOS()]
+						real_position = self.piStage.qPOS()
 						self.live_pmt = np.hstack((self.live_pmt, pmt_val))
 						self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
 						x_real = np.mean([real_position0[0], real_position[0]])
@@ -646,8 +646,8 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)==0]
-			data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)==0]
+			data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)!=0]
+			data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)!=0]
 
 			imsave(fname+"_pmt.tif",data_pmt.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
 			imsave(fname+"_pmt1.tif",data_pmt1.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
@@ -656,8 +656,8 @@ class microV(QtGui.QMainWindow):
 			print(self.piStage.CloseConnection())
 			return
 
-		data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)==0]
-		data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)==0]
+		data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)!=0]
+		data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)!=0]
 		#data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
 		#data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
 		#imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16), imagej=True)
@@ -940,6 +940,7 @@ class microV(QtGui.QMainWindow):
 		self.img.setColorMap(cmap)
 		g = pg.GridItem()
 		self.img.addItem(g)
+		'''
 		x_arrow = pg.ArrowItem(angle=180, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='r')
 		x_arrow.setPos(40,0)
 		self.img.addItem(x_arrow)
@@ -953,7 +954,7 @@ class microV(QtGui.QMainWindow):
 		y_arrow = pg.ArrowItem(angle=90, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='g')
 		y_arrow.setPos(0,40)
 		self.img.addItem(y_arrow)
-
+		'''
 
 
 		self.img1 = pg.ImageView()  ## giving the plots names allows us to link their axes together
