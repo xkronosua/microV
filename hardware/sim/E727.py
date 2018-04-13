@@ -20,7 +20,7 @@ class E727():
 	ID = 0
 	iError = None
 	pos = np.array([0,0,0])
-
+	vel = [100,100,100]
 	def __init__(self):
 		pass
 	def EnumerateUSB(self):
@@ -210,7 +210,7 @@ class E727():
 			print("IsMoving> ERROR ",iError, szErrorMesage)
 			#self.CloseConnection()
 		'''
-		dr = np.sqrt(sum((self.prev_pos-self.pos)**2))
+		dr = np.sqrt(np.sum((self.prev_pos-self.pos)**2))
 		t = dr/100/self.vel[0]
 		#print(">>>>>",t,dr)
 		time.sleep(t)

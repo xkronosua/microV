@@ -9,9 +9,14 @@ from scipy.signal import argrelextrema
 import scipy.misc
 import matplotlib
 from skimage.external.tifffile import imsave
+import sharedmem
+from scipy.signal import resample
+
+MODE = 'lab'
 
 if len(sys.argv)>1:
 	if sys.argv[1] == 'sim':
+		MODE = 'sim'
 		from hardware.sim.CCS200 import *
 		from hardware.sim.ni import *
 		from hardware.sim.E727 import *
@@ -34,11 +39,15 @@ else:
 	import picopy
 
 from hardware.pico_radar import fastScan
+from hardware.pico_multiproc_picopy import *
 
 #get_ipython().run_line_magic('matplotlib', 'qt')
 
 import traceback
 from multiprocessing import Process, Queue
+
+
+
 
 
 class microV(QtGui.QMainWindow):
@@ -63,6 +72,9 @@ class microV(QtGui.QMainWindow):
 	pico_VRange_dict = {"Auto":20.0,'20mV':0.02,'50mV':0.05,'100mV':0.1,
 			'200mV':0.2,'500mV':0.5,'1V': 1.0, '2V': 2.0,
 			'5V': 5.0, '10V': 10.0, '20V': 20.0,}
+
+	pico_shared_buf = sharedmem.full_like(np.zeros((5000,3)),value=0,dtype=np.float64)
+	pico_config = {}
 
 	processOut = Queue()
 	def __init__(self, parent=None):
@@ -201,29 +213,40 @@ class microV(QtGui.QMainWindow):
 
 	def pico_set(self):
 		self.n_captures = self.ui.pico_n_captures.value()
-
+		self.pico_config['n_captures'] = self.n_captures
 		ChA_VRange = self.ui.pico_ChA_VRange.currentText()
 		#ChA_VRange = self.pico_VRange_dict[ChA_VRange]
-
+		self.pico_config['ChA_VRange'] = ChA_VRange
 		ChA_Offset = self.ui.pico_ChA_offset.value()
-
+		self.pico_config['ChA_Offset'] = ChA_Offset
 		ChB_VRange = self.ui.pico_ChB_VRange.currentText()
+		self.pico_config['ChB_VRange'] = ChB_VRange
 		#ChB_VRange = self.pico_VRange_dict[ChB_VRange]
 		ChB_Offset = self.ui.pico_ChB_offset.value()
+		self.pico_config['ChB_Offset'] = ChB_Offset
 
 		self.ps.setChannel("A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
 		self.ps.setChannel("B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
 
 		sampleInterval = float(self.ui.pico_sampleInterval.text())
 		samplingDuration = float(self.ui.pico_samplingDuration.text())
-		self.ps.setSamplingInterval(sampleInterval,samplingDuration)
+		pico_pretrig = float(self.ui.pico_pretrig.text())
+		self.pico_config['sampleInterval'] = sampleInterval
+		self.pico_config['samplingDuration'] = samplingDuration
+		self.pico_config['pico_pretrig'] = pico_pretrig
+		self.ps.setSamplingInterval(sampleInterval,samplingDuration,pre_trigger=pico_pretrig,
+			number_of_frames=self.n_captures, downsample=1, downsample_mode='NONE')
 
 		trigSrc = self.ui.pico_TrigSource.currentText()
 		if trigSrc == 'External':
 			trigSrc = 'ext'
 		threshold_V = self.ui.pico_TrigThreshold.value()
 		direction = self.ui.pico_Trig_mode.currentText().upper()
-		self.pico_pretrig = float(self.ui.pico_pretrig.text())
+		self.pico_config['trigSrc'] = trigSrc
+		self.pico_config['threshold_V'] = threshold_V
+		self.pico_config['direction'] = direction
+
+
 		self.ps.setSimpleTrigger(trigSrc=trigSrc, threshold_V=threshold_V, direction=direction,
 								 timeout_ms=5, enabled=True)
 		#self.samples_per_segment = self.ps.memorySegments(self.n_captures)
@@ -241,8 +264,7 @@ class microV(QtGui.QMainWindow):
 		#dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
 		#t1 = time.time()
 		#self.ps.runBlock()
-		r = self.ps.capture_prep_block( pre_trigger=self.pico_pretrig, number_of_frames=self.n_captures, downsample=2, downsample_mode='NONE',
-			return_scaled_array=1)
+		r = self.ps.capture_prep_block(return_scaled_array=1)
 		dataA = r[0]['A'].mean(axis=0)
 		dataB = r[0]['B'].mean(axis=0)
 		scanT = r[1]
@@ -291,7 +313,7 @@ class microV(QtGui.QMainWindow):
 		return dataA_p2p, dataB_p2p
 
 	############################################################################
-	###############################   Powermeter     ###########################
+	###############################   Powermeter	 ###########################
 	###############################   Thorlabs PM100 ###########################
 
 	def connect_powermeter(self,state):
@@ -670,56 +692,122 @@ class microV(QtGui.QMainWindow):
 		#print(self.piStage.CloseConnection())
 	def start_fast3DScan(self,state):
 		if state:
-			self.fast3DScan()
+			try:
+				self.fast3DScan()
+			except:
+				traceback.print_exc()
+				#self.pico_reader_proc.terminate()
+
 			self.ui.fast3DScan.setChecked(False)
 		else:
-			pass
+			self.pico_reader_proc.terminate()
+			self.ui.fast3DScan.setChecked(False)
+
 
 
 	def fast3DScan(self):
+		if self.ps:
+			del self.ps
+		self.pico_reader_proc = multiprocessing.Process(target=create_pico_reader,
+			args=[self.pico_config,self.pico_shared_buf])
+		self.pico_reader_proc.deamon = True
+		self.pico_reader_proc.start()
+
 		z_start = float(self.ui.scan3D_config.item(0,1).text())
 		z_end = float(self.ui.scan3D_config.item(0,2).text())
 		z_step = float(self.ui.scan3D_config.item(0,3).text())
-		Range_z = np.arange(z_start,z_end,z_step)
-
+		if z_step == 0:
+			Range_z = np.array([z_start]*100)
+		else:
+			Range_z = np.arange(z_start,z_end,z_step)
+		Range_zi = np.arange(len(Range_z))
 		y_start = float(self.ui.scan3D_config.item(1,1).text())
 		y_end = float(self.ui.scan3D_config.item(1,2).text())
 		y_step = float(self.ui.scan3D_config.item(1,3).text())
 
 		Range_y = np.arange(y_start,y_end,y_step)
+		Range_yi = np.arange(len(Range_y))
+
 
 		x_start = float(self.ui.scan3D_config.item(2,1).text())
 		x_end = float(self.ui.scan3D_config.item(2,2).text())
 		x_step = float(self.ui.scan3D_config.item(2,3).text())
 
-		Range_x = np.arange(x_start,x_end,x_step)
 
-		start0=time.time()
-		#
-		#q = Queue()
-		n_captures = self.ui.fastScan_n_captures.value()
-		data_pmt,data_pmt1 = fastScan(self.piStage,self.ps,n_captures=n_captures, x_range=Range_x,y_range=Range_y,z_range=Range_z,app=app)
-		#p = Process(target=fastScan,args=(self.piStage,self.ps,Range_x,Range_y,Range_z,q,))
-		#p.start()
-		#while q.empty():
-		#	app.processEvents()
-		#	time.sleep(0.1)
-		#data_pmt, data_pmt1 = q.get()
-		print('TotalTime:',time.time()-start0)
-		self.img.setImage(data_pmt,pos=(Range_x.min(),Range_y.min()),
-		scale=(x_step,y_step),xvals=Range_z)
-		self.img1.setImage(data_pmt1,pos=(Range_x.min(),Range_y.min()),
-		scale=(x_step,y_step),xvals=Range_z)
-		path = self.ui.scan3D_path.text()
-		if "_" in path:
-			path = "".join(path.split("_")[:-1])#+"_"+str(round(time.time()))
-		else:
-			path = path #+ "_"+str(round(time.time()))
-		t = round(time.time())
-		print(data_pmt.shape,type(data_pmt))
-		imsave(path+"_fastScan_"+str(t)+'.tif',data_pmt)
-		imsave(path+"_fastScan1_"+str(t)+'.tif',data_pmt1)
-		self.ps.close()
+		Range_x = np.arange(x_start,x_end,x_step)
+		Range_xi = np.arange(len(Range_x))
+
+		layerIndex = 0
+		while self.pico_shared_buf.sum()==0:
+			time.sleep(0.1)
+		for z,zi in zip(Range_z,Range_zi):
+			#if not self.scan3DisAlive: break
+			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
+			#fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
+			#with open(fname,'a') as f:
+			#	f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\ttime\n")
+			data_pmt = []
+			data_pmt1 = []
+
+			forward = True
+			for y,yi in zip(Range_y,Range_yi):
+				#if not self.scan3DisAlive: break
+				Range_x_tmp = Range_x
+				if forward:
+					Range_x_tmp = Range_x[::-1]
+					Range_xi_tmp = Range_xi[::-1]
+					#forward = False
+				else:
+					Range_x_tmp = Range_x
+					Range_xi_tmp = Range_xi
+					#forward = True
+				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
+				if not r: break
+				self.live_pmt = np.array([])
+				self.live_pmt1 = np.array([])
+				self.live_x = np.array([])
+				self.live_y = np.array([])
+
+				self.live_integr_spectra = []
+				tmp = []
+				tmp1 = []
+
+				t0 = time.time()
+				r = self.piStage.MOV([Range_x_tmp[0]],axis=b'1',waitUntilReady=1)
+				if not r: break
+				t1 = time.time()
+				real_position0 = self.piStage.qPOS()
+				data = self.pico_shared_buf
+				w = (data[:,0]>=t0)&(data[:,0]<=t1)
+				print("inRange:",sum(w))
+				try:
+					dataA = resample(data[w,1],len(Range_x))
+					dataB = resample(data[w,2],len(Range_x))
+				except:
+					dataA = data[-len(Range_x):,1]
+					dataB = data[-len(Range_x):,2]
+				tmp.append(dataA)
+				tmp1.append(dataB)
+					#print(tmp)
+				#if len(tmp)>=1 and len(tmp1)>=1:
+
+				if forward:
+					forward = False
+					data_pmt.append(np.hstack(tmp[::-1]))
+					data_pmt1.append(np.hstack(tmp1[::-1]))
+
+				else:
+					forward = True
+					data_pmt.append(np.hstack(tmp))
+					data_pmt1.append(np.hstack(tmp1))
+		#print(data_pmt)
+		self.img.setImage(np.array(data_pmt).T)
+		self.img1.setImage(np.array(data_pmt1).T)
+		#start0=time.time()
+		self.pico_reader_proc.terminate()
+
+
+
 		self.initPico()
 
 
@@ -850,11 +938,11 @@ class microV(QtGui.QMainWindow):
 	############################################################################
 	##########################   Ui   ##########################################
 	def initUI(self):
+
+
 		self.ui.actionExit.toggled.connect(self.closeEvent)
 
 		self.ui.scan1D_filePath_find.clicked.connect(self.scan1D_filePath_find)
-
-
 
 		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
 
@@ -896,6 +984,19 @@ class microV(QtGui.QMainWindow):
 		########################################################################
 		########################################################################
 		########################################################################
+
+		if MODE == 'sim':
+			self.ui.pico_n_captures.setValue(10)
+
+			self.ui.pico_ChA_VRange.setCurrentIndex(4)
+			self.ui.pico_ChB_VRange.setCurrentIndex(4)
+			self.ui.pico_sampleInterval.setText('0.00001')
+			self.ui.pico_samplingDuration.setText('0.003')
+
+			self.ui.pico_TrigSource.setCurrentIndex(2)
+			self.ui.pico_TrigThreshold.setValue(-0.350)
+			self.pico_pretrig = 0.001
+			self.ui.pico_pretrig.setText('0.001')
 
 		self.tabColors = {
 			0: 'green',
@@ -994,11 +1095,13 @@ class microV(QtGui.QMainWindow):
 		except:
 			traceback.print_exc()
 		try:
-			self.DAQmx.close()
+			if self.DAQmx:
+				self.DAQmx.close()
 		except:
 			traceback.print_exc()
 		try:
-			self.ps.close()
+			if self.ps:
+				self.ps.close()
 		except:
 			traceback.print_exc()
 		try:

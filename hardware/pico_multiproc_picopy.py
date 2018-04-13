@@ -10,13 +10,67 @@ from multiprocessing import Queue
 import time
 import traceback
 import picopy
+import sharedmem
+
+def set_picoscope(config):
+	ps = picopy.Pico3k()
+	c = config
+	ps.setChannel("A", coupling="DC", VRange=c['ChA_VRange'], VOffset=c['ChA_Offset'])
+	ps.setChannel("B", coupling="DC", VRange=c['ChB_VRange'], VOffset=c['ChB_Offset'])
+
+	ps.setSamplingInterval(c['sampleInterval'],c['samplingDuration'],pre_trigger = c['pico_pretrig'],
+		number_of_frames=c['n_captures'], downsample=1, downsample_mode='NONE')
+
+	ps.setSimpleTrigger(trigSrc=c['trigSrc'], threshold_V=c['threshold_V'],
+			direction=c['direction'], timeout_ms=5, enabled=True)
+	return ps
+
+def push_data_to_fixBuff(buf, data):
+	push_len = len(data)
+	assert len(buf) >= push_len
+	buf[:-push_len] = buf[push_len:]
+	buf[-push_len:] = data
+	return buf
+
+def create_pico_reader(config,shared_data):
+	ps = set_picoscope(config)
+	i=0
+	while True:
+		print('start')
+		try:
+			#print(i)
+			r = ps.capture_prep_block(return_scaled_array=1)
+			dataA = r[0]['A']
+			dataB = r[0]['B']
+			scanA = abs(dataA.max(axis=1) - dataA.min(axis=1))
+			scanB = abs(dataB.max(axis=1) - dataB.min(axis=1))
+			scanT = r[1]
+			push_data_to_fixBuff(shared_data,np.array([scanT,scanA,scanB]).T)
+			#print(scanA)
+			i +=1
+		except:
+			traceback.print_exc()
+			break
+	del ps
+
+pico_shared_buf = sharedmem.full_like(np.zeros((500,3)),value=-1,dtype=np.float64)
+
+
+config = {	'ChA_VRange':'500mV','ChA_Offset':0,
+			'ChB_VRange':'500mV','ChB_Offset':0,
+			'sampleInterval':0.0001,'samplingDuration':0.003,
+			'pico_pretrig':0.001,'n_captures':10,'trigSrc':'ext',
+			'threshold_V':-0.350,'direction':'RISING'}
+
 
 def reader(q):
 	pico = picopy.Pico3k()
-	n_captures = 100
+
+	n_captures = 10
 	pico.setChannel("A", coupling="DC", VRange='500mV')
 	pico.setChannel("B", coupling="DC", VRange='500mV')
-	(sampleInterval, noSamples, maxSamples) = pico.setSamplingInterval(0.00001,0.0035)
+	(sampleInterval, noSamples, maxSamples) = pico.setSamplingInterval(0.00001,0.003,pre_trigger=0.001,
+		number_of_frames=n_captures, downsample=1, downsample_mode='NONE',)
 
 	#trigger = picopy.EdgeTrigger(channel='B', threshold=-0.35, direction='FALLING')
 	#pico.set_trigger(trigger)
@@ -25,11 +79,10 @@ def reader(q):
 
 	for i in range(50):
 
-		r = pico.capture_prep_block( number_of_frames=n_captures, downsample=1, downsample_mode='NONE',
-			return_scaled_array=1)
+		r = pico.capture_prep_block( return_scaled_array=1)
 		q.put(r)
-	pico.close()
 	q.put('done')
+	pico.close()
 
 class Pico_view(QtGui.QMainWindow):
 	timer = QtCore.QTimer()
@@ -73,50 +126,26 @@ class Pico_view(QtGui.QMainWindow):
 
 		self.timer.timeout.connect(self.update)
 		self.timer.start(0.5)
-		self.ps = multiprocessing.Process(target=reader,args=[self.q,])
-		self.ps.start()
-		#self.pico.join()
+		#self.ps = picopy.Pico3k()
+		self.p = multiprocessing.Process(target=create_pico_reader,args=[config,pico_shared_buf])
+		self.p.start()
+		#self.p.join()
 		#self.actionExit.toggled.connect(self.closeEvent)
 
 
 	def update(self):
 		#print(data)
+		data = pico_shared_buf
 
-			if not self.q.empty():
-				data_q = []
-				while not self.q.empty():
-					out = self.q.get()
-					if out == 'done':
-						self.timer.stop()
-						self.ps.join()
-						return
-					data_q.append(out)
-				#print(data)
-				#L = len(data_q)*self.pico.n_captures
-				for data in data_q:
-					self.liveA = np.hstack((self.liveA,
-						abs(data[0]['A'].max(axis=1)-data[0]['A'].min(axis=1))))
-					self.liveB = np.hstack((self.liveB,
-						abs(data[0]['B'].max(axis=1)-data[0]['B'].min(axis=1))))
-					self.liveT = np.hstack((self.liveT,data[1]))
-				dataA = data[0]['A'].mean(axis=0)
-				dataB = data[0]['B'].mean(axis=0)
-				L = len(data[1])
-				if len(self.liveA)>500:
-
-					self.liveA = self.liveA[L:]
-					self.liveB = self.liveB[L:]
-					self.liveT = self.liveT[L:]
-				print(dataA.shape)
-				self.curveA.setData(dataA)
-				self.curveB.setData(dataB)
-				self.curveA1.setData(x=self.liveT,y=self.liveA)
-				self.curveB1.setData(x=self.liveT,y=self.liveB)
-				app.processEvents()
+		self.curveA1.setData(x=data[:,0],y=data[:,1])
+		self.curveB1.setData(x=data[:,0],y=data[:,2])
+		app.processEvents()
 
 
 	def closeEvent(self, evnt=None):
 		print('closeEvent')
+		self.p.terminate()
+
 		#self.pico.close()
 		#self.pico.alive=False
 		#ex.pico.terminate()
