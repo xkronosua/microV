@@ -1124,7 +1124,8 @@ class microV(QtGui.QMainWindow):
 
 
 if __name__ == '__main__':
-
+	import sys
+	__spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
 
 	app = QtGui.QApplication(sys.argv)
 	try:
