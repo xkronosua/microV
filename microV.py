@@ -91,6 +91,8 @@ class microV(QtGui.QMainWindow):
 		#self.initDAQmx()
 
 		self.calibrTimer = QtCore.QTimer()
+		self.laserStatus = QtCore.QTimer()
+
 		self.initUI()
 
 		#self.scan_image()
@@ -104,6 +106,44 @@ class microV(QtGui.QMainWindow):
 				self.DAQmx.close()
 			except:
 				traceback.print_exc()
+	def laserSetShutter(self):
+		self.laserStatus.stop()
+		state = self.ui.laserShutter.isChecked()
+		if state==0:
+			state = '1'
+		else:
+			state = '0'
+
+		with open('laserIn','w+') as f:
+			f.write('SHUTter '+state+'\n')
+		self.laserStatus.start(2000)
+
+	def laserSetWavelength(self):
+		self.laserStatus.stop()
+		wavelength = self.ui.laserWavelength_to_set.value()
+		with open('laserIn','w+') as f:
+			f.write('WAVelength '+str(wavelength)+'\n')
+		self.laserStatus.start(2000)
+
+
+	def onLaserStatus(self):
+		status = ''
+		with open('laserOut','r') as f:
+			status = f.read()
+		#print(status)
+		try:
+			status = status.split('\t')
+			t = float(status[0])
+			statusCode = status[1]
+			shutter = int(status[2])
+			power_int = float(status[3])
+			wavelength = int(status[4])
+			self.ui.laserPower_internal.setValue(power_int)
+			self.ui.laserWavelength.setValue(wavelength)
+			self.ui.laserShutter.setChecked(shutter!=0)
+		except:
+			traceback.print_exc()
+			print('Laser: noData')
 
 	def initDAQmx(self):
 		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
@@ -938,7 +978,7 @@ class microV(QtGui.QMainWindow):
 	############################################################################
 	##########################   Ui   ##########################################
 	def initUI(self):
-
+		self.laserStatus.start(2000)
 
 		self.ui.actionExit.toggled.connect(self.closeEvent)
 
@@ -975,6 +1015,10 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.startCalibr.toggled[bool].connect(self.startCalibr)
 		self.calibrTimer.timeout.connect(self.onCalibrTimer)
+
+		self.ui.laserSetWavelength.clicked.connect(self.laserSetWavelength)
+		self.ui.laserSetShutter.clicked.connect(self.laserSetShutter)
+		self.laserStatus.timeout.connect(self.onLaserStatus)
 
 		self.ui.connect_pico.toggled[bool].connect(self.connect_pico)
 		self.ui.pico_set.clicked.connect(self.pico_set)
