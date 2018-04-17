@@ -24,6 +24,8 @@ if len(sys.argv)>1:
 		from hardware.sim.picoscope import ps3000a
 		from hardware.sim.AG_UC2 import AG_UC2
 		import picopy
+		from hardware.sim.andor.Shamrock import *
+		from hardware.sim.andor.AndorCamera import *
 		#from hardware.sim.PM100 import visa
 else:
 	from hardware.ni1 import *
@@ -89,16 +91,18 @@ class microV(QtGui.QMainWindow):
 		self.ui.closeEvent = self.closeEvent
 		self.ui.show()
 		self._want_to_close = False
+
+		self.calibrTimer = QtCore.QTimer()
+		self.laserStatus = QtCore.QTimer()
+		self.andorCameraLiveTimer = QtCore.QTimer()
+
+		self.initUI()
+
 		self.initPiStage()
 		#self.initSpectrometer()
 		self.initHWP()
 		#self.initPico()
 		#self.initDAQmx()
-
-		self.calibrTimer = QtCore.QTimer()
-		self.laserStatus = QtCore.QTimer()
-
-		self.initUI()
 
 		#self.scan_image()
 	############################################################################
@@ -121,14 +125,14 @@ class microV(QtGui.QMainWindow):
 
 		with open('laserIn','w+') as f:
 			f.write('SHUTter '+state+'\n')
-		self.laserStatus.start(2000)
+		self.laserStatus.start(1000)
 
 	def laserSetWavelength(self):
 		self.laserStatus.stop()
 		wavelength = self.ui.laserWavelength_to_set.value()
 		with open('laserIn','w+') as f:
 			f.write('WAVelength '+str(wavelength)+'\n')
-		self.laserStatus.start(2000)
+		self.laserStatus.start(1000)
 
 
 	def onLaserStatus(self):
@@ -146,6 +150,7 @@ class microV(QtGui.QMainWindow):
 			self.ui.laserPower_internal.setValue(power_int)
 			self.ui.laserWavelength.setValue(wavelength)
 			self.ui.laserShutter.setChecked(shutter!=0)
+
 		except:
 			traceback.print_exc()
 			print('Laser: noData')
@@ -430,6 +435,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.Pi_XPos.setText(str(pos[0]))
 		self.ui.Pi_YPos.setText(str(pos[1]))
 		self.ui.Pi_ZPos.setText(str(pos[2]))
+		self.statusBar_Position.setText('[%.5f\t%.5f\t%.5f]'%tuple(pos))
 
 	def Pi_X_go(self):
 		pos = self.ui.Pi_X_move_to.value()
@@ -450,14 +456,10 @@ class microV(QtGui.QMainWindow):
 		self.setUiPiPos(pos=pos)
 
 	def Pi_XYZ_50mkm(self):
-		print(self.piStage.MOV(50,axis=1,waitUntilReady=True))
-		time.sleep(0.2)
-		print(self.piStage.MOV(50,axis=2,waitUntilReady=True))
-		time.sleep(0.2)
-		print(self.piStage.MOV(50,axis=3,waitUntilReady=True))
+		print(self.piStage.MOV([50,50,50],axis=b'1 2 3',waitUntilReady=True))
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
-		time.sleep(1)
+
 	def Pi_autoZero(self):
 		print(self.piStage.ATZ())
 		pos = self.piStage.qPOS()
@@ -521,24 +523,44 @@ class microV(QtGui.QMainWindow):
 
 	def andorCameraGetData(self,state):
 		if state:
-			print('andorCameraGetData')
-			self.andorCCD.StartAcquisition()
-			self.andorCCD.WaitForAcquisition()
-			data = self.andorCCD.GetMostRecentImage()
-			print(data)
-			wavelength = np.arange(len(data))
-			if self.ui.shamrockConnect.isChecked():
-				shape=self.andorCCD.GetDetector()
-				size=self.andorCCD.GetPixelSize()
-				self.shamrock.shamrock.SetPixelWidth(size[0])
-				self.shamrock.shamrock.SetNumberPixels(shape[0])
-				self.shamrock.shamrock.GetCalibration()
-				wavelength = self.shamrock.shamrock.GetCalibration()
-			self.line_spectra.setData(x=wavelength, y = data)
-			self.ui.andorCameraGetData.setChecked(False)
+			if not self.ui.andorCameraLive.isChecked():
+				print('andorCameraGetData')
+				self.andorCCD.StartAcquisition()
+				self.andorCCD.WaitForAcquisition()
+				data = self.andorCCD.GetMostRecentImage()
+				print(data)
+				wavelength = np.arange(len(data))
+				if self.ui.shamrockConnect.isChecked():
+					shape=self.andorCCD.GetDetector()
+					size=self.andorCCD.GetPixelSize()
+					self.shamrock.shamrock.SetPixelWidth(size[0])
+					self.shamrock.shamrock.SetNumberPixels(shape[0])
+					self.shamrock.shamrock.GetCalibration()
+					wavelength = self.shamrock.shamrock.GetCalibration()
+				self.line_spectra.setData(x=wavelength, y = data)
+				self.ui.andorCameraGetData.setChecked(False)
+			else:
+				self.andorCameraLiveTimer.start(100)
 		else:
-			pass
+			self.andorCameraLiveTimer.stop()
 
+	def onAndorCameraLiveTimeout(self):
+		self.andorCameraLiveTimer.stop()
+		self.andorCCD.StartAcquisition()
+		self.andorCCD.WaitForAcquisition()
+		data = self.andorCCD.GetMostRecentImage()
+		print(data)
+		wavelength = np.arange(len(data))
+		if self.ui.shamrockConnect.isChecked():
+			shape=self.andorCCD.GetDetector()
+			size=self.andorCCD.GetPixelSize()
+			self.shamrock.shamrock.SetPixelWidth(size[0])
+			self.shamrock.shamrock.SetNumberPixels(shape[0])
+			self.shamrock.shamrock.GetCalibration()
+			wavelength = self.shamrock.shamrock.GetCalibration()
+		self.line_spectra.setData(x=wavelength, y = data)
+
+		self.andorCameraLiveTimer.start(100)
 	############################################################################
 	###############################   rotPiezoStage	#########################
 
@@ -1055,7 +1077,7 @@ class microV(QtGui.QMainWindow):
 	############################################################################
 	##########################   Ui   ##########################################
 	def initUI(self):
-		self.laserStatus.start(2000)
+		self.laserStatus.start(1000)
 
 		self.ui.actionExit.toggled.connect(self.closeEvent)
 
@@ -1112,6 +1134,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.andorCameraExposure.valueChanged[float].connect(self.andorCameraSetExposure)
 		self.ui.andorCameraGetData.toggled[bool].connect(self.andorCameraGetData)
 		self.ui.andorCameraReadoutMode.currentIndexChanged[int].connect(self.andorCameraSetReadoutMode)
+		self.andorCameraLiveTimer.timeout.connect(self.onAndorCameraLiveTimeout)
+
 		########################################################################
 		########################################################################
 		########################################################################
@@ -1201,6 +1225,8 @@ class microV(QtGui.QMainWindow):
 		g1 = pg.GridItem()
 		self.img1.addItem(g1)
 
+		self.statusBar_Position = QtGui.QLabel('[nan nan nan]')
+		self.ui.statusbar.addWidget(self.statusBar_Position)
 
 
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')

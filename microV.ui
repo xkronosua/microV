@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>564</width>
-    <height>559</height>
+    <width>688</width>
+    <height>627</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>3</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -142,8 +142,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>115</height>
+              <width>244</width>
+              <height>164</height>
              </rect>
             </property>
             <attribute name="label">
@@ -201,8 +201,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>255</width>
-              <height>121</height>
+              <width>294</width>
+              <height>159</height>
              </rect>
             </property>
             <attribute name="label">
@@ -273,8 +273,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>395</height>
+              <width>351</width>
+              <height>426</height>
              </rect>
             </property>
             <attribute name="label">
@@ -460,8 +460,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>229</width>
-              <height>122</height>
+              <width>265</width>
+              <height>178</height>
              </rect>
             </property>
             <attribute name="label">
@@ -565,8 +565,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>174</width>
-              <height>70</height>
+              <width>186</width>
+              <height>94</height>
              </rect>
             </property>
             <attribute name="label">
@@ -607,8 +607,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>240</width>
-              <height>291</height>
+              <width>320</width>
+              <height>438</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1012,9 +1012,9 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>0</y>
-              <width>339</width>
-              <height>309</height>
+              <y>-167</y>
+              <width>369</width>
+              <height>452</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1773,8 +1773,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>564</width>
-     <height>21</height>
+     <width>688</width>
+     <height>34</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
