@@ -37,6 +37,8 @@ else:
 	import visa
 	from ThorlabsPM100 import ThorlabsPM100
 	import picopy
+	from hardware.andor.Shamrock import *
+	from hardware.andor.AndorCamera import *
 
 from hardware.pico_radar import fastScan
 from hardware.pico_multiproc_picopy import *
@@ -60,6 +62,9 @@ class microV(QtGui.QMainWindow):
 	#ps = ps3000a.PS3000a(connect=False)
 	ps = None
 	n_captures = None
+
+	shamrock = ShamRockController()
+	andorCCD = AndorCamera()
 	#inst = visa.instrument('USB0::0x0000::0x0000::DG5Axxxxxxxxx::INSTR', term_chars='\n', timeout=1)
 	power_meter = None#ThorlabsPM100(inst=inst)
 	#DAQmx = nidaqmx.Task()
@@ -462,6 +467,78 @@ class microV(QtGui.QMainWindow):
 		vel = self.ui.Pi_Velocity.value()
 		self.piStage.VEL([vel]*3,b'1 2 3')
 		print('VEL:',self.piStage.qVEL())
+
+	############################################################################
+	###############################   Shamrock	################################
+	def shamrockConnect(self, state):
+		if state:
+			self.shamrock.Initialize()
+			self.shamrock.Connect()
+			port = self.shamrock.shamrock.GetPort()
+			self.ui.shamrockPort.setCurrentIndex(port-1)
+			wavelength = self.shamrock.shamrock.GetWavelength()
+			self.ui.shamrockWavelength.setText(str(wavelength))
+			grating = self.shamrock.shamrock.GetGrating()
+			self.ui.shamrockGrating.setCurrentIndex(grating)
+
+		else:
+			self.shamrock.Close()
+
+	def shamrockSetWavelength(self):
+		wl = self.ui.shamrockWavelength_to_set.value()
+		self.shamrock.shamrock.SetWavelength(wl)
+		wavelength = self.shamrock.shamrock.GetWavelength()
+		self.ui.shamrockWavelength.setText(str(wavelength))
+
+	def shamrockSetPort(self,val):
+		port = val+1
+		self.shamrock.shamrock.SetPort(port)
+		port = self.shamrock.shamrock.GetPort()
+		self.ui.shamrockPort.setCurrentIndex(port-1)
+
+	def shamrockSetGrating(self,grating):
+		self.shamrock.shamrock.SetGrating(grating)
+		grating = self.shamrock.shamrock.GetGrating()
+		self.ui.shamrockGrating.setCurrentIndex(grating)
+
+	############################################################################
+	###############################   AndorCamera	############################
+
+	def andorCameraConnect(self, state):
+		if state:
+			self.andorCCD.Initialize()
+			self.andorCCD.SetExposureTime(self.ui.andorCameraExposure.value())
+		else:
+			self.andorCCD.ShutDown()
+
+	def andorCameraSetExposure(self,val):
+		self.andorCCD.SetExposureTime(val)
+		val = self.andorCCD.GetAcquisitionTimings()[0]
+
+	def andorCameraSetReadoutMode(self,val):
+		mode = self.ui.andorCameraReadoutMode.currentText()
+		self.andorCCD.SetReadMode(mode)
+
+	def andorCameraGetData(self,state):
+		if state:
+			print('andorCameraGetData')
+			self.andorCCD.StartAcquisition()
+			self.andorCCD.WaitForAcquisition()
+			data = self.andorCCD.GetMostRecentImage()
+			print(data)
+			wavelength = np.arange(len(data))
+			if self.ui.shamrockConnect.isChecked():
+				shape=self.andorCCD.GetDetector()
+				size=self.andorCCD.GetPixelSize()
+				self.shamrock.shamrock.SetPixelWidth(size[0])
+				self.shamrock.shamrock.SetNumberPixels(shape[0])
+				self.shamrock.shamrock.GetCalibration()
+				wavelength = self.shamrock.shamrock.GetCalibration()
+			self.line_spectra.setData(x=wavelength, y = data)
+			self.ui.andorCameraGetData.setChecked(False)
+		else:
+			pass
+
 	############################################################################
 	###############################   rotPiezoStage	#########################
 
@@ -1025,6 +1102,16 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.Pi_Set.clicked.connect(self.Pi_Set)
 
+		self.ui.shamrockConnect.toggled[bool].connect(self.shamrockConnect)
+		self.ui.shamrockSetWavelength.clicked.connect(self.shamrockSetWavelength)
+		self.ui.shamrockPort.currentIndexChanged[int].connect(self.shamrockSetPort)
+		self.ui.shamrockGrating.currentIndexChanged[int].connect(self.shamrockSetGrating)
+
+
+		self.ui.andorCameraConnect.toggled[bool].connect(self.andorCameraConnect)
+		self.ui.andorCameraExposure.valueChanged[float].connect(self.andorCameraSetExposure)
+		self.ui.andorCameraGetData.toggled[bool].connect(self.andorCameraGetData)
+		self.ui.andorCameraReadoutMode.currentIndexChanged[int].connect(self.andorCameraSetReadoutMode)
 		########################################################################
 		########################################################################
 		########################################################################
@@ -1150,6 +1237,14 @@ class microV(QtGui.QMainWindow):
 			traceback.print_exc()
 		try:
 			self.rotPiezoStage.close()
+		except:
+			traceback.print_exc()
+		try:
+			self.shamrock.Close()
+		except:
+			traceback.print_exc()
+		try:
+			self.andorCCD.ShutDown()
 		except:
 			traceback.print_exc()
 

@@ -59,7 +59,7 @@ class laserDaemon(QWidget):
 		wavelength = self.Laser.query("READ:WAVelength?").replace('\n','')
 		self.ui.wavelength.setValue(float(wavelength))
 		shutter = self.Laser.query("SHUTter?").replace('\n','')
-
+		self.ui.shutter.setChecked(shutter=='1')
 		status = self.Laser.query("*STB?").replace('\n','')
 		v = int(status)
 		shutter_ = v.to_bytes(32,byteorder='big')[2]
@@ -83,7 +83,7 @@ class laserDaemon(QWidget):
 					print(wl)
 				elif re.match('SHUTter [0-1]\n', c):
 					sh = int(self.command.split(' ')[-1])
-					self.setShutter(sh)
+					self.setShutter(sh,manual=True)
 
 		print(self.command)
 
@@ -149,8 +149,9 @@ class laserDaemon(QWidget):
 
 			except:
 				self.statusLog("err",dir='<<')
-	def setShutter(self,state=None):
-		if state is None:
+	def setShutter(self,state=None,manual=False):
+		if not manual:
+			print('int')
 			state = self.ui.shutter.isChecked()
 			if state > 0:
 				state = '0'
