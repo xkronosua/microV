@@ -115,7 +115,7 @@ class AndorCamera(object):
 
 	# Init ---------------------------------------------------------------------
 
-	def Initialize(self, acquisitionMode = "single", triggerMode = "internal", \
+	def Initialize(self, acquisitionMode = "accumulate", triggerMode = "internal", \
 				   temperature = -85,):
 		self.logger.debug("Initialize")
 		with self.lock:

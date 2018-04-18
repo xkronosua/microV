@@ -41,6 +41,7 @@ else:
 	import picopy
 	from hardware.andor.Shamrock import *
 	from hardware.andor.AndorCamera import *
+	from hardware.HWP_stepper import *
 
 from hardware.pico_radar import fastScan
 from hardware.pico_multiproc_picopy import *
@@ -67,6 +68,7 @@ class microV(QtGui.QMainWindow):
 
 	shamrock = ShamRockController()
 	andorCCD = AndorCamera()
+	HWP_stepper = None
 	#inst = visa.instrument('USB0::0x0000::0x0000::DG5Axxxxxxxxx::INSTR', term_chars='\n', timeout=1)
 	power_meter = None#ThorlabsPM100(inst=inst)
 	#DAQmx = nidaqmx.Task()
@@ -561,6 +563,48 @@ class microV(QtGui.QMainWindow):
 		self.line_spectra.setData(x=wavelength, y = data)
 
 		self.andorCameraLiveTimer.start(100)
+
+	############################################################################
+	###############################   HWP_stepper	############################
+
+	def HWP_stepper_Connect(self,state):
+		if state:
+			self.HWP_stepper = HWP_stepper(4000,0.01, "dev1/ctr1", reset=True)
+			self.ui.HWP_stepper_angle.setText('0')
+		else:
+			try:
+				self.HWP_stepper.close()
+			except:
+				traceback.print_exc()
+			self.HWP_stepper = None
+	def HWP_stepper_MoveTo_Go(self):
+		if not self.HWP_stepper is None:
+			angle = self.ui.HWP_stepper_MoveTo.value()
+			wait = self.ui.HWP_stepper_wait.isChecked()
+			self.HWP_stepper.moveTo(angle,wait=wait)
+			angle_ = self.HWP_stepper.getAngle()
+			self.ui.HWP_stepper_angle.setText(str(angle_))
+	def HWP_stepper_CW(self):
+		if not self.HWP_stepper is None:
+			self.HWP_stepper.direction(1)
+			step = self.ui.HWP_stepper_step.value()
+			wait = self.ui.HWP_stepper_wait.isChecked()
+			self.HWP_stepper.start(step=step,wait=wait)
+			angle_ = self.HWP_stepper.getAngle()
+			self.ui.HWP_stepper_angle.setText(str(angle_))
+	def HWP_stepper_CCW(self):
+		if not self.HWP_stepper is None:
+			self.HWP_stepper.direction(0)
+			step = self.ui.HWP_stepper_step.value()
+			wait = self.ui.HWP_stepper_wait.isChecked()
+			self.HWP_stepper.start(step=step,wait=wait)
+			angle_ = self.HWP_stepper.getAngle()
+			self.ui.HWP_stepper_angle.setText(str(angle_))
+
+	def HWP_stepper_Reset(self):
+		if not self.HWP_stepper is None:
+			self.HWP_stepper.resetAngel()
+
 	############################################################################
 	###############################   rotPiezoStage	#########################
 
@@ -1011,7 +1055,7 @@ class microV(QtGui.QMainWindow):
 	def scan1D(self):
 		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
 		with open(fname,'a') as f:
-			f.write("#X\tY\tZ\tHWP\tpmt_signal\tpmt1_signal\ttime\n")
+			f.write("#X\tY\tZ\tHWP_power\tHWP_stepper\tpmt_signal\tpmt1_signal\ttime\n")
 		axis = self.ui.scan1D_axis.currentText()
 		move_function = None
 		if axis == "X":
@@ -1020,11 +1064,16 @@ class microV(QtGui.QMainWindow):
 			move_function = lambda pos: self.piStage.MOV(pos,axis=2,waitUntilReady=True)
 		elif axis == "Z":
 			move_function = lambda pos: self.piStage.MOV(pos,axis=3,waitUntilReady=True)
-		elif axis == 'HWP':
+		elif axis == 'HWP_Power':
 			def move_function(pos):
 				self.HWP.mAbs(pos)
 				pos = self.HWP.getPos()
 				self.ui.HWP_angle.setText(str(round(pos,6)))
+		elif axis == 'HWP_stepper':
+			def move_function(pos):
+				self.HWP_stepper.moveTo(float(pos),wait=True)
+				pos = self.HWP_stepper.getAngle()
+				self.ui.HWP_stepper_angle.setText(str(round(pos,6)))
 
 		steps_range = np.arange(self.ui.scan1D_start.value(),
 								self.ui.scan1D_end.value(),
@@ -1035,14 +1084,18 @@ class microV(QtGui.QMainWindow):
 
 			real_position = [round(p,4) for p in self.piStage.qPOS()]
 			HWP_angle = float(self.ui.HWP_angle.text())
+			HWP_stepper_angle = float(self.ui.HWP_stepper_angle.text())
+
 			if axis == 'X':
 				x = real_position[0]
 			if axis == 'Y':
 				x = real_position[1]
 			if axis == 'Z':
 				x = real_position[2]
-			if axis == 'HWP':
+			if axis == 'HWP_Power':
 				x = HWP_angle
+			if axis == 'HWP_stepper':
+				x = HWP_stepper_angle
 
 			self.live_pmt = np.hstack((self.live_pmt, pmt_val))
 			self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
@@ -1052,7 +1105,7 @@ class microV(QtGui.QMainWindow):
 			self.line_pmt1.setData(x=self.live_x,y=self.live_pmt1)
 
 			app.processEvents()
-			dataSet = real_position +[HWP_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
+			dataSet = real_position +[HWP_angle, HWP_stepper_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
 			#print(dataSet[-1])
 			with open(fname,'a') as f:
 				f.write("\t".join([str(round(i,10)) for i in dataSet])+"\n")
@@ -1135,6 +1188,13 @@ class microV(QtGui.QMainWindow):
 		self.ui.andorCameraGetData.toggled[bool].connect(self.andorCameraGetData)
 		self.ui.andorCameraReadoutMode.currentIndexChanged[int].connect(self.andorCameraSetReadoutMode)
 		self.andorCameraLiveTimer.timeout.connect(self.onAndorCameraLiveTimeout)
+
+
+		self.ui.HWP_stepper_Connect.toggled[bool].connect(self.HWP_stepper_Connect)
+		self.ui.HWP_stepper_MoveTo_Go.clicked.connect(self.HWP_stepper_MoveTo_Go)
+		self.ui.HWP_stepper_CW.clicked.connect(self.HWP_stepper_CW)
+		self.ui.HWP_stepper_CCW.clicked.connect(self.HWP_stepper_CCW)
+		self.ui.HWP_stepper_Reset.clicked.connect(self.HWP_stepper_Reset)
 
 		########################################################################
 		########################################################################
@@ -1271,6 +1331,10 @@ class microV(QtGui.QMainWindow):
 			traceback.print_exc()
 		try:
 			self.andorCCD.ShutDown()
+		except:
+			traceback.print_exc()
+		try:
+			self.HWP_stepper.close()
 		except:
 			traceback.print_exc()
 

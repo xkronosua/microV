@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>2</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -135,15 +135,15 @@
          <item>
           <widget class="QToolBox" name="toolBox">
            <property name="currentIndex">
-            <number>2</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="page">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>244</width>
-              <height>164</height>
+              <width>196</width>
+              <height>115</height>
              </rect>
             </property>
             <attribute name="label">
@@ -201,12 +201,110 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>294</width>
-              <height>159</height>
+              <width>356</width>
+              <height>436</height>
              </rect>
             </property>
             <attribute name="label">
              <string>HWP</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_12">
+             <item row="0" column="0">
+              <widget class="QPushButton" name="HWP_stepper_Connect">
+               <property name="text">
+                <string>Connect</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_12">
+               <item>
+                <widget class="QLabel" name="HWP_stepper_angle">
+                 <property name="text">
+                  <string>nan</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="HWP_stepper_MoveTo">
+                 <property name="minimum">
+                  <double>-360.000000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>360.000000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>10.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="HWP_stepper_MoveTo_Go">
+                 <property name="text">
+                  <string>Go</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="HWP_stepper_wait">
+               <property name="text">
+                <string>WaitUntilReady</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_11">
+               <item>
+                <widget class="QPushButton" name="HWP_stepper_CW">
+                 <property name="text">
+                  <string>&lt;&lt;</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="HWP_stepper_step">
+                 <property name="maximum">
+                  <double>999999.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="HWP_stepper_CCW">
+                 <property name="text">
+                  <string>&gt;&gt;</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="4" column="0">
+              <widget class="QPushButton" name="HWP_stepper_Reset">
+               <property name="text">
+                <string>Reset</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="HWP_Power">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>255</width>
+              <height>121</height>
+             </rect>
+            </property>
+            <attribute name="label">
+             <string>HWP_Power</string>
             </attribute>
             <layout class="QGridLayout" name="gridLayout_6">
              <item row="2" column="2">
@@ -273,8 +371,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>351</width>
-              <height>426</height>
+              <width>241</width>
+              <height>197</height>
              </rect>
             </property>
             <attribute name="label">
@@ -460,8 +558,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>265</width>
-              <height>178</height>
+              <width>229</width>
+              <height>122</height>
              </rect>
             </property>
             <attribute name="label">
@@ -565,8 +663,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>186</width>
-              <height>94</height>
+              <width>174</width>
+              <height>70</height>
              </rect>
             </property>
             <attribute name="label">
@@ -607,8 +705,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>320</width>
-              <height>438</height>
+              <width>240</width>
+              <height>291</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1012,9 +1110,9 @@
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-167</y>
-              <width>369</width>
-              <height>452</height>
+              <y>0</y>
+              <width>356</width>
+              <height>375</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1091,12 +1189,12 @@
                    <widget class="QComboBox" name="shamrockPort">
                     <item>
                      <property name="text">
-                      <string>CCD</string>
+                      <string>PMT</string>
                      </property>
                     </item>
                     <item>
                      <property name="text">
-                      <string>PMT</string>
+                      <string>CCD</string>
                      </property>
                     </item>
                    </widget>
@@ -1662,7 +1760,12 @@
                 </item>
                 <item>
                  <property name="text">
-                  <string>HWP</string>
+                  <string>HWP_Power</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>HWP_stepper</string>
                  </property>
                 </item>
                </widget>
@@ -1774,7 +1877,7 @@
      <x>0</x>
      <y>0</y>
      <width>688</width>
-     <height>34</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
