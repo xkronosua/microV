@@ -482,8 +482,12 @@ if __name__ == "__main__":
 	try:
 		print(piStage.qSAI())
 		print("SVO:",piStage.qSVO(b'1 2 3'))
-		print(piStage.SVO(b'1 2 3',[True, True, True]))
+		print(piStage.SVO(b'1 2 3',[True, True, 0]))
+		print(piStage.ATZ())
+
 		print("SVO:",piStage.qSVO(b'1 2 3'))
+		print(piStage.MOV(100,axis=3, waitUntilReady=True))
+		print(piStage.qPOS())
 
 		print("qTWG:",piStage.qTWG())
 		print("qWGO:",piStage.qWGO())
@@ -495,7 +499,6 @@ if __name__ == "__main__":
 		piStage.WGO( iWaveGenerator, iStatMode, 3)
 
 		#time.sleep(1)
-		#print(piStage.ATZ())
 		#print(piStage.MOV(dPos=[0,0,0],axis=b"1 2 3", waitUntilReady=True))
 		#print(piStage.MOV(dPos=[50,50,50],axis=b"1 2 3", waitUntilReady=True))
 
@@ -503,7 +506,7 @@ if __name__ == "__main__":
 		#print(piStage.BRA(b'1 2 3',[True, True, True]))
 		#print(piStage.CMO())
 		#print(piStage.qCMO())
-		print(piStage.VEL([1000,1000,1000],b'1 2 3'))
+		print(piStage.VEL([10000,10000,10000],b'1 2 3'))
 		print("qVEL:",piStage.qVEL())
 		'''
 		print(piStage.MOV(dPos=100,axis=1, waitUntilReady=True))
@@ -531,17 +534,17 @@ if __name__ == "__main__":
 		#// Write a sin wave to the wave table 1. //
 		#///////////////////////////////////////////
 		iWaveTableIds = [1,2,3]
-		print(piStage.WAV_SIN_P(iWaveTableIds[0], 1, 1000, 0, 500, 30, 0, 1000))
-		print(piStage.WAV_SIN_P(iWaveTableIds[1], 2, 1000, 0, 500, 15, 0, 1000))
-		print(piStage.WAV_SIN_P(iWaveTableIds[2], 3, 1000, 0, 500, 5, 0, 1000))
+		#print(piStage.WAV_SIN_P(iWaveTableIds[0], 1, 1000, 0, 500, 30, 0, 1000))
+		#print(piStage.WAV_SIN_P(iWaveTableIds[1], 2, 1000, 0, 500, 15, 0, 1000))
+		#print(piStage.WAV_SIN_P(iWaveTableIds[2], 3, 1000, 0, 500, 5, 0, 1000))
 		N = 20
 		t = np.arange(0,2*np.pi,0.01)
 		X = [0,100,0,100,0,100]#np.sin(t)*50+50
 		Y = [50]*len(X)#np.sin(2*t)*50+50
-		Z = [20]*len(X)#np.sin(4*t)*50+50
-		#print(piStage.WAV_PNT(iWaveTableIds[0], 0, len(X), 0, X))
-		#print(piStage.WAV_PNT(iWaveTableIds[1], 0, len(Y), 0, Y))
-		#print(piStage.WAV_PNT(iWaveTableIds[2], 0, len(Z), 0, Z))
+		Z = [-50,100]*(len(X)//2)#np.sin(4*t)*50+50
+		print(piStage.WAV_PNT(iWaveTableIds[0], 0, len(X), 0, X))
+		print(piStage.WAV_PNT(iWaveTableIds[1], 0, len(Y), 0, Y))
+		print(piStage.WAV_PNT(iWaveTableIds[2], 0, len(Z), 0, Z))
 
 
 		#////////////////////////////////////////
@@ -590,7 +593,7 @@ if __name__ == "__main__":
 		x = []
 		y = []
 		t = []
-		while m and k<10000:
+		while m and k<1000:
 			k+=1
 			p = piStage.qPOS()
 			print(p,k)

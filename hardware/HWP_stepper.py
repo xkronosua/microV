@@ -2,6 +2,7 @@ import numpy as np
 import time
 from PyDAQmx.DAQmxFunctions import *
 from PyDAQmx.DAQmxConstants import *
+from threading import Timer
 
 class HWP_stepper():
 	""" Class to create a continuous pulse train on a counter
@@ -21,7 +22,7 @@ class HWP_stepper():
 	steps_deg = 1.8
 	calibr = 8.92
 	currentAngle = 0
-	def __init__(self, freq=10.,duty_cycle=0.5, counter="Dev1/ctr1", reset=False):
+	def __init__(self, freq=10.,duty_cycle=0.5, counter="Dev1/ctr1", reset=False, enableTimeout=10):
 		self.reset = reset
 		if reset:
 			self.currentAngle = 0
@@ -39,9 +40,15 @@ class HWP_stepper():
 
 		DAQmxCreateDOChan(taskHandle1,"/Dev1/port0/line6:7","",DAQmx_Val_ChanForAllLines)
 		self.taskHandleDirEnable = taskHandle1
+		self.enableTimeout = enableTimeout
 
 
-
+	def onEnableTimeout(self):
+		print('enableTimeout')
+		try:
+			self.enable(0)
+		except:
+			print('err')
 	def enable(self,state):
 		if state:
 			state = 1
@@ -52,6 +59,8 @@ class HWP_stepper():
 		DAQmxStartTask(self.taskHandleDirEnable)
 		DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
 		DAQmxStopTask(self.taskHandleDirEnable)
+		enableTimeout_thread = Timer(self.enableTimeout, self.onEnableTimeout)
+		enableTimeout_thread.start()
 
 	def direction(self,state):
 		if state:

@@ -32,6 +32,8 @@ def push_data_to_fixBuff(buf, data):
 	buf[-push_len:] = data
 	return buf
 
+pico_shared_buf = sharedmem.full_like(np.zeros((5000,3)),value=0,dtype=np.float64)
+
 def create_pico_reader(config,shared_data):
 	ps = set_picoscope(config)
 	i=0
@@ -39,30 +41,34 @@ def create_pico_reader(config,shared_data):
 		print('start')
 		try:
 			#print(i)
+			d = shared_data.copy()
 			r = ps.capture_prep_block(return_scaled_array=1)
 			dataA = r[0]['A']
 			dataB = r[0]['B']
 			scanA = abs(dataA.max(axis=1) - dataA.min(axis=1))
 			scanB = abs(dataB.max(axis=1) - dataB.min(axis=1))
 			scanT = r[1]
-			push_data_to_fixBuff(shared_data,np.array([scanT,scanA,scanB]).T)
-			#print(scanA)
+			shared_data[:] = push_data_to_fixBuff(shared_data,np.array([scanT,scanA,scanB]).T)[:]
+			print("s",shared_data.sum(),pico_shared_buf.sum())
+			time.sleep(1)
 			i +=1
 		except:
 			traceback.print_exc()
 			break
 	del ps
 
-pico_shared_buf = sharedmem.full_like(np.zeros((500,3)),value=-1,dtype=np.float64)
 
 
+'''
 config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 			'ChB_VRange':'500mV','ChB_Offset':0,
 			'sampleInterval':0.0001,'samplingDuration':0.003,
 			'pico_pretrig':0.001,'n_captures':10,'trigSrc':'ext',
 			'threshold_V':-0.350,'direction':'RISING'}
+'''
 
 
+'''
 def reader(q):
 	pico = picopy.Pico3k()
 
@@ -83,6 +89,7 @@ def reader(q):
 		q.put(r)
 	q.put('done')
 	pico.close()
+'''
 
 class Pico_view(QtGui.QMainWindow):
 	timer = QtCore.QTimer()
@@ -110,10 +117,10 @@ class Pico_view(QtGui.QMainWindow):
 		self.show()
 
 		## Create an empty plot curve to be filled later, set its pen
-		self.curveA = pw.plot()
+		self.curveA = pw.plot([0,1])
 		self.curveA.setPen((255,0,0))
 
-		self.curveB = pw.plot()
+		self.curveB = pw.plot([0,1])
 		self.curveB.setPen((0,255,0))
 
 		## Create an empty plot curve to be filled later, set its pen
@@ -125,8 +132,13 @@ class Pico_view(QtGui.QMainWindow):
 
 
 		self.timer.timeout.connect(self.update)
-		self.timer.start(0.5)
+		self.timer.start(3000)
 		#self.ps = picopy.Pico3k()
+		config = {	'ChA_VRange':'20mV','ChA_Offset':0,
+					'ChB_VRange':'20mV','ChB_Offset':0,
+					'sampleInterval':2e-9,'samplingDuration':15e-9,
+					'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
+					'threshold_V':0.02,'direction':'RISING'}
 		self.p = multiprocessing.Process(target=create_pico_reader,args=[config,pico_shared_buf])
 		self.p.start()
 		#self.p.join()
@@ -134,8 +146,8 @@ class Pico_view(QtGui.QMainWindow):
 
 
 	def update(self):
-		#print(data)
-		data = pico_shared_buf
+		data = pico_shared_buf.copy()
+		print(":",data.sum(),pico_shared_buf.sum())
 
 		self.curveA1.setData(x=data[:,0],y=data[:,1])
 		self.curveB1.setData(x=data[:,0],y=data[:,2])
@@ -158,7 +170,7 @@ class Pico_view(QtGui.QMainWindow):
 ## Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
 	import sys
-	__spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
+	#__spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
 
 	app = QtGui.QApplication(sys.argv)
 	ex = Pico_view()

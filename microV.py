@@ -70,7 +70,8 @@ class microV(QtGui.QMainWindow):
 	andorCCD = AndorCamera()
 	HWP_stepper = None
 	#inst = visa.instrument('USB0::0x0000::0x0000::DG5Axxxxxxxxx::INSTR', term_chars='\n', timeout=1)
-	power_meter = None#ThorlabsPM100(inst=inst)
+	power_meter = None
+	power_meter_instr = None#ThorlabsPM100(inst=inst)
 	#DAQmx = nidaqmx.Task()
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
 	live_pmt = []
@@ -368,24 +369,24 @@ class microV(QtGui.QMainWindow):
 	###############################   Powermeter	 ###########################
 	###############################   Thorlabs PM100 ###########################
 
-	def connect_powermeter(self,state):
+	def pm100Connect(self,state):
 		if state:
-			self.initPowermeter()
+			rm = visa.ResourceManager()
+			self.power_meter_instr = rm.open_resource(
+				'USB0::0x1313::0x8078::P0011470::INSTR',timeout=1)
+			self.power_meter = ThorlabsPM100(inst=self.power_meter_instr)
+			self.readPower()
 		else:
-			try:
-				self.ps.close()
-			except:
-				traceback.print_exc()
-
-	def powermeter_set(self):
-		pass
-
-	def initPowermeter(self):
-		pass
-		#self.pico_set()
+			self.power_meter_instr.close()
 
 	def readPower(self):
-		pass
+		self.power_meter.sense.correction.wavelength = float(self.ui.laserWavelength.text())
+		val = self.power_meter.read
+		self.ui.pm100Power.setText(str(val))
+		return val
+
+	def pm100Average(self,val):
+		self.power_meter.sense.average.count = val
 
 	############################################################################
 	###############################   HWP	###################################
@@ -478,15 +479,21 @@ class microV(QtGui.QMainWindow):
 		if state:
 			self.shamrock.Initialize()
 			self.shamrock.Connect()
-			port = self.shamrock.shamrock.GetPort()
-			self.ui.shamrockPort.setCurrentIndex(port-1)
+
 			wavelength = self.shamrock.shamrock.GetWavelength()
 			self.ui.shamrockWavelength.setText(str(wavelength))
+			port = self.shamrock.shamrock.GetPort()
+			self.ui.shamrockPort.blockSignals(True)
+			self.ui.shamrockPort.setCurrentIndex(port-1)
+			self.ui.shamrockPort.blockSignals(False)
 			grating = self.shamrock.shamrock.GetGrating()
-			self.ui.shamrockGrating.setCurrentIndex(grating)
+			self.ui.shamrockGrating.blockSignals(True)
+			self.ui.shamrockGrating.setCurrentIndex(grating-1)
+			self.ui.shamrockGrating.blockSignals(False)
 
 		else:
 			self.shamrock.Close()
+
 
 	def shamrockSetWavelength(self):
 		wl = self.ui.shamrockWavelength_to_set.value()
@@ -498,20 +505,36 @@ class microV(QtGui.QMainWindow):
 		port = val+1
 		self.shamrock.shamrock.SetPort(port)
 		port = self.shamrock.shamrock.GetPort()
+		self.ui.shamrockPort.blockSignals(True)
 		self.ui.shamrockPort.setCurrentIndex(port-1)
+		self.ui.shamrockPort.blockSignals(False)
 
-	def shamrockSetGrating(self,grating):
+	def shamrockSetGrating(self,val):
+		grating = val+1
 		self.shamrock.shamrock.SetGrating(grating)
 		grating = self.shamrock.shamrock.GetGrating()
-		self.ui.shamrockGrating.setCurrentIndex(grating)
+		self.ui.shamrockGrating.blockSignals(True)
+		self.ui.shamrockGrating.setCurrentIndex(grating-1)
+		self.ui.shamrockGrating.blockSignals(False)
 
 	############################################################################
 	###############################   AndorCamera	############################
 
 	def andorCameraConnect(self, state):
 		if state:
+
 			self.andorCCD.Initialize()
 			self.andorCCD.SetExposureTime(self.ui.andorCameraExposure.value())
+			self.andorCCDBaseline = np.array([])
+			size=self.andorCCD.GetPixelSize()
+			self.andorCCD_wavelength = np.arange(size[0])
+			self.andorCCD_wavelength_center = float(self.ui.shamrockWavelength.text())
+			if self.ui.shamrockConnect.isChecked():
+				shape=self.andorCCD.GetDetector()
+				size=self.andorCCD.GetPixelSize()
+				self.shamrock.shamrock.SetPixelWidth(size[0])
+				self.shamrock.shamrock.SetNumberPixels(shape[0])
+				self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
 		else:
 			self.andorCCD.ShutDown()
 
@@ -524,27 +547,35 @@ class microV(QtGui.QMainWindow):
 		self.andorCCD.SetReadMode(mode)
 
 	def andorCameraGetData(self,state):
+		data_center = 0
 		if state:
 			if not self.ui.andorCameraLive.isChecked():
 				print('andorCameraGetData')
 				self.andorCCD.StartAcquisition()
 				self.andorCCD.WaitForAcquisition()
 				data = self.andorCCD.GetMostRecentImage()
+				if len(self.andorCCDBaseline) == len(data):
+					data-= self.andorCCDBaseline
 				print(data)
-				wavelength = np.arange(len(data))
+
 				if self.ui.shamrockConnect.isChecked():
-					shape=self.andorCCD.GetDetector()
-					size=self.andorCCD.GetPixelSize()
-					self.shamrock.shamrock.SetPixelWidth(size[0])
-					self.shamrock.shamrock.SetNumberPixels(shape[0])
-					self.shamrock.shamrock.GetCalibration()
-					wavelength = self.shamrock.shamrock.GetCalibration()
-				self.line_spectra.setData(x=wavelength, y = data)
+					w_c = float(self.ui.shamrockWavelength.text())
+					if not w_c == self.andorCCD_wavelength_center:
+						shape=self.andorCCD.GetDetector()
+						size=self.andorCCD.GetPixelSize()
+						self.shamrock.shamrock.SetPixelWidth(size[0])
+						self.shamrock.shamrock.SetNumberPixels(shape[0])
+						self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
+
+					w_r = (self.andorCCD_wavelength>(w_c-10))&(self.andorCCD_wavelength<(w_c+10))
+					data_center = float(data[w_r].mean())
+				self.line_spectra.setData(x=self.andorCCD_wavelength, y = data)
 				self.ui.andorCameraGetData.setChecked(False)
 			else:
-				self.andorCameraLiveTimer.start(100)
+				self.andorCameraLiveTimer.start(10)
 		else:
 			self.andorCameraLiveTimer.stop()
+		return data_center
 
 	def onAndorCameraLiveTimeout(self):
 		self.andorCameraLiveTimer.stop()
@@ -564,6 +595,21 @@ class microV(QtGui.QMainWindow):
 
 		self.andorCameraLiveTimer.start(100)
 
+	def andorCameraGetBaseline(self):
+		print('andorCameraGetBaseline')
+		self.andorCCD.StartAcquisition()
+		self.andorCCD.WaitForAcquisition()
+		data = self.andorCCD.GetMostRecentImage()
+		self.andorCCDBaseline = data
+		wavelength = np.arange(len(data))
+		if self.ui.shamrockConnect.isChecked():
+			shape=self.andorCCD.GetDetector()
+			size=self.andorCCD.GetPixelSize()
+			self.shamrock.shamrock.SetPixelWidth(size[0])
+			self.shamrock.shamrock.SetNumberPixels(shape[0])
+			self.shamrock.shamrock.GetCalibration()
+			wavelength = self.shamrock.shamrock.GetCalibration()
+		self.line_spectra.setData(x=wavelength, y = data)
 	############################################################################
 	###############################   HWP_stepper	############################
 
@@ -571,6 +617,7 @@ class microV(QtGui.QMainWindow):
 		if state:
 			self.HWP_stepper = HWP_stepper(4000,0.01, "dev1/ctr1", reset=True)
 			self.ui.HWP_stepper_angle.setText('0')
+
 		else:
 			try:
 				self.HWP_stepper.close()
@@ -788,6 +835,12 @@ class microV(QtGui.QMainWindow):
 						real_position0 = self.piStage.qPOS()
 						pmt_val, pmt_val1 = self.readPico()
 						real_position = self.piStage.qPOS()
+						#########################################
+						if self.ui.andorCameraConnect.isChecked():
+							pmt_val = self.andorCameraGetData(1)
+
+
+							#################################################
 						self.live_pmt = np.hstack((self.live_pmt, pmt_val))
 						self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
 						x_real = np.mean([real_position0[0], real_position[0]])
@@ -1188,6 +1241,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.andorCameraGetData.toggled[bool].connect(self.andorCameraGetData)
 		self.ui.andorCameraReadoutMode.currentIndexChanged[int].connect(self.andorCameraSetReadoutMode)
 		self.andorCameraLiveTimer.timeout.connect(self.onAndorCameraLiveTimeout)
+		self.ui.andorCameraGetBaseline.clicked.connect(self.andorCameraGetBaseline)
+
 
 
 		self.ui.HWP_stepper_Connect.toggled[bool].connect(self.HWP_stepper_Connect)
@@ -1195,6 +1250,10 @@ class microV(QtGui.QMainWindow):
 		self.ui.HWP_stepper_CW.clicked.connect(self.HWP_stepper_CW)
 		self.ui.HWP_stepper_CCW.clicked.connect(self.HWP_stepper_CCW)
 		self.ui.HWP_stepper_Reset.clicked.connect(self.HWP_stepper_Reset)
+
+
+		self.ui.pm100Connect.toggled[bool].connect(self.pm100Connect)
+		self.ui.pm100Average.valueChanged[int].connect(self.pm100Average)
 
 		########################################################################
 		########################################################################
@@ -1231,6 +1290,8 @@ class microV(QtGui.QMainWindow):
 		self.pw_preview = pg.PlotWidget(name='preview')  ## giving the plots names allows us to link their axes together
 		self.ui.previewArea.addWidget(self.pw_preview)
 
+
+
 		self.line_DAQmx_sig = self.pw_preview.plot(pen=(255,0,0))
 		self.line_DAQmx_sig1 = self.pw_preview.plot(pen=(255,255,0))
 		self.line_DAQmx_ref = self.pw_preview.plot(pen=(255,0,255))
@@ -1238,12 +1299,19 @@ class microV(QtGui.QMainWindow):
 		self.line_pico_ChA = self.pw_preview.plot(pen=(255,215,0))
 		self.line_pico_ChB = self.pw_preview.plot(pen=(0,255,255))
 
-		self.pw1 = pg.PlotWidget(name='Graph1')  ## giving the plots names allows us to link their axes together
-		self.ui.plotArea.addWidget(self.pw1)
+		self.pw1 = pg.PlotWidget(name='Scan')  ## giving the plots names allows us to link their axes together
 
 		self.line_pmt = self.pw1.plot(pen=(255,215,0))
 		self.line_pmt1 = self.pw1.plot(pen=(0,255,255))
-		self.line_spectra = self.pw1.plot(pen=(0,255,0))
+		#self.line_spectra = self.pw1.plot(pen=(0,255,0))
+		self.pw_spectra = pg.PlotWidget(name='Spectra')
+		self.line_spectra = self.pw_spectra.plot(pen=(0,255,0))
+		splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
+		splitter.addWidget(self.pw1)
+		splitter.addWidget(self.pw_spectra)
+
+		self.ui.plotArea.addWidget(splitter)
+
 
 		self.img = pg.ImageView()  ## giving the plots names allows us to link their axes together
 		data = np.zeros((100,100))
@@ -1312,10 +1380,11 @@ class microV(QtGui.QMainWindow):
 		except:
 			traceback.print_exc()
 		try:
-			if self.DAQmx:
-				self.DAQmx.close()
+			if self.power_meter_instr:
+				self.power_meter_instr.close()
 		except:
 			traceback.print_exc()
+
 		try:
 			if self.ps:
 				self.ps.close()
@@ -1326,14 +1395,17 @@ class microV(QtGui.QMainWindow):
 		except:
 			traceback.print_exc()
 		try:
-			self.shamrock.Close()
+			if self.ui.shamrockConnect.isChecked():
+				self.shamrock.Close()
 		except:
 			traceback.print_exc()
 		try:
-			self.andorCCD.ShutDown()
+			if self.ui.andorCameraConnect.isChecked():
+				self.andorCCD.ShutDown()
 		except:
 			traceback.print_exc()
 		try:
+			self.HWP_stepper.enable(0)
 			self.HWP_stepper.close()
 		except:
 			traceback.print_exc()
