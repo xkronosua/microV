@@ -74,8 +74,8 @@ class microV(QtGui.QMainWindow):
 	power_meter_instr = None#ThorlabsPM100(inst=inst)
 	#DAQmx = nidaqmx.Task()
 	#DAQmx = MultiChannelAnalogInput(["Dev1/ai0,Dev1/ai2"])
-	live_pmt = []
-	live_pmt1 = []
+	live_pmtA = []
+	live_pmtB = []
 	live_x = []
 	live_y = []
 	live_integr_spectra = []
@@ -260,7 +260,8 @@ class microV(QtGui.QMainWindow):
 			self.initPico()
 		else:
 			try:
-				self.ps.close()
+				del self.ps
+				self.ps = None
 			except:
 				traceback.print_exc()
 
@@ -380,12 +381,16 @@ class microV(QtGui.QMainWindow):
 			self.power_meter_instr.close()
 
 	def readPower(self):
+		if not self.ui.pm100Connect.isChecked():
+			self.ui.pm100Connect.setChecked(True)
 		self.power_meter.sense.correction.wavelength = float(self.ui.laserWavelength.text())
 		val = self.power_meter.read
 		self.ui.pm100Power.setText(str(val))
 		return val
 
 	def pm100Average(self,val):
+		if not self.ui.pm100Connect.isChecked():
+			self.ui.pm100Connect.setChecked(True)
 		self.power_meter.sense.average.count = val
 
 	############################################################################
@@ -484,7 +489,7 @@ class microV(QtGui.QMainWindow):
 			self.ui.shamrockWavelength.setText(str(wavelength))
 			port = self.shamrock.shamrock.GetPort()
 			self.ui.shamrockPort.blockSignals(True)
-			self.ui.shamrockPort.setCurrentIndex(port-1)
+			self.ui.shamrockPort.setCurrentIndex(port)
 			self.ui.shamrockPort.blockSignals(False)
 			grating = self.shamrock.shamrock.GetGrating()
 			self.ui.shamrockGrating.blockSignals(True)
@@ -496,20 +501,26 @@ class microV(QtGui.QMainWindow):
 
 
 	def shamrockSetWavelength(self):
+		if not self.ui.shamrockConnect.isChecked():
+			self.ui.shamrockConnect.setChecked(True)
 		wl = self.ui.shamrockWavelength_to_set.value()
 		self.shamrock.shamrock.SetWavelength(wl)
 		wavelength = self.shamrock.shamrock.GetWavelength()
 		self.ui.shamrockWavelength.setText(str(wavelength))
 
 	def shamrockSetPort(self,val):
-		port = val+1
+		if not self.ui.shamrockConnect.isChecked():
+			self.ui.shamrockConnect.setChecked(True)
+		port = val
 		self.shamrock.shamrock.SetPort(port)
 		port = self.shamrock.shamrock.GetPort()
 		self.ui.shamrockPort.blockSignals(True)
-		self.ui.shamrockPort.setCurrentIndex(port-1)
+		self.ui.shamrockPort.setCurrentIndex(port)
 		self.ui.shamrockPort.blockSignals(False)
 
 	def shamrockSetGrating(self,val):
+		if not self.ui.shamrockConnect.isChecked():
+			self.ui.shamrockConnect.setChecked(True)
 		grating = val+1
 		self.shamrock.shamrock.SetGrating(grating)
 		grating = self.shamrock.shamrock.GetGrating()
@@ -539,6 +550,7 @@ class microV(QtGui.QMainWindow):
 			self.andorCCD.ShutDown()
 
 	def andorCameraSetExposure(self,val):
+
 		self.andorCCD.SetExposureTime(val)
 		val = self.andorCCD.GetAcquisitionTimings()[0]
 
@@ -625,6 +637,9 @@ class microV(QtGui.QMainWindow):
 				traceback.print_exc()
 			self.HWP_stepper = None
 	def HWP_stepper_MoveTo_Go(self):
+		if not self.ui.HWP_stepper_Connect.isChecked():
+			self.ui.HWP_stepper_Connect.setChecked(True)
+
 		if not self.HWP_stepper is None:
 			angle = self.ui.HWP_stepper_MoveTo.value()
 			wait = self.ui.HWP_stepper_wait.isChecked()
@@ -632,6 +647,8 @@ class microV(QtGui.QMainWindow):
 			angle_ = self.HWP_stepper.getAngle()
 			self.ui.HWP_stepper_angle.setText(str(angle_))
 	def HWP_stepper_CW(self):
+		if not self.ui.HWP_stepper_Connect.isChecked():
+			self.ui.HWP_stepper_Connect.setChecked(True)
 		if not self.HWP_stepper is None:
 			self.HWP_stepper.direction(1)
 			step = self.ui.HWP_stepper_step.value()
@@ -640,6 +657,8 @@ class microV(QtGui.QMainWindow):
 			angle_ = self.HWP_stepper.getAngle()
 			self.ui.HWP_stepper_angle.setText(str(angle_))
 	def HWP_stepper_CCW(self):
+		if not self.ui.HWP_stepper_Connect.isChecked():
+			self.ui.HWP_stepper_Connect.setChecked(True)
 		if not self.HWP_stepper is None:
 			self.HWP_stepper.direction(0)
 			step = self.ui.HWP_stepper_step.value()
@@ -694,9 +713,12 @@ class microV(QtGui.QMainWindow):
 			traceback.print_exc()
 	def startCalibr(self,state):
 		if state:
-			self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
-			self.live_pmt = []
-			self.live_pmt1 = []
+			if not self.ui.connect_pico.isChecked():
+				#self.ui.connect_pico.toggled.emit(True)
+				self.ui.connect_pico.setChecked(True)
+			self.calibrTimer.start(10)
+			self.live_pmtA = []
+			self.live_pmtB = []
 			self.live_x = []
 			self.live_y = []
 
@@ -707,19 +729,19 @@ class microV(QtGui.QMainWindow):
 	def onCalibrTimer(self):
 		self.calibrTimer.stop()
 		spectra = np.zeros(3648)#self.getSpectra()
-		pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
-		self.live_pmt.append(pmt_val)
-		self.live_pmt1.append(pmt_val1)
-		if len(self.live_pmt)>800:
-			self.live_pmt.pop(0)
-		if len(self.live_pmt1)>800:
-			self.live_pmt1.pop(0)
+		pmt_valA,pmt_valB = self.readPico()#self.readDAQmx(print_dt=True)
+		self.live_pmtA.append(pmt_valA)
+		self.live_pmtB.append(pmt_valB)
+		if len(self.live_pmtA)>800:
+			self.live_pmtA.pop(0)
+		if len(self.live_pmtB)>800:
+			self.live_pmtB.pop(0)
 		s_from = self.ui.usbSpectr_from.value()
 		s_to = self.ui.usbSpectr_to.value()
 		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
 		#setLine(spectra)
-		self.line_pmt.setData(self.live_pmt)
-		self.line_pmt1.setData(self.live_pmt1)
+		self.line_pmtA.setData(self.live_pmtA)
+		self.line_pmtB.setData(self.live_pmtB)
 		#self.line_spectra.setData(self.live_integr_spectra)
 
 		self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
@@ -736,8 +758,8 @@ class microV(QtGui.QMainWindow):
 		print(state)
 		if state:
 			try:
-				self.live_pmt = []
-				self.live_pmt1 = []
+				self.live_pmtA = []
+				self.live_pmtB = []
 				self.live_x = []
 				self.live_y = []
 
@@ -747,8 +769,8 @@ class microV(QtGui.QMainWindow):
 			except:
 				traceback.print_exc()
 		else:
-			self.live_pmt = []
-			self.live_pmt1 = []
+			self.live_pmtA = []
+			self.live_pmtB = []
 			self.live_x = []
 			self.live_y = []
 
@@ -787,8 +809,8 @@ class microV(QtGui.QMainWindow):
 
 			Range_x = np.arange(x_start,x_end,x_step)
 			Range_xi = np.arange(len(Range_x))
-			data_pmt = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
-			data_pmt1 = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+			data_pmtA = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+			data_pmtB = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
 			layerIndex = 0
 			for z,zi in zip(Range_z,Range_zi):
 				if not self.scan3DisAlive: break
@@ -797,7 +819,7 @@ class microV(QtGui.QMainWindow):
 
 				fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 				with open(fname,'a') as f:
-					f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\ttime\n")
+					f.write("#X\tY\tZ\tpmtA_signal\tpmtB_signal\ttime\n")
 
 
 
@@ -818,8 +840,8 @@ class microV(QtGui.QMainWindow):
 						forward = True
 					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 					if not r: break
-					self.live_pmt = np.array([])
-					self.live_pmt1 = np.array([])
+					self.live_pmtA = np.array([])
+					self.live_pmtB = np.array([])
 					self.live_x = np.array([])
 					self.live_y = np.array([])
 
@@ -833,16 +855,16 @@ class microV(QtGui.QMainWindow):
 						if not r: break
 
 						real_position0 = self.piStage.qPOS()
-						pmt_val, pmt_val1 = self.readPico()
+						pmt_valA, pmt_valB = self.readPico()
 						real_position = self.piStage.qPOS()
 						#########################################
 						if self.ui.andorCameraConnect.isChecked():
-							pmt_val = self.andorCameraGetData(1)
+							pmt_valA = self.andorCameraGetData(1)
 
 
 							#################################################
-						self.live_pmt = np.hstack((self.live_pmt, pmt_val))
-						self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
+						self.live_pmtA = np.hstack((self.live_pmtA, pmt_valA))
+						self.live_pmtB = np.hstack((self.live_pmtB, pmt_valB))
 						x_real = np.mean([real_position0[0], real_position[0]])
 						y_real = np.mean([real_position0[1], real_position[1]])
 
@@ -850,7 +872,7 @@ class microV(QtGui.QMainWindow):
 						self.live_y = np.hstack((self.live_y,y_real))
 
 						#spectra = np.zeros(3648)
-						dataSet = real_position +[pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
+						dataSet = real_position +[pmt_valA, pmt_valB, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
 						#print(dataSet[-1])
 						with open(fname,'a') as f:
 							f.write("\t".join([str(i) for i in dataSet])+"\n")
@@ -869,14 +891,14 @@ class microV(QtGui.QMainWindow):
 								xi_ = len(Range_xi_tmp)-1
 							if yi_>= len(Range_yi):
 								yi_ = len(Range_yi)-1
-						data_pmt[zi,xi_,yi_] = pmt_val
-						data_pmt1[zi,xi_,yi_] = pmt_val1
+						data_pmtA[zi,xi_,yi_] = pmt_val
+						data_pmtB[zi,xi_,yi_] = pmt_valB
 						#print(self.live_x[-1], x, xi_,xi, yi_, yi)
 
 						#self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
 
-						self.line_pmt.setData(x=self.live_x,y=self.live_pmt)
-						self.line_pmt1.setData(x=self.live_x,y=self.live_pmt1)
+						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 
 						#self.line_spectra.setData(self.live_integr_spectra)
 
@@ -890,38 +912,38 @@ class microV(QtGui.QMainWindow):
 						#print(time.time()-start)
 					#self.setImage(data_spectra)
 
-					self.img.setImage(data_pmt,pos=(Range_x.min(),Range_y.min()),
+					self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
 					scale=(x_step,y_step),xvals=Range_z)
-					self.img1.setImage(data_pmt1,pos=(Range_x.min(),Range_y.min()),
+					self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
 					scale=(x_step,y_step),xvals=Range_z)
 					self.img.setCurrentIndex(layerIndex)
 					self.img1.setCurrentIndex(layerIndex)
 
-					#print(sum(data_pmt),sum(data_pmt1))
+					#print(sum(data_pmtA),sum(data_pmtB))
 
-				#imsave(fname+"_pmt.tif",data_pmt1.astype(np.int16))
-				#imsave(fname+"_pmt1.tif",data_pmt1.astype(np.int16))
+				#imsave(fname+"_pmtA.tif",data_pmtB.astype(np.int16))
+				#imsave(fname+"_pmtB.tif",data_pmtB.astype(np.int16))
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)!=0]
-			data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)!=0]
+			data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
+			data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
 
-			imsave(fname+"_pmt.tif",data_pmt.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
-			imsave(fname+"_pmt1.tif",data_pmt1.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
 
 			print(self.spectrometer.close())
 			print(self.piStage.CloseConnection())
 			return
 
-		data_pmt = data_pmt[data_pmt.sum(axis=2).sum(axis=1)!=0]
-		data_pmt1 = data_pmt1[data_pmt1.sum(axis=2).sum(axis=1)!=0]
-		#data_pmt_16 = data_pmt/data_pmt.max()*32768*2-32768
-		#data_pmt1_16 = data_pmt1/data_pmt1.max()*32768*2-32768
-		#imsave(fname+"_pmt.tif",data_pmt_16.astype(np.int16), imagej=True)
-		#imsave(fname+"_pmt1.tif",data_pmt1_16.astype(np.int16), imagej=True)
-		imsave(fname+"_pmt.tif",data_pmt.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
-		imsave(fname+"_pmt1.tif",data_pmt1.astype(np.float32), imagej=True,resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+		data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
+		data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
+		#data_pmt_16 = data_pmtA/data_pmtA.max()*32768*2-32768
+		#data_pmtB_16 = data_pmtB/data_pmtB.max()*32768*2-32768
+		#imsave(fname+"_pmtA.tif",data_pmt_16.astype(np.int16), imagej=True)
+		#imsave(fname+"_pmtB.tif",data_pmtB_16.astype(np.int16), imagej=True)
+		imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+		imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True,resolution=(x_step*1e-4,y_step*1e-4,'cm'))
 
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
@@ -981,9 +1003,9 @@ class microV(QtGui.QMainWindow):
 			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 			#fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 			#with open(fname,'a') as f:
-			#	f.write("#X\tY\tZ\tpmt_signal\tpmt1_signal\ttime\n")
-			data_pmt = []
-			data_pmt1 = []
+			#	f.write("#X\tY\tZ\tpmtA_signal\tpmtB_signal\ttime\n")
+			data_pmtA = []
+			data_pmtB = []
 
 			forward = True
 			for y,yi in zip(Range_y,Range_yi):
@@ -999,8 +1021,8 @@ class microV(QtGui.QMainWindow):
 					#forward = True
 				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 				if not r: break
-				self.live_pmt = np.array([])
-				self.live_pmt1 = np.array([])
+				self.live_pmtA = np.array([])
+				self.live_pmtB = np.array([])
 				self.live_x = np.array([])
 				self.live_y = np.array([])
 
@@ -1029,16 +1051,16 @@ class microV(QtGui.QMainWindow):
 
 				if forward:
 					forward = False
-					data_pmt.append(np.hstack(tmp[::-1]))
-					data_pmt1.append(np.hstack(tmp1[::-1]))
+					data_pmtA.append(np.hstack(tmp[::-1]))
+					data_pmtB.append(np.hstack(tmp1[::-1]))
 
 				else:
 					forward = True
-					data_pmt.append(np.hstack(tmp))
-					data_pmt1.append(np.hstack(tmp1))
-		#print(data_pmt)
-		self.img.setImage(np.array(data_pmt).T)
-		self.img1.setImage(np.array(data_pmt1).T)
+					data_pmtA.append(np.hstack(tmp))
+					data_pmtB.append(np.hstack(tmp1))
+		#print(data_pmtA)
+		self.img.setImage(np.array(data_pmtA).T)
+		self.img1.setImage(np.array(data_pmtB).T)
 		#start0=time.time()
 		self.pico_reader_proc.terminate()
 
@@ -1062,7 +1084,7 @@ class microV(QtGui.QMainWindow):
 	def polarScan(self):
 		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
 		with open(fname,'a') as f:
-			f.write("#X\tY\tZ\tHWP\tpmt_signal\tpmt1_signal\ttime\n")
+			f.write("#X\tY\tZ\tHWP\tpmtA_signal\tpmtB_signal\ttime\n")
 		self.rotPiezoStage.move(self.ui.scanPolar_angle.value())
 		isMoving = self.rotPiezoStage.isMoving()
 		n = 0
@@ -1072,17 +1094,17 @@ class microV(QtGui.QMainWindow):
 			if n>10:
 				isMoving = self.rotPiezoStage.isMoving()
 				n = 0
-			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
-			self.live_pmt = np.hstack((self.live_pmt, pmt_val))
-			self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
+			pmt_valA,pmt_valB = self.readPico()#self.readDAQmx(print_dt=True)
+			self.live_pmtA = np.hstack((self.live_pmtA, pmt_valA))
+			self.live_pmtB = np.hstack((self.live_pmtB, pmt_valB))
 
-			self.line_pmt.setData(self.live_pmt)
-			self.line_pmt1.setData(self.live_pmt1)
+			self.line_pmtA.setData(self.live_pmtA)
+			self.line_pmtB.setData(self.live_pmtB)
 			app.processEvents()
 			real_position = [round(p,4) for p in self.piStage.qPOS()]
 			HWP_angle = float(self.ui.HWP_angle.text())
 
-			dataSet = real_position +[HWP_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
+			dataSet = real_position +[HWP_angle, pmt_valA, pmt_valB, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
 			#print(dataSet[-1])
 			with open(fname,'a') as f:
 				f.write("\t".join([str(round(i,6)) for i in dataSet])+"\n")
@@ -1092,15 +1114,15 @@ class microV(QtGui.QMainWindow):
 	def scanPolar(self,state):
 		if state:
 			print(state)
-			self.live_pmt = np.array([])
-			self.live_pmt1 = np.array([])
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
 			self.live_x = np.array([])
 			self.alive = True
 			self.polarScan()
 
 		else:
-			self.live_pmt = np.array([])
-			self.live_pmt1 = np.array([])
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
 			self.live_x = np.array([])
 			self.alive = False
 			self.rotPiezoStage.stop()
@@ -1108,7 +1130,7 @@ class microV(QtGui.QMainWindow):
 	def scan1D(self):
 		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
 		with open(fname,'a') as f:
-			f.write("#X\tY\tZ\tHWP_power\tHWP_stepper\tpmt_signal\tpmt1_signal\ttime\n")
+			f.write("#X\tY\tZ\tHWP_power\tHWP_stepper\tpmtA_signal\tpmtB_signal\ttime\n")
 		axis = self.ui.scan1D_axis.currentText()
 		move_function = None
 		if axis == "X":
@@ -1133,7 +1155,7 @@ class microV(QtGui.QMainWindow):
 								self.ui.scan1D_step.value())
 		for new_pos in steps_range:
 			if not self.alive: break
-			pmt_val,pmt_val1 = self.readPico()#self.readDAQmx(print_dt=True)
+			pmt_valA,pmt_valB = self.readPico()#self.readDAQmx(print_dt=True)
 
 			real_position = [round(p,4) for p in self.piStage.qPOS()]
 			HWP_angle = float(self.ui.HWP_angle.text())
@@ -1150,15 +1172,15 @@ class microV(QtGui.QMainWindow):
 			if axis == 'HWP_stepper':
 				x = HWP_stepper_angle
 
-			self.live_pmt = np.hstack((self.live_pmt, pmt_val))
-			self.live_pmt1 = np.hstack((self.live_pmt1, pmt_val1))
+			self.live_pmtA = np.hstack((self.live_pmtA, pmt_valA))
+			self.live_pmtB = np.hstack((self.live_pmtB, pmt_valB))
 			self.live_x = np.hstack((self.live_x, x))
 
-			self.line_pmt.setData(x=self.live_x,y=self.live_pmt)
-			self.line_pmt1.setData(x=self.live_x,y=self.live_pmt1)
+			self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+			self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 
 			app.processEvents()
-			dataSet = real_position +[HWP_angle, HWP_stepper_angle, pmt_val, pmt_val1, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
+			dataSet = real_position +[HWP_angle, HWP_stepper_angle, pmt_valA, pmt_valB, time.time()]# + spectra[spectra_range[0]:spectra_range[1]]
 			#print(dataSet[-1])
 			with open(fname,'a') as f:
 				f.write("\t".join([str(round(i,10)) for i in dataSet])+"\n")
@@ -1167,15 +1189,15 @@ class microV(QtGui.QMainWindow):
 
 	def scan1D_Scan(self,state):
 		if state:
-			self.live_pmt = np.array([])
-			self.live_pmt1 = np.array([])
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
 			self.live_x = np.array([])
 			self.alive = True
 			self.scan1D()
 
 		else:
-			self.live_pmt = np.array([])
-			self.live_pmt1 = np.array([])
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
 			self.live_x = np.array([])
 			self.alive = False
 			#self.rotPiezoStage.stop()
@@ -1186,6 +1208,8 @@ class microV(QtGui.QMainWindow):
 		self.laserStatus.start(1000)
 
 		self.ui.actionExit.toggled.connect(self.closeEvent)
+
+		self.ui.scan3D_config.cellChanged[int,int].connect(self.syncRectROI_table)
 
 		self.ui.scan1D_filePath_find.clicked.connect(self.scan1D_filePath_find)
 
@@ -1301,8 +1325,8 @@ class microV(QtGui.QMainWindow):
 
 		self.pw1 = pg.PlotWidget(name='Scan')  ## giving the plots names allows us to link their axes together
 
-		self.line_pmt = self.pw1.plot(pen=(255,215,0))
-		self.line_pmt1 = self.pw1.plot(pen=(0,255,255))
+		self.line_pmtA = self.pw1.plot(pen=(255,215,0))
+		self.line_pmtB = self.pw1.plot(pen=(0,255,255))
 		#self.line_spectra = self.pw1.plot(pen=(0,255,0))
 		self.pw_spectra = pg.PlotWidget(name='Spectra')
 		self.line_spectra = self.pw_spectra.plot(pen=(0,255,0))
@@ -1324,6 +1348,14 @@ class microV(QtGui.QMainWindow):
 		self.img.setColorMap(cmap)
 		g = pg.GridItem()
 		self.img.addItem(g)
+
+		self.rectROI = pg.RectROI([0, 0], [100, 100], pen=(0,9))
+		self.rectROI_1 = pg.RectROI([0, 0], [100, 100], pen=(0,9))
+
+
+		self.img.addItem(self.rectROI)
+
+
 		'''
 		x_arrow = pg.ArrowItem(angle=180, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='r')
 		x_arrow.setPos(40,0)
@@ -1352,12 +1384,77 @@ class microV(QtGui.QMainWindow):
 		self.img1.setColorMap(cmap)
 		g1 = pg.GridItem()
 		self.img1.addItem(g1)
+		self.img1.addItem(self.rectROI_1)
+		self.rectROI.sigRegionChanged.connect(self.syncRectROI)
+		self.rectROI_1.sigRegionChanged.connect(self.syncRectROI)
+
 
 		self.statusBar_Position = QtGui.QLabel('[nan nan nan]')
 		self.ui.statusbar.addWidget(self.statusBar_Position)
 
 
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
+	def syncRectROI(self):
+		sender = self.sender()
+		pos = list(sender.pos())
+		size = list(sender.size())
+		sender.blockSignals(True)
+		if pos[0] < 0:
+			pos[0] = 0
+		if pos[0] > 100:
+			pos[0] = 100
+		if pos[1] < 0:
+			pos[1] = 0
+		if pos[1] > 100:
+			pos[1] = 100
+
+		if pos[0]+size[0] > 100:
+			size[0] = 100-pos[0]
+		if pos[1]+size[1] > 100:
+			size[1] = 100-pos[1]
+
+		sender.setPos(pos)
+		sender.setSize(size)
+		sender.blockSignals(False)
+
+		if sender == self.rectROI:
+			self.rectROI_1.blockSignals(True)
+			self.rectROI_1.setPos(pos)
+			self.rectROI_1.setSize(size)
+			self.rectROI_1.blockSignals(False)
+
+		else:
+			self.rectROI.blockSignals(True)
+			self.rectROI.setPos(pos)
+			self.rectROI.setSize(size)
+			self.rectROI.blockSignals(False)
+		self.ui.scan3D_config.item(2,1).setText(str(pos[0]))
+		self.ui.scan3D_config.item(1,1).setText(str(pos[1]))
+
+		self.ui.scan3D_config.item(2,2).setText(str(size[0]+pos[0]))
+		self.ui.scan3D_config.item(1,2).setText(str(size[1]+pos[1]))
+
+	def syncRectROI_table(self,row,col):
+		pos = [0,0]
+		pos[0] = float(self.ui.scan3D_config.item(2,1).text())
+		pos[1] = float(self.ui.scan3D_config.item(1,1).text())
+
+		size = [0,0]
+		size[0] = float(self.ui.scan3D_config.item(2,2).text())-pos[0]
+		size[1] = float(self.ui.scan3D_config.item(1,2).text())-pos[1]
+
+		self.rectROI.blockSignals(True)
+		self.rectROI_1.blockSignals(True)
+
+		self.rectROI.setPos(pos)
+		self.rectROI.setSize(size)
+
+		self.rectROI_1.setPos(pos)
+		self.rectROI_1.setSize(size)
+
+		self.rectROI.blockSignals(False)
+		self.rectROI_1.blockSignals(False)
+
 
 	def styleTabs(self, index):
 		self.ui.configTabWidget.setStyleSheet('''
@@ -1387,7 +1484,7 @@ class microV(QtGui.QMainWindow):
 
 		try:
 			if self.ps:
-				self.ps.close()
+				del self.ps
 		except:
 			traceback.print_exc()
 		try:
@@ -1405,8 +1502,9 @@ class microV(QtGui.QMainWindow):
 		except:
 			traceback.print_exc()
 		try:
-			self.HWP_stepper.enable(0)
-			self.HWP_stepper.close()
+			if not self.HWP_stepper is None:
+
+				self.HWP_stepper.close()
 		except:
 			traceback.print_exc()
 

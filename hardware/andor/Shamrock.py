@@ -156,6 +156,7 @@ class ShamRockController:
 
 		self.dll.ShamrockSetPort.argtypes = [c_int, c_int]
 		self.dll.ShamrockGetPort.argtypes = [c_int, POINTER(c_int)]
+		self.dll.ShamrockFlipperReset.argtypes = [c_int,]
 
 
 	# Basic Shamrock features --------------------------------------------------
@@ -563,15 +564,23 @@ class ShamRock():
 	def SetPort(self, port):
 		self.logger.debug("SetPort %d" % (port))
 		with self.lock:
-			error = self.dll.ShamrockSetGrating(self.curId, port)
+			error = self.dll.ShamrockSetPort(self.curId, port)
 		ShamRockErrors.ProcessErrorCode(error)
 
 	def GetPort(self):
 		res = c_int()
 		with self.lock:
-			error = self.dll.ShamrockGetGrating(self.curId, byref(res))
+			error = self.dll.ShamrockGetPort(self.curId, byref(res))
 		ShamRockErrors.ProcessErrorCode(error)
 		self.logger.debug("GetPort %d" % (res.value))
+		return res.value
+
+	def ResetPort(self):
+		with self.lock:
+			error = self.dll.ShamrockFlipperReset(self.curId)
+		ShamRockErrors.ProcessErrorCode(error)
+		port = self.GetPort()
+		self.logger.debug("GetPort %d" %(port))
 		return res.value
 	# Info ---------------------------------------------------------------------
 

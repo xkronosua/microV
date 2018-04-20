@@ -2,7 +2,7 @@ import numpy as np
 import time
 from PyDAQmx.DAQmxFunctions import *
 from PyDAQmx.DAQmxConstants import *
-from threading import Timer
+from threading import Timer, Thread
 
 class HWP_stepper():
 	""" Class to create a continuous pulse train on a counter
@@ -44,7 +44,10 @@ class HWP_stepper():
 
 
 	def onEnableTimeout(self):
-		print('enableTimeout')
+		#print('thread_start')
+		while (time.time()-self.enableTimeStart) < self.enableTimeout:
+			time.sleep(1)
+		print('HWP_enableTimeout')
 		try:
 			self.enable(0)
 		except:
@@ -54,13 +57,18 @@ class HWP_stepper():
 			state = 1
 		else:
 			state = 0
+		if not self.Enable == state:
+			data = np.array([self.Direction, self.Enable], dtype=np.uint8)
+			DAQmxStartTask(self.taskHandleDirEnable)
+			DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
+			DAQmxStopTask(self.taskHandleDirEnable)
+			if state == 1:
+				enableTimeout_thread = Thread(target=self.onEnableTimeout)
+				self.enableTimeStart = time.time()
+				enableTimeout_thread.start()
+		if state == 1:
+			self.enableTimeStart = time.time()
 		self.Enable = state
-		data = np.array([self.Direction, self.Enable], dtype=np.uint8)
-		DAQmxStartTask(self.taskHandleDirEnable)
-		DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
-		DAQmxStopTask(self.taskHandleDirEnable)
-		enableTimeout_thread = Timer(self.enableTimeout, self.onEnableTimeout)
-		enableTimeout_thread.start()
 
 	def direction(self,state):
 		if state:
@@ -116,6 +124,7 @@ class HWP_stepper():
 
 
 	def close(self):
+		self.enable(0)
 		self.clear()
 
 
