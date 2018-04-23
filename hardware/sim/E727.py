@@ -151,7 +151,12 @@ class E727():
 
 	def MOV(self, dPos,axis=1, waitUntilReady=False):
 		self.prev_pos = self.pos
-		self.pos=np.array(dPos)
+		if type(axis)==int:
+			self.pos[axis-1]=dPos
+		else:
+			ax = [int(i)-1 for i in axis.split(b' ')]
+			for i,a in enumerate(ax):
+				self.pos[a]=dPos[i]
 		'''
 		PI_MOV = self.libDLL['PI_MOV']
 		PI_MOV.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))

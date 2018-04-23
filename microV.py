@@ -11,6 +11,7 @@ import matplotlib
 from skimage.external.tifffile import imsave
 import sharedmem
 from scipy.signal import resample
+import SharedArray
 
 MODE = 'lab'
 
@@ -83,7 +84,9 @@ class microV(QtGui.QMainWindow):
 			'200mV':0.2,'500mV':0.5,'1V': 1.0, '2V': 2.0,
 			'5V': 5.0, '10V': 10.0, '20V': 20.0,}
 
-	pico_shared_buf = sharedmem.full_like(np.zeros((5000,3)),value=0,dtype=np.float64)
+	pico_shared_buf_name = 'microV_SharedArray'
+	pico_shared_buf = None
+	pico_control_queue = Queue()
 	pico_config = {}
 
 	processOut = Queue()
@@ -108,6 +111,13 @@ class microV(QtGui.QMainWindow):
 		#self.initDAQmx()
 
 		#self.scan_image()
+
+		try:
+			self.pico_shared_buf = SharedArray.create(self.pico_shared_buf_name, (10000,3))
+		except:
+			traceback.print_exc()
+			self.pico_shared_buf = SharedArray.attach(self.pico_shared_buf_name)
+
 	############################################################################
 	###############################   DAQmx	#################################
 	def connect_DAQmx(self,state):
@@ -861,8 +871,8 @@ class microV(QtGui.QMainWindow):
 						if self.ui.andorCameraConnect.isChecked():
 							pmt_valA = self.andorCameraGetData(1)
 
-
-							#################################################
+						print(real_position0,real_position)
+						#################################################
 						self.live_pmtA = np.hstack((self.live_pmtA, pmt_valA))
 						self.live_pmtB = np.hstack((self.live_pmtB, pmt_valB))
 						x_real = np.mean([real_position0[0], real_position[0]])
@@ -891,7 +901,7 @@ class microV(QtGui.QMainWindow):
 								xi_ = len(Range_xi_tmp)-1
 							if yi_>= len(Range_yi):
 								yi_ = len(Range_yi)-1
-						data_pmtA[zi,xi_,yi_] = pmt_val
+						data_pmtA[zi,xi_,yi_] = pmt_valA
 						data_pmtB[zi,xi_,yi_] = pmt_valB
 						#print(self.live_x[-1], x, xi_,xi, yi_, yi)
 
@@ -905,7 +915,7 @@ class microV(QtGui.QMainWindow):
 						#self.setLine(spectra)
 						#print(time.time()-start)
 						self.setUiPiPos(real_position)
-						print("[\t%.5f\t%.5f\t%.5f\t]\t%.5f"%tuple(real_position+[time.time()-start]))
+						print("[\t%.5f\t%.5f\t%.5f\t]\t%.5f"%tuple(list(real_position)+[time.time()-start]))
 						app.processEvents()
 						#time.sleep(0.01)
 						wait = self.ui.Pi_wait.isChecked()
@@ -955,11 +965,15 @@ class microV(QtGui.QMainWindow):
 			except:
 				traceback.print_exc()
 				#self.pico_reader_proc.terminate()
-
+			self.ui.fast3DScan.blockSignals(True)
 			self.ui.fast3DScan.setChecked(False)
+			self.ui.fast3DScan.blockSignals(False)
 		else:
-			self.pico_reader_proc.terminate()
+			self.pico_control_queue.put('kill')
+			#self.pico_reader_proc.terminate()
+			self.ui.fast3DScan.blockSignals(True)
 			self.ui.fast3DScan.setChecked(False)
+			self.ui.fast3DScan.blockSignals(False)
 
 
 
@@ -967,7 +981,7 @@ class microV(QtGui.QMainWindow):
 		if self.ps:
 			del self.ps
 		self.pico_reader_proc = multiprocessing.Process(target=create_pico_reader,
-			args=[self.pico_config,self.pico_shared_buf])
+			args=[self.pico_config,self.pico_shared_buf_name,self.pico_control_queue])
 		self.pico_reader_proc.deamon = True
 		self.pico_reader_proc.start()
 
@@ -996,8 +1010,11 @@ class microV(QtGui.QMainWindow):
 		Range_xi = np.arange(len(Range_x))
 
 		layerIndex = 0
-		while self.pico_shared_buf.sum()==0:
+		data = SharedArray.attach(self.pico_shared_buf_name)
+
+		while data.sum()==0:
 			time.sleep(0.1)
+
 		for z,zi in zip(Range_z,Range_zi):
 			#if not self.scan3DisAlive: break
 			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
@@ -1029,21 +1046,31 @@ class microV(QtGui.QMainWindow):
 				self.live_integr_spectra = []
 				tmp = []
 				tmp1 = []
-
+				t_tmp = []
+				r_tmp = []
+				#for x,xi in zip(Range_x_tmp,Range_xi_tmp):
 				t0 = time.time()
+				real_position0 = self.piStage.qPOS()
+
 				r = self.piStage.MOV([Range_x_tmp[0]],axis=b'1',waitUntilReady=1)
+				if MODE == 'sim':
+					time.sleep(0.6)
 				if not r: break
 				t1 = time.time()
-				real_position0 = self.piStage.qPOS()
-				data = self.pico_shared_buf
+				real_position = self.piStage.qPOS()
+				r_tmp.append(real_position0)
+				r_tmp.append(real_position)
+				t_tmp.append(t0)
+				t_tmp.append(t1)
+
 				w = (data[:,0]>=t0)&(data[:,0]<=t1)
-				print("inRange:",sum(w))
+				print("inRange:",sum(w),t1-t0)
 				try:
-					dataA = resample(data[w,1],len(Range_x))
-					dataB = resample(data[w,2],len(Range_x))
+					dataA = resample(data[w,1],len(Range_y))
+					dataB = resample(data[w,2],len(Range_y))
 				except:
-					dataA = data[-len(Range_x):,1]
-					dataB = data[-len(Range_x):,2]
+					dataA = data[-len(Range_y):,1]
+					dataB = data[-len(Range_y):,2]
 				tmp.append(dataA)
 				tmp1.append(dataB)
 					#print(tmp)
@@ -1059,10 +1086,18 @@ class microV(QtGui.QMainWindow):
 					data_pmtA.append(np.hstack(tmp))
 					data_pmtB.append(np.hstack(tmp1))
 		#print(data_pmtA)
-		self.img.setImage(np.array(data_pmtA).T)
-		self.img1.setImage(np.array(data_pmtB).T)
+		data_pmtA = np.array(data_pmtA).T
+		data_pmtB = np.array(data_pmtB).T
+
+		self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+		scale=((Range_x.max()-Range_x.min())/len(data_pmtA),y_step),xvals=Range_z)
+		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+		scale=((Range_x.max()-Range_x.min())/len(data_pmtA),y_step),xvals=Range_z)
+
+
 		#start0=time.time()
-		self.pico_reader_proc.terminate()
+		self.pico_control_queue.put('kill')
+		#self.pico_reader_proc.terminate()
 
 
 

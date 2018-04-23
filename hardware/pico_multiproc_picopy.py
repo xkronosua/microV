@@ -10,7 +10,7 @@ from multiprocessing import Queue
 import time
 import traceback
 import picopy
-import sharedmem
+import SharedArray
 
 def set_picoscope(config):
 	ps = picopy.Pico3k()
@@ -32,64 +32,39 @@ def push_data_to_fixBuff(buf, data):
 	buf[-push_len:] = data
 	return buf
 
-pico_shared_buf = sharedmem.full_like(np.zeros((5000,3)),value=0,dtype=np.float64)
 
-def create_pico_reader(config,shared_data):
+
+
+print(SharedArray.list())
+def create_pico_reader(config,shared_data_name,q=Queue()):
 	ps = set_picoscope(config)
 	i=0
+	buf = SharedArray.attach(shared_data_name)
 	while True:
 		print('start')
 		try:
-			#print(i)
-			d = shared_data.copy()
+
 			r = ps.capture_prep_block(return_scaled_array=1)
 			dataA = r[0]['A']
 			dataB = r[0]['B']
 			scanA = abs(dataA.max(axis=1) - dataA.min(axis=1))
 			scanB = abs(dataB.max(axis=1) - dataB.min(axis=1))
 			scanT = r[1]
-			shared_data[:] = push_data_to_fixBuff(shared_data,np.array([scanT,scanA,scanB]).T)[:]
-			print("s",shared_data.sum(),pico_shared_buf.sum())
-			time.sleep(1)
+			push_data_to_fixBuff(buf,np.array([scanT,scanA,scanB]).T)[:]
+			print("s",buf.sum())
+			if q.qsize()>0:
+				status = q.get()
+				if status == 'kill':
+					print(status)
+					break
+			#time.sleep(1)
 			i +=1
 		except:
 			traceback.print_exc()
 			break
 	del ps
+	del buf
 
-
-
-'''
-config = {	'ChA_VRange':'500mV','ChA_Offset':0,
-			'ChB_VRange':'500mV','ChB_Offset':0,
-			'sampleInterval':0.0001,'samplingDuration':0.003,
-			'pico_pretrig':0.001,'n_captures':10,'trigSrc':'ext',
-			'threshold_V':-0.350,'direction':'RISING'}
-'''
-
-
-'''
-def reader(q):
-	pico = picopy.Pico3k()
-
-	n_captures = 10
-	pico.setChannel("A", coupling="DC", VRange='500mV')
-	pico.setChannel("B", coupling="DC", VRange='500mV')
-	(sampleInterval, noSamples, maxSamples) = pico.setSamplingInterval(0.00001,0.003,pre_trigger=0.001,
-		number_of_frames=n_captures, downsample=1, downsample_mode='NONE',)
-
-	#trigger = picopy.EdgeTrigger(channel='B', threshold=-0.35, direction='FALLING')
-	#pico.set_trigger(trigger)
-	pico.setSimpleTrigger(trigSrc="B", threshold_V=-0.350, direction='FALLING',
-							 timeout_ms=10, enabled=True,delay=0)
-
-	for i in range(50):
-
-		r = pico.capture_prep_block( return_scaled_array=1)
-		q.put(r)
-	q.put('done')
-	pico.close()
-'''
 
 class Pico_view(QtGui.QMainWindow):
 	timer = QtCore.QTimer()
@@ -132,37 +107,54 @@ class Pico_view(QtGui.QMainWindow):
 
 
 		self.timer.timeout.connect(self.update)
-		self.timer.start(3000)
+		self.timer.start(1000)
 		#self.ps = picopy.Pico3k()
+
+
+		config = {	'ChA_VRange':'500mV','ChA_Offset':0,
+					'ChB_VRange':'500mV','ChB_Offset':0,
+					'sampleInterval':0.0001,'samplingDuration':0.003,
+					'pico_pretrig':0.001,'n_captures':100,'trigSrc':'ext',
+					'threshold_V':-0.350,'direction':'RISING'}
+		'''
 		config = {	'ChA_VRange':'20mV','ChA_Offset':0,
 					'ChB_VRange':'20mV','ChB_Offset':0,
 					'sampleInterval':2e-9,'samplingDuration':15e-9,
 					'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
 					'threshold_V':0.02,'direction':'RISING'}
-		self.p = multiprocessing.Process(target=create_pico_reader,args=[config,pico_shared_buf])
+		'''
+		self.sa_name = 'sha1'
+		try:
+			pico_shared_buf = SharedArray.create(self.sa_name,(1000,3))
+		except:
+			traceback.print_exc()
+			pico_shared_buf = SharedArray.attach(self.sa_name)
+			pico_shared_buf[:] = 0
+
+
+		self.p = multiprocessing.Process(target=create_pico_reader,args=[config,self.sa_name,self.q])
+
 		self.p.start()
 		#self.p.join()
 		#self.actionExit.toggled.connect(self.closeEvent)
 
 
 	def update(self):
-		data = pico_shared_buf.copy()
-		print(":",data.sum(),pico_shared_buf.sum())
+		data = SharedArray.attach(self.sa_name)
+		print(":",data.sum())
+		w = data[:,0]==0
 
-		self.curveA1.setData(x=data[:,0],y=data[:,1])
-		self.curveB1.setData(x=data[:,0],y=data[:,2])
+		self.curveA1.setData(x=data[~w,0],y=data[~w,1])
+		self.curveB1.setData(x=data[~w,0],y=data[~w,2])
 		app.processEvents()
+		del data
 
 
 	def closeEvent(self, evnt=None):
 		print('closeEvent')
-		self.p.terminate()
-
-		#self.pico.close()
-		#self.pico.alive=False
-		#ex.pico.terminate()
-		#data = np.array([self.liveT,self.liveA,self.liveB]).T
-		#np.savetxt('signal'+str(time.time())+'.txt',data)
+		self.q.put('kill')
+		self.p.join()
+		#self.p.terminate()
 
 
 
@@ -170,7 +162,7 @@ class Pico_view(QtGui.QMainWindow):
 ## Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
 	import sys
-	#__spec__ = "ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
+	__spec__ = None #"ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
 
 	app = QtGui.QApplication(sys.argv)
 	ex = Pico_view()
