@@ -90,7 +90,7 @@ class laserDaemon(QWidget):
 					self.command = c
 					if re.match('WAVelength [0-9]{3,4}\n', c):
 						wl = int(self.command.split(' ')[-1])
-						self.setWavelength(wl)
+						self.setWavelength(val=wl)
 						print(wl)
 					elif re.match('SHUTter [0-1]\n', c):
 						sh = int(self.command.split(' ')[-1])
@@ -107,7 +107,6 @@ class laserDaemon(QWidget):
 			self.statusLog("*IDN?",dir='>>')
 			idn = self.Laser.query("*IDN?")
 			self.statusLog(idn,dir='<<')
-
 			self.statusLog("TIMer:WATChdog 10",dir='>>')
 			with self.lock:
 				self.Laser.write("TIMer:WATChdog 10")
@@ -181,11 +180,12 @@ class laserDaemon(QWidget):
 			f(False)
 		t = Thread(target=unlock,args=[self.ui.wavelength.blockSignals,])
 		t.start()
-	def setWavelength(self):
+	def setWavelength(self,val=None):
+		if val is None:
+			val = self.ui.wavelength.value()
 
 		self.ui.wavelength.blockSignals(True)
-		val = self.ui.wavelength.value()
-		 self.wavelength_ready = False
+		self.wavelength_ready = False
 		if val>=680 and val<=1300:
 			self.statusLog("WAVelength "+str(val),dir='>>')
 			try:

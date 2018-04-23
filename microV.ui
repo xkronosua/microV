@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>0</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -122,6 +122,13 @@
            </property>
            <property name="maximum">
             <number>1300</number>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="3">
+          <widget class="QCheckBox" name="laserWavelength_ready">
+           <property name="text">
+            <string>ready</string>
            </property>
           </widget>
          </item>
@@ -714,8 +721,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>348</height>
+              <width>240</width>
+              <height>291</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1939,6 +1946,79 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_13">
          <item>
+          <widget class="QGroupBox" name="groupBox_9">
+           <property name="title">
+            <string>Laser_wavelength</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_14">
+            <item>
+             <layout class="QGridLayout" name="gridLayout_15">
+              <item row="0" column="2">
+               <widget class="QLabel" name="label_27">
+                <property name="text">
+                 <string>Step</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QLabel" name="label_28">
+                <property name="text">
+                 <string>End</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_29">
+                <property name="text">
+                 <string>Start</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QSpinBox" name="calibr_wavelength_start">
+                <property name="minimum">
+                 <number>680</number>
+                </property>
+                <property name="maximum">
+                 <number>1299</number>
+                </property>
+                <property name="value">
+                 <number>850</number>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QSpinBox" name="calibr_wavelength_end">
+                <property name="minimum">
+                 <number>681</number>
+                </property>
+                <property name="maximum">
+                 <number>1300</number>
+                </property>
+                <property name="value">
+                 <number>1300</number>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="2">
+               <widget class="QSpinBox" name="calibr_wavelength_step">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>620</number>
+                </property>
+                <property name="displayIntegerBase">
+                 <number>10</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
           <widget class="QGroupBox" name="groupBox_7">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -1950,82 +2030,6 @@
             <string>PowerCalibr</string>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_15">
-            <item>
-             <widget class="QGroupBox" name="groupBox_9">
-              <property name="title">
-               <string>Laser_wavelength</string>
-              </property>
-              <layout class="QVBoxLayout" name="verticalLayout_14">
-               <item>
-                <layout class="QGridLayout" name="gridLayout_15">
-                 <item row="0" column="2">
-                  <widget class="QLabel" name="label_27">
-                   <property name="text">
-                    <string>Step</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="1">
-                  <widget class="QLabel" name="label_28">
-                   <property name="text">
-                    <string>End</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="0" column="0">
-                  <widget class="QLabel" name="label_29">
-                   <property name="text">
-                    <string>Start</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="2">
-                  <widget class="QDoubleSpinBox" name="calibr_wavelength_step">
-                   <property name="decimals">
-                    <number>3</number>
-                   </property>
-                   <property name="minimum">
-                    <double>0.000000000000000</double>
-                   </property>
-                   <property name="maximum">
-                    <double>620.000000000000000</double>
-                   </property>
-                   <property name="value">
-                    <double>0.000000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="1">
-                  <widget class="QDoubleSpinBox" name="calibr_wavelength_end">
-                   <property name="minimum">
-                    <double>681.000000000000000</double>
-                   </property>
-                   <property name="maximum">
-                    <double>1300.000000000000000</double>
-                   </property>
-                   <property name="value">
-                    <double>1300.000000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="0">
-                  <widget class="QDoubleSpinBox" name="calibr_wavelength_start">
-                   <property name="minimum">
-                    <double>680.000000000000000</double>
-                   </property>
-                   <property name="maximum">
-                    <double>1299.000000000000000</double>
-                   </property>
-                   <property name="value">
-                    <double>850.000000000000000</double>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </item>
-              </layout>
-             </widget>
-            </item>
             <item>
              <widget class="QGroupBox" name="groupBox_8">
               <property name="title">
@@ -2100,7 +2104,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="calibr_go">
+             <widget class="QPushButton" name="power_calibr_go">
               <property name="text">
                <string>calibr</string>
               </property>
@@ -2114,22 +2118,108 @@
            <property name="title">
             <string>ConfocalParam</string>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_16">
-            <item>
-             <spacer name="verticalSpacer_2">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
+           <layout class="QGridLayout" name="gridLayout_17">
+            <item row="0" column="0">
+             <widget class="QGroupBox" name="groupBox_11">
+              <property name="title">
+               <string>Z</string>
               </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>20</width>
-                <height>233</height>
-               </size>
-              </property>
-             </spacer>
+              <layout class="QVBoxLayout" name="verticalLayout_16">
+               <item>
+                <layout class="QGridLayout" name="gridLayout_16">
+                 <item row="0" column="2">
+                  <widget class="QLabel" name="label_30">
+                   <property name="text">
+                    <string>Step</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QLabel" name="label_31">
+                   <property name="text">
+                    <string>End</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_32">
+                   <property name="text">
+                    <string>Start</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="2">
+                  <widget class="QDoubleSpinBox" name="confParam_scan_step">
+                   <property name="decimals">
+                    <number>3</number>
+                   </property>
+                   <property name="minimum">
+                    <double>0.000000000000000</double>
+                   </property>
+                   <property name="maximum">
+                    <double>100.000000000000000</double>
+                   </property>
+                   <property name="value">
+                    <double>0.100000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QDoubleSpinBox" name="confParam_scan_end">
+                   <property name="minimum">
+                    <double>0.000000000000000</double>
+                   </property>
+                   <property name="maximum">
+                    <double>100.000000000000000</double>
+                   </property>
+                   <property name="value">
+                    <double>50.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QDoubleSpinBox" name="confParam_scan_start">
+                   <property name="minimum">
+                    <double>0.000000000000000</double>
+                   </property>
+                   <property name="maximum">
+                    <double>100.000000000000000</double>
+                   </property>
+                   <property name="value">
+                    <double>0.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QPushButton" name="confParam_scan">
+                 <property name="text">
+                  <string>scan</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
             </item>
            </layout>
           </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
          </item>
         </layout>
        </widget>

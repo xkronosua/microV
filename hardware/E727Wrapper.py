@@ -244,3 +244,38 @@ Set the number of cycles for the wave generator output
 PI_WGC = libDLL['PI_WGC']
 PI_WGC.argtypes = (c_int, ctypes.POINTER(c_int),ctypes.POINTER(c_int),c_int)
 PI_WGC.restype = c_bool
+
+'''
+BOOL PI_DCO (int ID, const char* szAxes, const BOOL* pbValueArray)
+Sets drift compensation mode for given axes
+'''
+
+PI_DCO = libDLL['PI_DCO']
+PI_DCO.argtypes = (c_int, c_char_p,ctypes.POINTER(c_bool))
+PI_DCO.restype = c_bool
+
+'''
+BOOL PI_qDCO (int ID, const char* szAxes, BOOL* pbValueArray)
+Gets drift compensation mode
+'''
+PI_qDCO = libDLL['PI_qDCO']
+PI_qDCO.argtypes = (c_int, c_char_p,ctypes.POINTER(c_bool))
+PI_qDCO.restype = c_bool
+
+'''
+BOOL PI_DEC (int ID, const char* szAxes, double* pdValueArray)
+Set Closed-Loop Deceleration
+'''
+
+PI_DEC = libDLL['PI_DEC']
+PI_DEC.argtypes = (c_int, c_char_p,ctypes.POINTER(c_double))
+PI_DEC.restype = c_bool
+
+'''
+BOOL PI_qDEC (int ID, const char* szAxes, double* pdValueArray)
+Get Closed-Loop Deceleration
+'''
+
+PI_qDEC = libDLL['PI_qDEC']
+PI_qDEC.argtypes = (c_int, c_char_p,ctypes.POINTER(c_double))
+PI_qDEC.restype = c_bool

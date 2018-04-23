@@ -6,11 +6,11 @@ import sys
 
 from picoscope import ps3000a
 import multiprocessing
-from multiprocessing import Queue
+from multiprocessing import Queue, Array
 import time
 import traceback
 import picopy
-import SharedArray
+#import SharedArray
 
 def set_picoscope(config):
 	ps = picopy.Pico3k()
@@ -35,11 +35,12 @@ def push_data_to_fixBuff(buf, data):
 
 
 
-print(SharedArray.list())
-def create_pico_reader(config,shared_data_name,q=Queue()):
+#print(SharedArray.list())
+def create_pico_reader(config,shared_data,q=Queue()):
 	ps = set_picoscope(config)
 	i=0
-	buf = SharedArray.attach(shared_data_name)
+	buf = np.frombuffer(shared_data['data'].get_obj(), dtype='d').reshape(shared_data['shape'])
+
 	while True:
 		print('start')
 		try:
@@ -110,7 +111,7 @@ class Pico_view(QtGui.QMainWindow):
 		self.timer.start(1000)
 		#self.ps = picopy.Pico3k()
 
-
+		'''
 		config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 					'ChB_VRange':'500mV','ChB_Offset':0,
 					'sampleInterval':0.0001,'samplingDuration':0.003,
@@ -122,25 +123,21 @@ class Pico_view(QtGui.QMainWindow):
 					'sampleInterval':2e-9,'samplingDuration':15e-9,
 					'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
 					'threshold_V':0.02,'direction':'RISING'}
-		'''
-		self.sa_name = 'sha1'
-		try:
-			pico_shared_buf = SharedArray.create(self.sa_name,(1000,3))
-		except:
-			traceback.print_exc()
-			pico_shared_buf = SharedArray.attach(self.sa_name)
-			pico_shared_buf[:] = 0
 
-
-		self.p = multiprocessing.Process(target=create_pico_reader,args=[config,self.sa_name,self.q])
-
+		self.sa_shape = (1000,3)
+		unshared_arr = np.zeros(self.sa_shape[0]*self.sa_shape[1])
+		sa = Array('d', int(np.prod(self.sa_shape)))
+		self.sa = {'data':sa, 'shape':self.sa_shape}
+		self.p = multiprocessing.Process(target=create_pico_reader,args=[config,self.sa,self.q])
+		self.p.daemon = True
 		self.p.start()
 		#self.p.join()
 		#self.actionExit.toggled.connect(self.closeEvent)
 
 
 	def update(self):
-		data = SharedArray.attach(self.sa_name)
+		data = np.frombuffer(self.sa['data'].get_obj(), dtype='d').reshape(self.sa['shape'])
+
 		print(":",data.sum())
 		w = data[:,0]==0
 

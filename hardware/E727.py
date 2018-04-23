@@ -20,6 +20,7 @@ def errorTranslator(f):
 			args[0].CloseConnection()
 		return out
 	return wrapper
+
 '''
 def errorTranslator(f):
 	if not r:
@@ -196,6 +197,30 @@ class E727():
 		self.err_out = PI_qPOS(self.ID, axis, val)
 
 		return [v for v in val]
+
+
+	@errorTranslator
+	def DCO(self, flags=[1,1,1],axis=b'1 2 3'):
+		if type(axis)==bytes:
+			flags_ = (c_bool*len(flags))()
+			for i in range(len(flags)):
+				flags_[i] = c_bool(flags[i])
+		else:
+			axis=str(axis).encode()
+			flags_ = c_double(flags)
+
+		self.err_out = PI_DCO(self.ID, axis, flags_)
+
+		return self.err_out
+
+	@errorTranslator
+	def qDCO(self,axis=b"1 2 3"):
+		val = (c_bool*3)()
+		self.err_out = PI_qDCO(self.ID, axis, val)
+
+		return [v for v in val]
+
+
 
 	@errorTranslator
 	def IsMoving(self,axis=b""):
