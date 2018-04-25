@@ -180,13 +180,13 @@ class E727():
 
 
 		if waitUntilReady:
-			m = self.IsMoving()
+			m = self.IsMoving(axis)
 			#print(m)
 			N_max = 1000000
 			n = 0
 			while sum(m)!=0 or n>N_max:
 				n=n+1
-				m = self.IsMoving()
+				m = self.IsMoving(axis)
 				#print(m)
 				time.sleep(0.001)
 		return self.err_out

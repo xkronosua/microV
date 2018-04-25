@@ -90,7 +90,7 @@ class microV(QtGui.QMainWindow):
 			'200mV':0.2,'500mV':0.5,'1V': 1.0, '2V': 2.0,
 			'5V': 5.0, '10V': 10.0, '20V': 20.0,}
 
-	pico_shared_buf_shape = (1000,3)
+	pico_shared_buf_shape = (10000,3)
 	pico_shared_buf = None
 
 	pico_control_queue = Queue()
@@ -1099,7 +1099,7 @@ class microV(QtGui.QMainWindow):
 		layerIndex = 0
 		data = np.frombuffer(self.pico_shared_buf['data'].get_obj(), dtype='d').reshape(self.pico_shared_buf['shape'])
 
-		time.sleep(2)
+		time.sleep(5)
 		while data.sum()==0:
 			time.sleep(0.1)
 		inRange = 0
@@ -1138,10 +1138,10 @@ class microV(QtGui.QMainWindow):
 				t_tmp = []
 				r_tmp = []
 				#for x,xi in zip(Range_x_tmp,Range_xi_tmp):
-				t0 = time.time()
-				real_position0 = self.piStage.qPOS()
 
-				r = self.piStage.MOV([Range_x_tmp[0]],axis=b'1',waitUntilReady=1)
+				real_position0 = self.piStage.qPOS()
+				t0 = time.time()
+				r = self.piStage.MOV([Range_x.max()],axis=b'1',waitUntilReady=1)
 				if MODE == 'sim':
 					time.sleep(0.6)
 				if not r: break
@@ -1168,13 +1168,18 @@ class microV(QtGui.QMainWindow):
 
 				if forward:
 					forward = False
-					data_pmtA.append(np.hstack(tmp[::-1]))
-					data_pmtB.append(np.hstack(tmp1[::-1]))
-
+					#data_pmtA.append(np.hstack(tmp))
+					#data_pmtB.append(np.hstack(tmp1))
+				#
 				else:
 					forward = True
-					data_pmtA.append(np.hstack(tmp))
-					data_pmtB.append(np.hstack(tmp1))
+
+				data_pmtA.append(np.hstack(tmp))
+				data_pmtB.append(np.hstack(tmp1))
+
+				r = self.piStage.MOV([Range_x.min()],axis=b'1',waitUntilReady=1)
+
+				if not r: break
 				if inRange==0: time.sleep(1)
 				inRange = 0
 		#print(data_pmtA)
