@@ -839,6 +839,70 @@ class microV(QtGui.QMainWindow):
 		else:
 			self.scan3DisAlive = False
 
+	def meas_laser_spectra_go(self,state):
+		if state:
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
+			start_wavelength = self.ui.meas_laser_spectra_start.value()
+			end_wavelength = self.ui.meas_laser_spectra_end.value()
+			step_wavelength = self.ui.meas_laser_spectra_step.value()
+			self.scan3DisAlive = True
+			wl_range = np.arange(start_wavelength,end_wavelength,step_wavelength)
+			with pd.HDFStore('data/measLaserSpectra'+str(round(time.time()))+'.h5') as store:
+				store.keys()
+				self.live_x = np.array([])
+				self.live_integr_spectra = np.array([])
+				for wl in wl_range:
+					self.laserSetWavelength_(status=1,wavelength=wl)
+
+					time.sleep(3)
+					t0 = time.time()
+					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive:
+						time.sleep(0.5)
+						print('wait:Laser')
+						app.processEvents()
+
+
+					self.shamrockSetWavelength((wl/2+wl/3)/2)
+					#self.andorCameraGetBaseline()
+					integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
+
+
+					#start_Z = self.ui.confParam_scan_start.value()
+					#end_Z = self.ui.confParam_scan_end.value()
+					#step_Z = self.ui.confParam_scan_step.value()
+					#Range_Z = np.arange(start_Z,end_Z,step_Z)
+
+					df = pd.DataFrame(intens, index=wavelength_arr,columns=['init_signal'])
+					#for z in Range_Z:
+					#	print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
+					#	real_position = self.piStage.qPOS()
+					#	z_real = real_position[2]
+					integr_intens_SHG,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/2-20,wl/2+20])
+					w = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
+					integr_intens_THG = intens[w].sum()
+					df[str(wl)] = wavelength_arr
+					df['intens_'+str(wl)] = intens
+
+					self.live_x = np.hstack((self.live_x, wl))
+					self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
+
+					self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+					self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
+
+					self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+					app.processEvents()
+					if not self.scan3DisAlive:
+						store.put("at:"+str(wl), df)
+						return
+						break
+					store.put("data", df)
+
+
+
+		else:
+			self.scan3DisAlive = False
+
 	def test(self,q):
 		for i in range(100):
 			real_position = [round(p,4) for p in self.piStage.qPOS()]
@@ -1412,6 +1476,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.pm100Average.valueChanged[int].connect(self.pm100Average)
 
 		self.ui.confParam_scan.toggled[bool].connect(self.confParam_scan)
+
+		self.ui.meas_laser_spectra_go.toggled[bool].connect(self.meas_laser_spectra_go)
 
 		########################################################################
 		########################################################################
