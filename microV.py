@@ -11,6 +11,7 @@ import matplotlib
 from skimage.external.tifffile import imsave
 import sharedmem
 from scipy.signal import resample
+from scipy.ndimage.measurements import center_of_mass
 import pandas as pd
 
 #import SharedArray
@@ -346,8 +347,13 @@ class microV(QtGui.QMainWindow):
 		#dataA = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
 		#dataB = np.zeros((self.n_captures, self.samples_per_segment), dtype=np.int16)
 		#t1 = time.time()
+
 		#self.ps.runBlock()
-		r = self.ps.capture_prep_block(return_scaled_array=1)
+		try:
+			r = self.ps.capture_prep_block(return_scaled_array=1)
+		except:
+			traceback.print_exc()
+			return
 		dataA = r[0]['A'].mean(axis=0)
 		dataB = r[0]['B'].mean(axis=0)
 		scanT = r[1]
@@ -765,23 +771,23 @@ class microV(QtGui.QMainWindow):
 
 	def onCalibrTimer(self):
 		self.calibrTimer.stop()
-		spectra = np.zeros(3648)#self.getSpectra()
+		#spectra = np.zeros(3648)#self.getSpectra()
 		pmt_valA,pmt_valB = self.readPico()#self.readDAQmx(print_dt=True)
-		self.live_pmtA.append(pmt_valA)
-		self.live_pmtB.append(pmt_valB)
+		self.live_pmtA = np.hstack((self.live_pmtA,pmt_valA))
+		self.live_pmtB = np.hstack((self.live_pmtB,pmt_valB))
 		if len(self.live_pmtA)>800:
-			self.live_pmtA.pop(0)
+			self.live_pmtA = self.live_pmtA[1:]
 		if len(self.live_pmtB)>800:
-			self.live_pmtB.pop(0)
-		s_from = self.ui.usbSpectr_from.value()
-		s_to = self.ui.usbSpectr_to.value()
-		self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
+			self.live_pmtA = self.live_pmtA[1:]
+		#s_from = self.ui.usbSpectr_from.value()
+		#s_to = self.ui.usbSpectr_to.value()
+		#self.live_integr_spectra.append(np.sum(spectra[s_from:s_to])/1000)
 		#setLine(spectra)
 		self.line_pmtA.setData(self.live_pmtA)
 		self.line_pmtB.setData(self.live_pmtB)
 		#self.line_spectra.setData(self.live_integr_spectra)
 
-		self.calibrTimer.start(self.ui.usbSpectr_integr_time.value()*2000)
+		self.calibrTimer.start(100)
 		app.processEvents()
 
 	def confParam_scan(self, state):
@@ -863,8 +869,14 @@ class microV(QtGui.QMainWindow):
 						app.processEvents()
 
 
+					if self.ui.meas_laser_spectra_track.isChecked():
+						centerA, centerB = self.center_optim()
+						print(centerA, centerB)
+						self.piStage.MOV(centerA,b' 1 2 3',waitUntilReady=True)
+
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
 					#self.andorCameraGetBaseline()
+
 					integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
 
 
@@ -903,13 +915,86 @@ class microV(QtGui.QMainWindow):
 		else:
 			self.scan3DisAlive = False
 
-	def test(self,q):
-		for i in range(100):
-			real_position = [round(p,4) for p in self.piStage.qPOS()]
-			q.put(real_position)
-			print()
-			time.sleep(0.1)
-		print('done')
+	def center_optim(self):
+		self.scan3DisAlive = True
+		z_start = float(self.ui.scan3D_config.item(0,1).text())
+		z_end = float(self.ui.scan3D_config.item(0,2).text())
+		z_step = float(self.ui.scan3D_config.item(0,3).text())
+
+		Range_z = np.arange(z_start,z_end,z_step)
+		Range_zi = np.arange(len(Range_z))
+
+		y_start = float(self.ui.scan3D_config.item(1,1).text())
+		y_end = float(self.ui.scan3D_config.item(1,2).text())
+		y_step = float(self.ui.scan3D_config.item(1,3).text())
+
+		Range_y = np.arange(y_start,y_end,y_step)
+		Range_yi = np.arange(len(Range_y))
+
+		x_start = float(self.ui.scan3D_config.item(2,1).text())
+		x_end = float(self.ui.scan3D_config.item(2,2).text())
+		x_step = float(self.ui.scan3D_config.item(2,3).text())
+
+		Range_x = np.arange(x_start,x_end,x_step)
+		Range_xi = np.arange(len(Range_x))
+		data_pmtA = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+		data_pmtB = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+		layerIndex = 0
+		for z,zi in zip(Range_z,Range_zi):
+			if not self.scan3DisAlive: break
+			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
+
+			forward = True
+			for y,yi in zip(Range_y,Range_yi):
+				if not self.scan3DisAlive: break
+				Range_x_tmp = Range_x
+				if forward:
+					Range_x_tmp = Range_x[::-1]
+					Range_xi_tmp = Range_xi[::-1]
+					forward = False
+				else:
+					Range_x_tmp = Range_x
+					Range_xi_tmp = Range_xi
+					forward = True
+				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
+				if not r: break
+
+				for x,xi in zip(Range_x_tmp, Range_xi_tmp):
+
+					start=time.time()
+					#print('Start',start)
+					if not self.scan3DisAlive: break
+					r = self.piStage.MOV([x],axis=b'1',waitUntilReady=True)
+					if not r: break
+
+					#real_position0 = self.piStage.qPOS()
+					pmt_valA, pmt_valB = self.readPico()
+					data_pmtA[zi,xi,yi] = pmt_valA
+					data_pmtB[zi,xi,yi] = pmt_valB
+					#real_position = self.piStage.qPOS()
+					#########################################
+					#if self.ui.andorCameraConnect.isChecked():
+					#	pmt_valA,dd,wl = self.andorCameraGetData(1)
+
+					#print(real_position0,real_position)
+					#################################################
+					#x_real = np.mean([real_position0[0], real_position[0]])
+					#y_real = np.mean([real_position0[1], real_position[1]])
+		self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+		scale=(x_step,y_step),xvals=Range_z)
+		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+		scale=(x_step,y_step),xvals=Range_z)
+
+		centerA = np.array(center_of_mass(data_pmtA))[[1,2,0]]
+		centerB = np.array(center_of_mass(data_pmtB))[[1,2,0]]
+		centerA = centerA*np.array([x_step,y_step,z_step])+ \
+			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
+		centerB = centerB*np.array([x_step,y_step,z_step]) + \
+			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
+
+		return centerA, centeB
+
+
 
 	def start3DScan(self, state):
 		print(state)

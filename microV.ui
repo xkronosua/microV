@@ -149,8 +149,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>115</height>
+              <width>224</width>
+              <height>148</height>
              </rect>
             </property>
             <attribute name="label">
@@ -208,8 +208,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>259</width>
-              <height>155</height>
+              <width>294</width>
+              <height>198</height>
              </rect>
             </property>
             <attribute name="label">
@@ -306,8 +306,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>255</width>
-              <height>121</height>
+              <width>285</width>
+              <height>143</height>
              </rect>
             </property>
             <attribute name="label">
@@ -378,8 +378,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>436</height>
+              <width>285</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -574,8 +574,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>229</width>
-              <height>122</height>
+              <width>259</width>
+              <height>162</height>
              </rect>
             </property>
             <attribute name="label">
@@ -679,8 +679,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>174</width>
-              <height>70</height>
+              <width>186</width>
+              <height>86</height>
              </rect>
             </property>
             <attribute name="label">
@@ -721,8 +721,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>348</height>
+              <width>293</width>
+              <height>394</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1127,8 +1127,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>348</height>
+              <width>312</width>
+              <height>412</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1356,8 +1356,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>156</width>
-              <height>111</height>
+              <width>178</width>
+              <height>138</height>
              </rect>
             </property>
             <attribute name="label">
@@ -2014,13 +2014,20 @@
                  </layout>
                 </widget>
                </item>
-               <item row="1" column="0">
+               <item row="2" column="0">
                 <widget class="QPushButton" name="meas_laser_spectra_go">
                  <property name="text">
                   <string>Start</string>
                  </property>
                  <property name="checkable">
                   <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QCheckBox" name="meas_laser_spectra_track">
+                 <property name="text">
+                  <string>track</string>
                  </property>
                 </widget>
                </item>
@@ -2345,7 +2352,7 @@
      <x>0</x>
      <y>0</y>
      <width>688</width>
-     <height>21</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

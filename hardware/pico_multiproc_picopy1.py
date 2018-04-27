@@ -53,6 +53,8 @@ def search_time_range(shared_data,search_q=Queue(), out_q=Queue()):
 			dataA = buf[:,1][w].mean()
 			dataB = buf[:,2][w].mean()
 			out_q.put([position,dataA,dataB])
+			print(position,dataA,dataB)
+		time.sleep(0.01)
 
 
 
@@ -74,7 +76,7 @@ def create_pico_reader(config,shared_data,q=Queue()):
 			scanB = abs(dataB.max(axis=1) - dataB.min(axis=1))
 			scanT = r[1]
 			push_data_to_fixBuff(buf,np.array([scanT,scanA,scanB]).T)[:]
-			#print("s",buf.sum())
+			print("s",buf.sum())
 
 
 			if q.qsize()>0:
@@ -137,14 +139,14 @@ class Pico_view(QtGui.QMainWindow):
 
 
 		self.timer.timeout.connect(self.update)
-		self.timer.start(1000)
+		self.timer.start(10)
 		#self.ps = picopy.Pico3k()
 
 
 		config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 					'ChB_VRange':'500mV','ChB_Offset':0,
 					'sampleInterval':0.0001,'samplingDuration':0.003,
-					'pico_pretrig':0.001,'n_captures':100,'trigSrc':'ext',
+					'pico_pretrig':0.001,'n_captures':10,'trigSrc':'ext',
 					'threshold_V':-0.350,'direction':'RISING'}
 		'''
 		config = {	'ChA_VRange':'20mV','ChA_Offset':0,
@@ -153,7 +155,7 @@ class Pico_view(QtGui.QMainWindow):
 					'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
 					'threshold_V':0.02,'direction':'RISING'}
 		'''
-		self.sa_shape = (1000,3)
+		self.sa_shape = (10000,3)
 		unshared_arr = np.zeros(self.sa_shape[0]*self.sa_shape[1])
 		sa = Array('d', int(np.prod(self.sa_shape)))
 		self.sa = {'data':sa, 'shape':self.sa_shape}
@@ -164,19 +166,33 @@ class Pico_view(QtGui.QMainWindow):
 			time.sleep(0.1)
 		self.search_q = Queue()
 		self.out_q = Queue()
-
+		search_p = multiprocessing.Process(target=search_time_range,args=[self.sa,self.search_q,self.out_q])
+		search_p.daemon = True
+		search_p.start()
+		self.x = []
+		self.pmtA = []
+		self.pmtB = []
 		#self.p.join()
 		#self.actionExit.toggled.connect(self.closeEvent)
 
 
 	def update(self):
-		data = np.frombuffer(self.sa['data'].get_obj(), dtype='d').reshape(self.sa['shape'])
+		t0 = time.time()
+		time.sleep(0.03)
+		t1 = time.time()
+		self.search_q.put([t0,t1,time.perf_counter()])
 
-		print(":",data.sum())
-		w = data[:,0]==0
+		#data = np.frombuffer(self.sa['data'].get_obj(), dtype='d').reshape(self.sa['shape'])
 
-		self.curveA1.setData(x=data[~w,0],y=data[~w,1])
-		self.curveB1.setData(x=data[~w,0],y=data[~w,2])
+		#print(":",data.sum())
+		#w = data[:,0]==0
+		if self.out_q.qsize()>0:
+			x,pmtA,pmtB = self.out_q.get()
+			self.x.append(x)
+			self.pmtA.append(pmtA)
+			self.pmtB.append(pmtB)
+			self.curveA1.setData(x=self.x, y=self.pmtA)
+			self.curveB1.setData(x=self.x, y=self.pmtB)
 		app.processEvents()
 		#del data
 
@@ -184,7 +200,7 @@ class Pico_view(QtGui.QMainWindow):
 	def closeEvent(self, evnt=None):
 		print('closeEvent')
 		self.q.put('kill')
-		#self.p.join()
+		self.p.join()
 		#self.p.terminate()
 
 
