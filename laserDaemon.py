@@ -105,7 +105,11 @@ class laserDaemon(QWidget):
 			self.statusLog('connect')
 			self.Laser = self.resMan.open_resource('ASRL'+str(self.ui.port.value())+'::INSTR', baud_rate = 115200)
 			self.statusLog("*IDN?",dir='>>')
-			idn = self.Laser.query("*IDN?")
+			try:
+				idn = self.Laser.query("*IDN?")
+			except:
+				self.statusLog('err. retry')
+				idn = self.Laser.query("*IDN?")
 			self.statusLog(idn,dir='<<')
 			self.statusLog("TIMer:WATChdog 10",dir='>>')
 			with self.lock:

@@ -353,7 +353,7 @@ class microV(QtGui.QMainWindow):
 			r = self.ps.capture_prep_block(return_scaled_array=1)
 		except:
 			traceback.print_exc()
-			return
+			return [0,0]
 		dataA = r[0]['A'].mean(axis=0)
 		dataB = r[0]['B'].mean(axis=0)
 		scanT = r[1]
@@ -612,7 +612,7 @@ class microV(QtGui.QMainWindow):
 
 				if self.ui.shamrockConnect.isChecked():
 					c = float(self.ui.shamrockWavelength.text())
-					w_c = [c-10, c+10]
+					w_c = [c-20, c+20]
 					if len(integr_range)>0:
 						w_c = integr_range
 					if not w_c == self.andorCCD_wavelength_center:
@@ -759,13 +759,13 @@ class microV(QtGui.QMainWindow):
 			if not self.ui.connect_pico.isChecked():
 				#self.ui.connect_pico.toggled.emit(True)
 				self.ui.connect_pico.setChecked(True)
-			self.calibrTimer.start(10)
-			self.live_pmtA = []
-			self.live_pmtB = []
-			self.live_x = []
-			self.live_y = []
+			self.calibrTimer.start(100)
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
+			self.live_x = np.array([])
+			self.live_y = np.array([])
 
-			self.live_integr_spectra = []
+			self.live_integr_spectra = np.array([])
 		else:
 			self.calibrTimer.stop()
 
@@ -835,10 +835,10 @@ class microV(QtGui.QMainWindow):
 						self.line_spectra_central.setData(x=self.live_x,y=self.live_integr_spectra)
 						app.processEvents()
 						if not self.scan3DisAlive:
-							store.put("at:"+str(wl), df)
+							store.put("scan_"+str(wl), df)
 							return
 							break
-					store.put("at:"+str(wl), df)
+					store.put("scan_"+str(wl), df)
 
 
 
@@ -858,27 +858,44 @@ class microV(QtGui.QMainWindow):
 				store.keys()
 				self.live_x = np.array([])
 				self.live_integr_spectra = np.array([])
+
 				for wl in wl_range:
+					time_list = []
+					time_list.append(time.time())
 					self.laserSetWavelength_(status=1,wavelength=wl)
 
-					time.sleep(3)
+					#time.sleep(3)
+					for i in range(100):
+						time.sleep(0.03)
+						app.processEvents()
 					t0 = time.time()
+
 					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive:
-						time.sleep(0.5)
+						time.sleep(0.1)
 						print('wait:Laser')
 						app.processEvents()
+						if not self.scan3DisAlive:
+							break
 
-
+					time_list.append(time.time())
 					if self.ui.meas_laser_spectra_track.isChecked():
-						centerA, centerB = self.center_optim()
+						centerA, centerB, panelA, panelB = self.center_optim()
 						print(centerA, centerB)
 						self.piStage.MOV(centerA,b' 1 2 3',waitUntilReady=True)
-
+						self.setUiPiPos(pos=centerA)
+						pos = list(self.rectROI.pos())
+						size = list(self.rectROI.size())
+						pos[0] = centerA[0] - size[0]/2
+						pos[1] = centerA[1] - size[1]/2
+						self.rectROI.setPos(pos)
+					if not self.scan3DisAlive:
+						break
+					time_list.append(time.time())
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
 					#self.andorCameraGetBaseline()
-
+					time_list.append(time.time())
 					integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
-
+					time_list.append(time.time())
 
 					#start_Z = self.ui.confParam_scan_start.value()
 					#end_Z = self.ui.confParam_scan_end.value()
@@ -893,8 +910,8 @@ class microV(QtGui.QMainWindow):
 					integr_intens_SHG,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/2-20,wl/2+20])
 					w = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
 					integr_intens_THG = intens[w].sum()
-					df[str(wl)] = wavelength_arr
-					df['intens_'+str(wl)] = intens
+					df['wavelength'] = wavelength_arr
+					df['intens'] = intens
 
 					self.live_x = np.hstack((self.live_x, wl))
 					self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
@@ -905,11 +922,13 @@ class microV(QtGui.QMainWindow):
 					self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 					app.processEvents()
 					if not self.scan3DisAlive:
-						store.put("at:"+str(wl), df)
+						store.put("forceEnd_"+str(wl), df)
 						return
 						break
-					store.put("data", df)
-
+					store.put("spectra_"+str(wl), df)
+					store.put("trackA_"+str(wl), panelA)
+					store.put("center_"+str(wl), pd.DataFrame(centerA))
+					store.put("time_"+str(wl), pd.DataFrame(time_list))
 
 
 		else:
@@ -958,7 +977,7 @@ class microV(QtGui.QMainWindow):
 					forward = True
 				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 				if not r: break
-
+				app.processEvents()
 				for x,xi in zip(Range_x_tmp, Range_xi_tmp):
 
 					start=time.time()
@@ -984,15 +1003,23 @@ class microV(QtGui.QMainWindow):
 		scale=(x_step,y_step),xvals=Range_z)
 		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
 		scale=(x_step,y_step),xvals=Range_z)
-
-		centerA = np.array(center_of_mass(data_pmtA))[[1,2,0]]
-		centerB = np.array(center_of_mass(data_pmtB))[[1,2,0]]
+		w1 = data_pmtA>data_pmtA.mean()
+		w2 = data_pmtB>data_pmtB.mean()
+		centerA = np.array(center_of_mass(data_pmtA*w1))[[1,2,0]]
+		centerB = np.array(center_of_mass(data_pmtB*w2))[[1,2,0]]
 		centerA = centerA*np.array([x_step,y_step,z_step])+ \
 			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
 		centerB = centerB*np.array([x_step,y_step,z_step]) + \
 			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
 
-		return centerA, centeB
+		panelA = pd.Panel(data_pmtA,items=Range_z,
+			major_axis=Range_x,
+			minor_axis=Range_y)
+		panelB = pd.Panel(data_pmtA,items=Range_z,
+			major_axis=Range_x,
+			minor_axis=Range_y)
+
+		return centerA, centerB, panelA, panelB
 
 
 
@@ -1100,8 +1127,8 @@ class microV(QtGui.QMainWindow):
 						pmt_valA, pmt_valB = self.readPico()
 						real_position = self.piStage.qPOS()
 						#########################################
-						if self.ui.andorCameraConnect.isChecked():
-							pmt_valA,dd,wl = self.andorCameraGetData(1)
+						#if self.ui.andorCameraConnect.isChecked():
+							#pmt_valA,dd,wl = self.andorCameraGetData(1)
 
 						print(real_position0,real_position)
 						#################################################
@@ -1180,6 +1207,15 @@ class microV(QtGui.QMainWindow):
 
 		data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
 		data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
+		w1 = data_pmtA>data_pmtA.mean()
+		w2 = data_pmtB>data_pmtB.mean()
+		centerA = np.array(center_of_mass(data_pmtA*w1))[[1,2,0]]
+		centerB = np.array(center_of_mass(data_pmtB*w2))[[1,2,0]]
+		centerA = centerA*np.array([x_step,y_step,z_step])+ \
+			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
+		centerB = centerB*np.array([x_step,y_step,z_step]) + \
+			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
+		print(centerA,centerB)
 		#data_pmt_16 = data_pmtA/data_pmtA.max()*32768*2-32768
 		#data_pmtB_16 = data_pmtB/data_pmtB.max()*32768*2-32768
 		#imsave(fname+"_pmtA.tif",data_pmt_16.astype(np.int16), imagej=True)
