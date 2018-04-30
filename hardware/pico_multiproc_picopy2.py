@@ -49,12 +49,13 @@ def search_time_range(shared_data,search_q=Queue(), out_q=Queue()):
 			req = search_q.get()
 			if req == 'kill':
 				break
-			start, end, position = req
+			start, end, blocks = req
 			w = (buf[:,0]>start) & (buf[:,0]<end)
-			dataA = buf[:,1][w].mean()
-			dataB = buf[:,2][w].mean()
-			out_q.put([position,dataA,dataB])
-			print(position,dataA,dataB)
+			dataA = np.array([np.mean(i) for i in np.array_split(buf[:,1][w],blocks)])
+			dataB = np.array([np.mean(i) for i in np.array_split(buf[:,2][w],blocks)])
+			t = np.linspace(start,end,len(dataA))
+			out_q.put([t,dataA,dataB])
+			print(t,dataA,dataB)
 		time.sleep(0.01)
 
 
@@ -77,7 +78,7 @@ def create_pico_reader(config,shared_data,q=Queue()):
 			scanB = abs(dataB.max(axis=1) - dataB.min(axis=1))
 			scanT = r[1]
 			push_data_to_fixBuff(buf,np.array([scanT,scanA,scanB]).T)[:]
-			print("s",buf[:,1:].sum())
+			#print("s",buf[:,1:].sum())
 
 
 			if q.qsize()>0:
@@ -153,7 +154,7 @@ class Pico_view(QtGui.QMainWindow):
 		config = {	'ChA_VRange':'20mV','ChA_Offset':0,
 					'ChB_VRange':'20mV','ChB_Offset':0,
 					'sampleInterval':2e-9,'samplingDuration':15e-9,
-					'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
+					'pico_pretrig':0.000,'n_captures':5000,'trigSrc':'ext',
 					'threshold_V':0.02,'direction':'RISING'}
 		#'''
 		self.sa_shape = (10000,3)
@@ -212,7 +213,115 @@ if __name__ == '__main__':
 	import sys
 	__spec__ = None #"ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
 
-	app = QtGui.QApplication(sys.argv)
-	ex = Pico_view()
+	#app = QtGui.QApplication(sys.argv)
+	#ex = Pico_view()
 
-	app.exec_()
+	#app.exec_()
+	'''
+	config = {	'ChA_VRange':'500mV','ChA_Offset':0,
+				'ChB_VRange':'500mV','ChB_Offset':0,
+				'sampleInterval':0.0001,'samplingDuration':0.003,
+				'pico_pretrig':0.001,'n_captures':10,'trigSrc':'ext',
+				'threshold_V':-0.350,'direction':'RISING'}
+	'''
+	config = {	'ChA_VRange':'20mV','ChA_Offset':0,
+				'ChB_VRange':'20mV','ChB_Offset':0,
+				'sampleInterval':2e-9,'samplingDuration':15e-9,
+				'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
+				'threshold_V':0.02,'direction':'RISING'}
+	#'''
+
+	sa_shape = (100000,3)
+	unshared_arr = np.zeros(sa_shape[0]*sa_shape[1])
+	sa = Array('d', int(np.prod(sa_shape)))
+	sa = {'data':sa, 'shape':sa_shape}
+	q = Queue()
+	p = multiprocessing.Process(target=create_pico_reader,args=[config,sa,q])
+	p.daemon = True
+	p.start()
+	while q.qsize()==0:
+		time.sleep(0.1)
+	search_q = Queue()
+	out_q = Queue()
+	search_p = multiprocessing.Process(target=search_time_range,args=[sa,search_q,out_q])
+	search_p.daemon = True
+	search_p.start()
+	from hardware.E727 import *
+
+	piStage = E727()
+	print(piStage.ConnectUSBWithBaudRate())
+	print(piStage.qSAI())
+	print(piStage.SVO())
+	print(piStage.qPOS(b'1'))
+	#print(piStage.ATZ())
+	x_range=np.arange(0,100,10)
+	y_range=np.arange(0,100,1)
+	z_range=np.arange(30,31,1)
+	piStage.MOV(x_range.min(),axis=1, waitUntilReady=True)
+	piStage.MOV(y_range.min(),axis=2, waitUntilReady=True)
+	piStage.MOV(z_range.min(),axis=3, waitUntilReady=True)
+	time_table = np.hstack((time.time(),piStage.qPOS()))
+	Z = []
+	Y = []
+	X = []
+	try:
+		print('move')
+		for z in z_range:
+			#pos = piStage.qPOS()
+			#t.append([time.time(),pos)
+			piStage.MOV(z,axis=3, waitUntilReady=True)
+			#pos = piStage.qPOS()
+			#t.append([time.time(),pos)
+			#search_q.put([t[-2][0],t[-1][0],pos,1])
+			#Z.
+			forw = False
+			for y in y_range:
+				#t.append( [time.time(),[piStage.qPOS()]])
+				piStage.MOV(y,axis=2, waitUntilReady=True)
+				#t.append([time.time(),[piStage.qPOS()]])
+				#search_q.put([t[-2][0],t[-1][0],t[-1][1],1])
+				if forw:
+					x_range_ = x_range
+				else:
+					x_range_ = x_range[::-1]
+				for x in x_range_:
+					pos0 = piStage.qPOS()
+					t0 = time.time()
+					time_table = np.vstack((time_table, np.hstack((t0,pos0))))
+					piStage.MOV(x,axis=1, waitUntilReady=True)
+					pos1 = piStage.qPOS()
+					t1 = time.time()
+					time_table = np.vstack((time_table, np.hstack((t1,pos1))))
+					search_q.put([t0,t1,10])
+				forw = not forw
+
+		out = []
+		while not out_q.empty():
+			out.append(out_q.get())
+	except:
+		traceback.print_exc()
+		search_q.put('kill')
+		q.put('kill')
+		piStage.CloseConnection()
+	search_q.put('kill')
+	q.put('kill')
+	piStage.CloseConnection()
+	from scipy.interpolate import interp1d
+
+	x_i=interp1d(time_table[:,0],time_table[:,1])
+	y_i=interp1d(time_table[:,0],time_table[:,2])
+	z_i=interp1d(time_table[:,0],time_table[:,3])
+
+	from pylab import *
+
+	data = np.hstack(out).T
+	X = x_i(data[:,0])
+	Y = y_i(data[:,0])
+	Z = z_i(data[:,0])
+	XX,YY=np.meshgrid(X,Y)
+	from scipy.interpolate import griddata
+	#da = griddata((X, Y), data[:,1], (XX, YY),method='nearest')
+	db = griddata((X, Y), data[:,2], (XX, YY),method='nearest')
+
+	contourf(XX,YY,db)
+	show(0)

@@ -814,7 +814,7 @@ class microV(QtGui.QMainWindow):
 
 					self.shamrockSetWavelength(wl/3)
 					self.andorCameraGetBaseline()
-					integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
+					#integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
 
 
 					start_Z = self.ui.confParam_scan_start.value()
@@ -822,7 +822,7 @@ class microV(QtGui.QMainWindow):
 					step_Z = self.ui.confParam_scan_step.value()
 					Range_Z = np.arange(start_Z,end_Z,step_Z)
 
-					df = pd.DataFrame(intens, index=wavelength_arr,columns=['init_signal'])
+					df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['baseline'])
 					for z in Range_Z:
 						print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 						real_position = self.piStage.qPOS()
@@ -893,21 +893,23 @@ class microV(QtGui.QMainWindow):
 					time_list.append(time.time())
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
 					#self.andorCameraGetBaseline()
-					time_list.append(time.time())
-					integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
-					time_list.append(time.time())
+
+					#integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
+
 
 					#start_Z = self.ui.confParam_scan_start.value()
 					#end_Z = self.ui.confParam_scan_end.value()
 					#step_Z = self.ui.confParam_scan_step.value()
 					#Range_Z = np.arange(start_Z,end_Z,step_Z)
 
-					df = pd.DataFrame(intens, index=wavelength_arr,columns=['init_signal'])
+					df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['baseline'])
 					#for z in Range_Z:
 					#	print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 					#	real_position = self.piStage.qPOS()
 					#	z_real = real_position[2]
+					time_list.append(time.time())
 					integr_intens_SHG,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/2-20,wl/2+20])
+					time_list.append(time.time())
 					w = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
 					integr_intens_THG = intens[w].sum()
 					df['wavelength'] = wavelength_arr
@@ -1256,6 +1258,155 @@ class microV(QtGui.QMainWindow):
 			args=[self.pico_config,self.pico_shared_buf,self.pico_control_queue])
 		self.pico_reader_proc.deamon = True
 		self.pico_reader_proc.start()
+
+		z_start = float(self.ui.scan3D_config.item(0,1).text())
+		z_end = float(self.ui.scan3D_config.item(0,2).text())
+		z_step = float(self.ui.scan3D_config.item(0,3).text())
+		if z_step == 0:
+			Range_z = np.array([z_start]*100)
+		else:
+			Range_z = np.arange(z_start,z_end,z_step)
+		Range_zi = np.arange(len(Range_z))
+		y_start = float(self.ui.scan3D_config.item(1,1).text())
+		y_end = float(self.ui.scan3D_config.item(1,2).text())
+		y_step = float(self.ui.scan3D_config.item(1,3).text())
+
+		Range_y = np.arange(y_start,y_end,y_step)
+		Range_yi = np.arange(len(Range_y))
+
+
+		x_start = float(self.ui.scan3D_config.item(2,1).text())
+		x_end = float(self.ui.scan3D_config.item(2,2).text())
+		x_step = float(self.ui.scan3D_config.item(2,3).text())
+
+
+		Range_x = np.arange(x_start,x_end,x_step)
+		Range_xi = np.arange(len(Range_x))
+
+		layerIndex = 0
+		data = np.frombuffer(self.pico_shared_buf['data'].get_obj(), dtype='d').reshape(self.pico_shared_buf['shape'])
+
+		time.sleep(5)
+		while data.sum()==0:
+			time.sleep(0.1)
+		inRange = 0
+
+		for z,zi in zip(Range_z,Range_zi):
+			#if not self.scan3DisAlive: break
+			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
+			#fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
+			#with open(fname,'a') as f:
+			#	f.write("#X\tY\tZ\tpmtA_signal\tpmtB_signal\ttime\n")
+			data_pmtA = []
+			data_pmtB = []
+
+			forward = True
+			for y,yi in zip(Range_y,Range_yi):
+				#if not self.scan3DisAlive: break
+				Range_x_tmp = Range_x
+				if forward:
+					Range_x_tmp = Range_x[::-1]
+					Range_xi_tmp = Range_xi[::-1]
+					#forward = False
+				else:
+					Range_x_tmp = Range_x
+					Range_xi_tmp = Range_xi
+					#forward = True
+				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
+				if not r: break
+				self.live_pmtA = np.array([])
+				self.live_pmtB = np.array([])
+				self.live_x = np.array([])
+				self.live_y = np.array([])
+
+				self.live_integr_spectra = []
+				tmp = []
+				tmp1 = []
+				t_tmp = []
+				r_tmp = []
+				#for x,xi in zip(Range_x_tmp,Range_xi_tmp):
+
+				real_position0 = self.piStage.qPOS()
+				t0 = time.time()
+				r = self.piStage.MOV([Range_x.max()],axis=b'1',waitUntilReady=1)
+				if MODE == 'sim':
+					time.sleep(0.6)
+				if not r: break
+				t1 = time.time()
+				real_position = self.piStage.qPOS()
+				r_tmp.append(real_position0)
+				r_tmp.append(real_position)
+				t_tmp.append(t0)
+				t_tmp.append(t1)
+
+				w = (data[:,0]>=t0)&(data[:,0]<=t1)
+				print("inRange:",sum(w),t1-t0)
+				inRange +=sum(w)
+				try:
+					dataA = resample(data[w,1],len(Range_y))
+					dataB = resample(data[w,2],len(Range_y))
+				except:
+					dataA = data[-len(Range_y):,1]
+					dataB = data[-len(Range_y):,2]
+				tmp.append(dataA)
+				tmp1.append(dataB)
+					#print(tmp)
+				#if len(tmp)>=1 and len(tmp1)>=1:
+
+				if forward:
+					forward = False
+					#data_pmtA.append(np.hstack(tmp))
+					#data_pmtB.append(np.hstack(tmp1))
+				#
+				else:
+					forward = True
+
+				data_pmtA.append(np.hstack(tmp))
+				data_pmtB.append(np.hstack(tmp1))
+
+				r = self.piStage.MOV([Range_x.min()],axis=b'1',waitUntilReady=1)
+
+				if not r: break
+				if inRange==0: time.sleep(1)
+				inRange = 0
+		#print(data_pmtA)
+		data_pmtA = np.array(data_pmtA).T
+		data_pmtB = np.array(data_pmtB).T
+
+		self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+		scale=((Range_x.max()-Range_x.min())/len(data_pmtA),y_step),xvals=Range_z)
+		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+		scale=((Range_x.max()-Range_x.min())/len(data_pmtA),y_step),xvals=Range_z)
+
+
+		#start0=time.time()
+		self.pico_control_queue.put('kill')
+		#self.pico_reader_proc.terminate()
+
+
+
+		self.initPico()
+
+	def fast3DScan1(self):
+		if self.ps:
+			del self.ps
+
+		self.pico_shared_buf_shape = (10000,3)
+		unshared_arr = np.zeros(self.pico_shared_buf_shape[0]*self.pico_shared_buf_shape[1])
+		sa = Array('d', int(np.prod(self.pico_shared_buf_shape)))
+		self.pico_shared_buf = {'data':sa, 'shape':self.pico_shared_buf_shape}
+		self.pico_reader_proc = multiprocessing.Process(target=create_pico_reader,args=[self.pico_config,self.pico_shared_buf,self.pico_control_queue])
+		self.pico_reader_proc.daemon = True
+		self.pico_reader_proc.start()
+		while self.pico_control_queue.qsize()==0:
+			time.sleep(0.1)
+		print(self.pico_control_queue.get())
+		self.search_q = Queue()
+		self.out_q = Queue()
+		search_p = multiprocessing.Process(target=search_time_range,args=[self.pico_shared_buf,self.search_q,self.out_q])
+		search_p.daemon = True
+		search_p.start()
+
 
 		z_start = float(self.ui.scan3D_config.item(0,1).text())
 		z_end = float(self.ui.scan3D_config.item(0,2).text())
