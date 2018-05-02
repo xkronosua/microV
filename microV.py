@@ -1760,13 +1760,13 @@ class microV(QtGui.QMainWindow):
 
 			self.ui.pico_ChA_VRange.setCurrentIndex(4)
 			self.ui.pico_ChB_VRange.setCurrentIndex(4)
-			self.ui.pico_sampleInterval.setText('0.00001')
-			self.ui.pico_samplingDuration.setText('0.003')
+			self.ui.pico_sampleInterval.setText('0.000001')
+			self.ui.pico_samplingDuration.setText('0.007')
 
 			self.ui.pico_TrigSource.setCurrentIndex(2)
-			self.ui.pico_TrigThreshold.setValue(-0.350)
-			self.pico_pretrig = 0.001
-			self.ui.pico_pretrig.setText('0.001')
+			self.ui.pico_TrigThreshold.setValue(-0.330)
+			self.pico_pretrig = 0.0004
+			self.ui.pico_pretrig.setText('0.0004')
 
 		self.tabColors = {
 			0: 'green',

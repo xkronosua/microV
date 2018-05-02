@@ -11,6 +11,7 @@ import time
 import traceback
 import picopy
 
+
 #import SharedArray
 
 def set_picoscope(config):
@@ -143,19 +144,19 @@ class Pico_view(QtGui.QMainWindow):
 		self.timer.start(10)
 		#self.ps = picopy.Pico3k()
 
-		'''
+		#'''
 		config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 					'ChB_VRange':'500mV','ChB_Offset':0,
-					'sampleInterval':0.0001,'samplingDuration':0.003,
-					'pico_pretrig':0.001,'n_captures':10,'trigSrc':'ext',
-					'threshold_V':-0.350,'direction':'RISING'}
+					'sampleInterval':0.000001,'samplingDuration':0.0007,
+					'pico_pretrig':0.0004,'n_captures':1,'trigSrc':'ext',
+					'threshold_V':-0.330,'direction':'RISING','pulseFreq':1624.}
 		'''
 		config = {	'ChA_VRange':'20mV','ChA_Offset':0,
 					'ChB_VRange':'20mV','ChB_Offset':0,
 					'sampleInterval':2e-9,'samplingDuration':15e-9,
 					'pico_pretrig':0.000,'n_captures':500,'trigSrc':'ext',
-					'threshold_V':0.02,'direction':'RISING'}
-		#'''
+					'threshold_V':0.02,'direction':'RISING','pulseFreq':80e6}
+		'''
 		self.sa_shape = (10000,3)
 		unshared_arr = np.zeros(self.sa_shape[0]*self.sa_shape[1])
 		sa = Array('d', int(np.prod(self.sa_shape)))

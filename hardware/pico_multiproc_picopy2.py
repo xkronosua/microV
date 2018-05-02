@@ -69,6 +69,7 @@ def create_pico_reader(config,shared_data,q=Queue()):
 	q.put('ready')
 	while True:
 		#print('start')
+
 		try:
 
 			r = ps.capture_prep_block(return_scaled_array=1)
