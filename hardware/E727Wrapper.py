@@ -279,3 +279,16 @@ Get Closed-Loop Deceleration
 PI_qDEC = libDLL['PI_qDEC']
 PI_qDEC.argtypes = (c_int, c_char_p,ctypes.POINTER(c_double))
 PI_qDEC.restype = c_bool
+
+'''BOOL PI_IsGeneratorRunning (int ID, const int* piWaveGeneratorIdsArray, BOOL* pbValueArray, int iArraySize)
+Check if wave generators are running
+'''
+PI_IsGeneratorRunning = libDLL['PI_IsGeneratorRunning']
+PI_IsGeneratorRunning.argtypes = (c_int, ctypes.POINTER(c_int),ctypes.POINTER(c_bool),c_int)
+PI_IsGeneratorRunning.restype = c_bool
+
+'''BOOL PI_WCL (int ID, int iWaveTableIdsArray, int iArraySize)
+Clears the content of the given wave table'''
+PI_WCL = libDLL['PI_WCL']
+PI_WCL.argtypes = (c_int, ctypes.POINTER(c_int),c_int)
+PI_WCL.restype = c_bool

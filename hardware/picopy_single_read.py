@@ -4,12 +4,18 @@ import picopy
 from multiprocessing import Queue, Array, Event
 import numpy as np
 import time
-
+'''
 config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 			'ChB_VRange':'500mV','ChB_Offset':0,
 			'sampleInterval':2e-6,'samplingDuration':0.4,
 			'pico_pretrig':0.0004,'n_captures':1,'trigSrc':'ext',
 			'threshold_V':-0.320,'direction':'RISING','pulseFreq':1624.}
+'''
+config = {	'ChA_VRange':'20mV','ChA_Offset':0,
+			'ChB_VRange':'20mV','ChB_Offset':0,
+			'sampleInterval':2e-9,'samplingDuration':15e-9,
+			'pico_pretrig':0.000,'n_captures':5000,'trigSrc':'ext',
+			'threshold_V':0.02,'direction':'RISING','pulseFreq':80e6}
 q = multiprocessing.Queue()
 
 def push_data_to_fixBuff(buf, data):
@@ -92,10 +98,13 @@ def nonstop_capture(config,shared_data,runEvent,q):
 
 ## Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
+
 	import sys,os
 	__spec__ = None #"ModuleSpec(name='builtins', loader=<class '_frozen_importlib.BuiltinImporter'>)"
 	sys.path.append('../hardware/')
 	print(os.path.realpath(__file__))
+	#if len(sys.argv)>1 and sys.argv[1] =='d':
+	#	import ipdb; ipdb.set_trace()
 
 	sa_shape = (100000,3)
 	unshared_arr = np.zeros(sa_shape[0]*sa_shape[1])
@@ -113,8 +122,8 @@ if __name__ == '__main__':
 	search_p = multiprocessing.Process(target=search_time_range,args=[sa,search_q,out_q])
 	search_p.daemon = True
 	search_p.start()
-	from sim.E727 import *
-
+	from E727 import E727
+	print('E727')
 	piStage = E727()
 	print(piStage.ConnectUSBWithBaudRate())
 	print(piStage.qSAI())
