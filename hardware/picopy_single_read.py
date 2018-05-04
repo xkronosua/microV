@@ -6,7 +6,7 @@ import threading
 import numpy as np
 import time
 import traceback
-#'''
+'''
 config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 			'ChB_VRange':'500mV','ChB_Offset':0,
 			'sampleInterval':100e-6,'samplingDuration':1,
@@ -15,10 +15,10 @@ config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 '''
 config = {	'ChA_VRange':'20mV','ChA_Offset':0,
 			'ChB_VRange':'20mV','ChB_Offset':0,
-			'sampleInterval':2e-9,'samplingDuration':15e-9,
-			'pico_pretrig':0.000,'n_captures':5000,'trigSrc':'ext',
+			'sampleInterval':4e-9,'samplingDuration':15e-9*10000,
+			'pico_pretrig':0.000,'n_captures':1,'trigSrc':'ext',
 			'threshold_V':0.02,'direction':'RISING','pulseFreq':80e6}
-'''
+#'''
 q = multiprocessing.Queue()
 
 def photon_count(signal,t,dt_window,threshold):
@@ -26,8 +26,8 @@ def photon_count(signal,t,dt_window,threshold):
 	s = abs(signal*w)
 	t = t[w]
 	#s = signal.cumsum()
-	n = int((t.max()-t.min())//dt_window)
-	print(n,len(signal))
+	n = int(len(signal)//10)#int((t.max()-t.min())//dt_window)
+	print("N",n,len(signal),(t.max()-t.min()), dt_window)
 	s = np.array([i.sum() for i in np.array_split(s,n)])
 	print(s.shape)
 	t_new = np.linspace(t.min(),t.max(),len(s))
@@ -45,13 +45,13 @@ def ndp2p(shared_data,r,N):
 	dataA = r[0]['A']
 	dataB = r[0]['B']
 	#print(dataA,dataB.shape,N)
-	PHOTON_COUNT = 0
+	PHOTON_COUNT = 1
 	if PHOTON_COUNT:
 		dataA = dataA[0]
 		dataB = dataB[0]
 		dataT = r[2]
-		scanA, scanT, dt = photon_count(dataA,dataT,106e-6,0.011)
-		scanB, scanT, dt = photon_count(dataB,dataT,106e-6,0.37)
+		scanA, scanT, dt = photon_count(dataA,dataT,15e-8,0.001)
+		scanB, scanT, dt = photon_count(dataB,dataT,15e-8,0.001)
 		print(dt)
 
 
@@ -77,7 +77,7 @@ def getData_proc(shared_data,start,end,blocks,out_q):
 	for i in range(100):
 		if sum(w)==0:
 			w = (buf[:,0]>start) & (buf[:,0]<end)
-			time.sleep(0.1)
+			time.sleep(0.01)
 		else:
 			break
 	dataA = np.array([np.mean(i) for i in np.array_split(buf[:,1][w],blocks)])
@@ -111,6 +111,7 @@ def nonstop_capture(config,shared_data,runEvent,q):
 		#print(time.time()-t0,time.time()-t1,t1-t_0,len(r[0]['A'][0]))
 		t0 = time.time()
 		q.put(r)
+		break
 
 	del ps
 
@@ -134,7 +135,7 @@ if __name__ == '__main__':
 	p.daemon = True
 	p.start()
 	while q.qsize()==0:
-		time.sleep(0.1)
+		time.sleep(0.01)
 	search_q = Queue()
 	out_q = Queue()
 	#search_p = multiprocessing.Process(target=search_time_range,args=[sa,search_q,out_q])
@@ -167,7 +168,7 @@ if __name__ == '__main__':
 	time_table = np.vstack((time_table, np.hstack((t0,pos0))))
 	piStage.MOV(100,axis=1, waitUntilReady=True)
 
-	time.sleep(0.17)
+	time.sleep(0.0001)
 	pos1 = piStage.qPOS()
 	t1 = time.time()
 	time_table = np.vstack((time_table, np.hstack((t1,pos1))))
@@ -184,8 +185,8 @@ if __name__ == '__main__':
 
 		out.append(res)
 	from pylab import *
-	plot(out[0][0],out[0][1])
-	plot(out[0][0],out[0][2])
+	plot(out[0][0]-out[0][0][0],out[0][1],'b')
+	plot(out[0][0]-out[0][0][0],out[0][2],'r')
 	show(0)
 	r=q.get()
 	q.put('kill')
