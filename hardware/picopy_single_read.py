@@ -2,21 +2,36 @@
 import multiprocessing
 import picopy
 from multiprocessing import Queue, Array, Event
+import threading
 import numpy as np
 import time
-'''
+import traceback
+#'''
 config = {	'ChA_VRange':'500mV','ChA_Offset':0,
 			'ChB_VRange':'500mV','ChB_Offset':0,
-			'sampleInterval':2e-6,'samplingDuration':0.4,
-			'pico_pretrig':0.0004,'n_captures':1,'trigSrc':'ext',
-			'threshold_V':-0.320,'direction':'RISING','pulseFreq':1624.}
+			'sampleInterval':100e-6,'samplingDuration':1,
+			'pico_pretrig':0.0004,'n_captures':1,'trigSrc':'B',
+			'threshold_V':-0.350,'direction':'RISING','pulseFreq':1666.}
 '''
 config = {	'ChA_VRange':'20mV','ChA_Offset':0,
 			'ChB_VRange':'20mV','ChB_Offset':0,
 			'sampleInterval':2e-9,'samplingDuration':15e-9,
 			'pico_pretrig':0.000,'n_captures':5000,'trigSrc':'ext',
 			'threshold_V':0.02,'direction':'RISING','pulseFreq':80e6}
+'''
 q = multiprocessing.Queue()
+
+def photon_count(signal,t,dt_window,threshold):
+	w = abs(signal) > threshold
+	s = abs(signal*w)
+	t = t[w]
+	#s = signal.cumsum()
+	n = int((t.max()-t.min())//dt_window)
+	print(n,len(signal))
+	s = np.array([i.sum() for i in np.array_split(s,n)])
+	print(s.shape)
+	t_new = np.linspace(t.min(),t.max(),len(s))
+	return s, t_new, (t.max()-t.min())/n
 
 def push_data_to_fixBuff(buf, data):
 	push_len = len(data)
@@ -26,54 +41,50 @@ def push_data_to_fixBuff(buf, data):
 	return buf
 
 def ndp2p(shared_data,r,N):
-	print('ndp2p')
+	print('>ndp2p')
 	dataA = r[0]['A']
 	dataB = r[0]['B']
-	print(dataA,dataB.shape,N)
-	try:
-		b = np.array(np.split( dataB[:,:int(dataB.shape[1]//N*N)],N,axis=1)).mean(axis=1)
-	except:
-		traceback.print_exc()
-	print(2)
+	#print(dataA,dataB.shape,N)
+	PHOTON_COUNT = 0
+	if PHOTON_COUNT:
+		dataA = dataA[0]
+		dataB = dataB[0]
+		dataT = r[2]
+		scanA, scanT, dt = photon_count(dataA,dataT,106e-6,0.011)
+		scanB, scanT, dt = photon_count(dataB,dataT,106e-6,0.37)
+		print(dt)
 
-	scanB = abs(b.max(axis=1) - b.min(axis=1))
-	a = np.array(np.split( dataA[:,:int(dataA.shape[1]//N*N)],N,axis=1)).mean(axis=1)
-	scanA = abs(a.max(axis=1) - a.min(axis=1))
-	scanT = r[2][:int(dataB.shape[1]//N*N)]
-	scanT = np.linspace(scanT.min(),scanT.max(),len(scanA))
-	print(scanA)
+
+	else:
+		a = np.array(np.split( dataA[:,:int(dataA.shape[1]//N*N)],N,axis=1)).mean(axis=1)
+		scanA = abs(a.max(axis=1) - a.min(axis=1))
+		b = np.array(np.split( dataB[:,:int(dataB.shape[1]//N*N)],N,axis=1)).mean(axis=1)
+		scanB = abs(b.max(axis=1) - b.min(axis=1))
+
+		scanT = r[2][:int(dataB.shape[1]//N*N)]
+		scanT = np.linspace(scanT.min(),scanT.max(),len(scanA))
+	#print(scanA)
 	buf = np.frombuffer(shared_data['data'].get_obj(), dtype='d').reshape(shared_data['shape'])
 	push_data_to_fixBuff(buf,np.array([scanT,scanA,scanB]).T)[:]
 	print("s",buf[:,1:].sum())
 	#q.put([scanA,scanB,scanT])
+	print('<ndp2p')
 
-def search_time_range(shared_data, search_q=multiprocessing.Queue(), out_q=multiprocessing.Queue()):
-	print('search')
-	timeout = 10
 
+def getData_proc(shared_data,start,end,blocks,out_q):
 	buf = np.frombuffer(shared_data['data'].get_obj(), dtype='d').reshape(shared_data['shape'])
-	last_time = time.time()
-	while True:
-		if time.time()-last_time>timeout:
-			break
-		if search_q.qsize()>0:
-			last_time = time.time()
-			req = search_q.get()
-			if req == 'kill':
-				print('search_kill')
-				break
-			start, end, blocks = req
+	w = (buf[:,0]>start) & (buf[:,0]<end)
+	for i in range(100):
+		if sum(w)==0:
 			w = (buf[:,0]>start) & (buf[:,0]<end)
-			for i in range(100):
-				if sum(w)==0:
-					print('noData')
-					continue
-			dataA = np.array([np.mean(i) for i in np.array_split(buf[:,1][w],blocks)])
-			dataB = np.array([np.mean(i) for i in np.array_split(buf[:,2][w],blocks)])
-			t = np.linspace(start,end,len(dataA))
-			out_q.put([t,dataA,dataB])
-			print(t,dataA,dataB)
-		time.sleep(0.01)
+			time.sleep(0.1)
+		else:
+			break
+	dataA = np.array([np.mean(i) for i in np.array_split(buf[:,1][w],blocks)])
+	dataB = np.array([np.mean(i) for i in np.array_split(buf[:,2][w],blocks)])
+	t = np.linspace(start,end,len(dataA))
+	out_q.put([t,dataA,dataB])
+	print('>getData_proc')
 
 def nonstop_capture(config,shared_data,runEvent,q):
 	ps = picopy.Pico3k()
@@ -81,19 +92,26 @@ def nonstop_capture(config,shared_data,runEvent,q):
 	N = int(config['samplingDuration']*config['pulseFreq'])
 	r = ps.capture_prep_block(return_scaled_array=1)
 	q.put('ready')
+	t0 = time.time()
 	while True:
 		runEvent.wait()
-		runEvent.clear()
-		print('run')
-		r = ps.capture_prep_block(return_scaled_array=1)
-		p = multiprocessing.Process(target=ndp2p,args=[shared_data,r,N])
-		p.daemon = True
-		p.start()
-		if q.qsize()>0:
+		#runEvent.clear()
+
+		if not q.empty():
 			status = q.get()
 			if status=='kill':
 				print(status)
 				break
+		#print('run')
+		#t_0 = time.time()
+		r = ps.capture_prep_block(return_scaled_array=1)
+		#t1=time.time()
+		threading.Thread(target=ndp2p,args=[shared_data,r,N]).start()
+
+		#print(time.time()-t0,time.time()-t1,t1-t_0,len(r[0]['A'][0]))
+		t0 = time.time()
+		q.put(r)
+
 	del ps
 
 ## Start Qt event loop unless running in interactive mode.
@@ -113,16 +131,16 @@ if __name__ == '__main__':
 	q = Queue()
 	runEvent = Event()
 	p = multiprocessing.Process(target=nonstop_capture,args=[config,sa,runEvent,q])
-	#p.daemon = True
+	p.daemon = True
 	p.start()
 	while q.qsize()==0:
 		time.sleep(0.1)
 	search_q = Queue()
 	out_q = Queue()
-	search_p = multiprocessing.Process(target=search_time_range,args=[sa,search_q,out_q])
-	search_p.daemon = True
-	search_p.start()
-	from E727 import E727
+	#search_p = multiprocessing.Process(target=search_time_range,args=[sa,search_q,out_q])
+	#search_p.daemon = True
+	#search_p.start()
+	from sim.E727 import E727
 	print('E727')
 	piStage = E727()
 	print(piStage.ConnectUSBWithBaudRate())
@@ -149,24 +167,28 @@ if __name__ == '__main__':
 	time_table = np.vstack((time_table, np.hstack((t0,pos0))))
 	piStage.MOV(100,axis=1, waitUntilReady=True)
 
-	time.sleep(0.5)
+	time.sleep(0.17)
 	pos1 = piStage.qPOS()
 	t1 = time.time()
 	time_table = np.vstack((time_table, np.hstack((t1,pos1))))
-	search_q.put([t0,t1,1000])
+	multiprocessing.Process(target=getData_proc,args=[sa,t0,t1,1000,out_q]).start()
 
-	runEvent.set()
-	q.put('kill')
-	search_q.put('kill')
-	#p.join()
-	#search_p.join()
+
 	out = []
 	#time.sleep(10)
+	while out_q.empty():
+		time.sleep(0.1)
 
 	while out_q.qsize()>0:
-		out.append(out_q.get())
+		res = out_q.get()
 
-
+		out.append(res)
+	from pylab import *
+	plot(out[0][0],out[0][1])
+	plot(out[0][0],out[0][2])
+	show(0)
+	r=q.get()
+	q.put('kill')
 	'''
 	try:
 		print('move')
