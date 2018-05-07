@@ -14,6 +14,7 @@ from scipy.signal import resample
 from scipy.ndimage.measurements import center_of_mass
 import pandas as pd
 
+import threading
 #import SharedArray
 
 MODE = 'lab'
@@ -57,11 +58,14 @@ from multiprocessing import Process, Queue, Array
 
 
 def photon_count(signal,t,dt_window,threshold):
+	n = int(len(signal)//10)#int((t.max()-t.min())//dt_window)
 	w = signal < threshold
+	if sum(w) == 0:
+		return np.zeros(len(t)), t, (t.max()-t.min())/n
 	s = abs(signal*w)
 	t = t[w]
 	#s = signal.cumsum()
-	n = int(len(signal)//10)#int((t.max()-t.min())//dt_window)
+
 	print("N",n,len(signal),(t.max()-t.min()), dt_window)
 	s = np.array([i.sum() for i in np.array_split(s,n)])
 	print(s.shape)
@@ -947,7 +951,8 @@ class microV(QtGui.QMainWindow):
 						pos[0] = center[0] - size[0]/2
 						pos[1] = center[1] - size[1]/2
 
-						bg_center = bg_center + center - spectra_center
+						delta = center - spectra_center
+						bg_center = bg_center + delta
 						spectra_center = center
 						self.ui.meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]))
 						self.ui.meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]))
@@ -958,6 +963,11 @@ class microV(QtGui.QMainWindow):
 						self.ui.meas_laser_spectra_probe.item(1,2).setText(str(center[2]))
 
 						self.rectROI.setPos(pos)
+						z_start = float(self.ui.scan3D_config.item(0,1).text())
+						z_end = float(self.ui.scan3D_config.item(0,2).text())
+						self.ui.scan3D_config.item(0,1).setText(str(z_start+delta[2]))
+						self.ui.scan3D_config.item(0,2).setText(str(z_end+delta[2]))
+
 
 
 					if not self.scan3DisAlive:
@@ -1341,7 +1351,7 @@ class microV(QtGui.QMainWindow):
 		if state:
 			try:
 				self.HWP.cleanUpAPT()
-				self.fast3DScan()
+				self.fast3DScan2()
 			except:
 				traceback.print_exc()
 				#self.pico_reader_proc.terminate()
@@ -1354,7 +1364,7 @@ class microV(QtGui.QMainWindow):
 			self.ui.fast3DScan.blockSignals(True)
 			self.ui.fast3DScan.setChecked(False)
 			self.ui.fast3DScan.blockSignals(False)
-			self.HWP = APTMotor(83854487, HWTYPE=31)
+			#self.HWP = APTMotor(83854487, HWTYPE=31)
 
 
 
@@ -1645,6 +1655,121 @@ class microV(QtGui.QMainWindow):
 
 		self.initPico()
 
+	def fast3DScan2(self):
+
+
+
+		z_start = float(self.ui.scan3D_config.item(0,1).text())
+		z_end = float(self.ui.scan3D_config.item(0,2).text())
+		z_step = float(self.ui.scan3D_config.item(0,3).text())
+		if z_step == 0:
+			Range_z = np.array([z_start]*100)
+		else:
+			Range_z = np.arange(z_start,z_end,z_step)
+		Range_zi = np.arange(len(Range_z))
+		y_start = float(self.ui.scan3D_config.item(1,1).text())
+		y_end = float(self.ui.scan3D_config.item(1,2).text())
+		y_step = float(self.ui.scan3D_config.item(1,3).text())
+
+		Range_y = np.arange(y_start,y_end,y_step)
+		Range_yi = np.arange(len(Range_y))
+
+
+		x_start = float(self.ui.scan3D_config.item(2,1).text())
+		x_end = float(self.ui.scan3D_config.item(2,2).text())
+		x_step = float(self.ui.scan3D_config.item(2,3).text())
+
+
+		Range_x = np.arange(x_start,x_end,x_step)
+		Range_xi = np.arange(len(Range_x))
+
+		self.piStage.MOV([0],axis=b'1',waitUntilReady=1)
+		scan_t = []
+		for i in range(10):
+			t0 = time.time()
+			self.piStage.MOV([100],axis=b'1',waitUntilReady=1)
+			self.piStage.MOV([0],axis=b'1',waitUntilReady=1)
+			t1 = time.time()
+			scan_t.append((t1-t0)/2)
+		scan_t = np.mean(scan_t)
+		vel = 100/scan_t
+		print('scan_t',scan_t, vel,(Range_x.max()-Range_x.min())/vel)
+		#self.ui.pico_samplingDuration.setText(str((Range_x.max()-Range_x.min())/vel/10))
+		#self.pico_set()
+
+		layerIndex = 0
+
+		inRange = 0
+		data_pmtA = []
+		data_pmtB = []
+		def move(x):
+			#time.sleep(0.001)
+			self.piStage.MOV([x],axis=b'1',waitUntilReady=1)
+
+		for z,zi in zip(Range_z,Range_zi):
+			#if not self.scan3DisAlive: break
+			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
+			#fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
+			#with open(fname,'a') as f:
+			#	f.write("#X\tY\tZ\tpmtA_signal\tpmtB_signal\ttime\n")
+			data_pmtA_ = []
+			data_pmtB_ = []
+
+			forward = True
+			for y,yi in zip(Range_y,Range_yi):
+				#if not self.scan3DisAlive: break
+				Range_x_tmp = Range_x
+				if forward:
+					Range_x_tmp = Range_x[::-1]
+					Range_xi_tmp = Range_xi[::-1]
+					#forward = False
+				else:
+					Range_x_tmp = Range_x
+					Range_xi_tmp = Range_xi
+					#forward = True
+				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
+
+				x=Range_x_tmp.max()
+				thr = threading.Thread(target=move,args=[x])
+				thr.start()
+				r = self.ps.capture_prep_block(return_scaled_array=1)
+				thr.join()
+				dataA = r[0]['A']
+				dataB = r[0]['B']
+				#dataA = np.hstack(dataA)
+				#dataB = np.hstack(dataB)
+				dataT = r[2]
+				N = int(self.pico_config['samplingDuration']*self.pico_config['pulseFreq'])
+				scanA = np.array([])
+				scanB = np.array([])
+
+				a = np.hstack(np.split( dataA[:,:int(dataA.shape[1]//N*N)],N,axis=1))
+				scanA = abs(a.max(axis=1) - a.min(axis=1))
+				b = np.hstack(np.split( dataB[:,:int(dataB.shape[1]//N*N)],N,axis=1))
+				scanB = abs(b.max(axis=1) - b.min(axis=1))
+
+
+
+				if forward:
+					data_pmtA_.append([i.mean() for i in np.array_split(scanA,len(Range_x))][::-1])
+					data_pmtB_.append([i.mean() for i in np.array_split(scanB,len(Range_x))][::-1])
+					forward = False
+				else:
+					data_pmtA_.append([i.mean() for i in np.array_split(scanA,len(Range_x))])
+					data_pmtB_.append([i.mean() for i in np.array_split(scanB,len(Range_x))])
+					forward = True
+				app.processEvents()
+
+			data_pmtA.append(np.array(data_pmtA_).T)
+			data_pmtB.append(np.array(data_pmtB_).T)
+			print(x,y,z)
+		data_pmtA = np.array(data_pmtA)
+		data_pmtB = np.array(data_pmtB)
+		self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+		scale=(x_step,y_step),xvals=Range_z)
+		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+		scale=(x_step,y_step),xvals=Range_z)
+
 
 	############################################################################
 	###############################   scan3D	################################
@@ -1922,7 +2047,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.plotArea.addWidget(splitter)
 
 
-		self.img = pg.ImageView()  ## giving the plots names allows us to link their axes together
+		self.img = pg.ImageView()
 		data = np.zeros((100,100))
 		self.ui.imageArea.addWidget(self.img)
 		self.img.setImage(data)
@@ -2022,7 +2147,11 @@ class microV(QtGui.QMainWindow):
 			size[0] = 100-pos[0]
 		if pos[1]+size[1] > 100:
 			size[1] = 100-pos[1]
-
+		#self.spectra_signal_probe.setData(x=[pos[0]+size[0]/2],y=[pos[1]+size[1]/2])
+		#self.spectra_signal_probe1.setData(x=[pos[0]+size[0]/2],y=[pos[1]+size[1]/2])
+		#self.ui.meas_laser_spectra_probe
+		#self.spectra_bg_probe.setData(x=[pos[0]],y=[pos[1]])
+		#self.spectra_bg_probe1.setData(x=[pos[0]],y=[pos[1]])
 		sender.setPos(pos)
 		sender.setSize(size)
 		sender.blockSignals(False)
