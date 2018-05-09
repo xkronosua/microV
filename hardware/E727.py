@@ -189,7 +189,7 @@ class E727():
 				n=n+1
 				m = self.IsMoving(axis)
 				#print(m)
-				time.sleep(0.001)
+				#time.sleep(0.001)
 		return self.err_out
 
 	@errorTranslator

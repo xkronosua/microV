@@ -13,7 +13,7 @@ import sharedmem
 from scipy.signal import resample
 from scipy.ndimage.measurements import center_of_mass
 import pandas as pd
-
+from scipy.interpolate import interp1d
 import threading
 #import SharedArray
 
@@ -1080,46 +1080,53 @@ class microV(QtGui.QMainWindow):
 		data_pmtA = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
 		data_pmtB = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
 		layerIndex = 0
-		for z,zi in zip(Range_z,Range_zi):
-			if not self.scan3DisAlive: break
-			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 
-			forward = True
-			for y,yi in zip(Range_y,Range_yi):
+		if self.ui.meas_laser_spectra_track_fast.isChecked():
+			data_pmtA, data_pmtB,(Range_x,Range_y,Range_z) = self.fast3DScan2()
+		else:
+
+
+			for z,zi in zip(Range_z,Range_zi):
 				if not self.scan3DisAlive: break
-				Range_x_tmp = Range_x
-				if forward:
-					Range_x_tmp = Range_x[::-1]
-					Range_xi_tmp = Range_xi[::-1]
-					forward = False
-				else:
-					Range_x_tmp = Range_x
-					Range_xi_tmp = Range_xi
-					forward = True
-				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
-				if not r: break
-				app.processEvents()
-				for x,xi in zip(Range_x_tmp, Range_xi_tmp):
+				print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 
-					start=time.time()
-					#print('Start',start)
+				forward = True
+				for y,yi in zip(Range_y,Range_yi):
 					if not self.scan3DisAlive: break
-					r = self.piStage.MOV([x],axis=b'1',waitUntilReady=True)
+					Range_x_tmp = Range_x
+					if forward:
+						Range_x_tmp = Range_x[::-1]
+						Range_xi_tmp = Range_xi[::-1]
+						forward = False
+					else:
+						Range_x_tmp = Range_x
+						Range_xi_tmp = Range_xi
+						forward = True
+					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 					if not r: break
+					app.processEvents()
+					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
 
-					#real_position0 = self.piStage.qPOS()
-					pmt_valA, pmt_valB = self.readPico()
-					data_pmtA[zi,xi,yi] = pmt_valA
-					data_pmtB[zi,xi,yi] = pmt_valB
-					#real_position = self.piStage.qPOS()
-					#########################################
-					#if self.ui.andorCameraConnect.isChecked():
-					#	pmt_valA,dd,wl = self.andorCameraGetData(1)
+						start=time.time()
+						#print('Start',start)
+						if not self.scan3DisAlive: break
+						r = self.piStage.MOV([x],axis=b'1',waitUntilReady=True)
+						if not r: break
 
-					#print(real_position0,real_position)
-					#################################################
-					#x_real = np.mean([real_position0[0], real_position[0]])
-					#y_real = np.mean([real_position0[1], real_position[1]])
+						#real_position0 = self.piStage.qPOS()
+						pmt_valA, pmt_valB = self.readPico()
+						data_pmtA[zi,xi,yi] = pmt_valA
+						data_pmtB[zi,xi,yi] = pmt_valB
+						#real_position = self.piStage.qPOS()
+						#########################################
+						#if self.ui.andorCameraConnect.isChecked():
+						#	pmt_valA,dd,wl = self.andorCameraGetData(1)
+
+						#print(real_position0,real_position)
+						#################################################
+						#x_real = np.mean([real_position0[0], real_position[0]])
+						#y_real = np.mean([real_position0[1], real_position[1]])
+
 		self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
 		scale=(x_step,y_step),xvals=Range_z)
 		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
@@ -1132,6 +1139,12 @@ class microV(QtGui.QMainWindow):
 			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
 		centerB = centerB*np.array([x_step,y_step,z_step]) + \
 			np.array([Range_x.min(),Range_y.min(),Range_z.min()])
+
+		layerIndex = np.abs(Range_z - centerA[2]).argmin()
+		layerIndex1 = np.abs(Range_z - centerB[2]).argmin()
+
+		self.img.setCurrentIndex(layerIndex)
+		self.img1.setCurrentIndex(layerIndex1)
 
 		panelA = pd.Panel(data_pmtA,items=Range_z,
 			major_axis=Range_x,
@@ -1350,7 +1363,8 @@ class microV(QtGui.QMainWindow):
 	def start_fast3DScan(self,state):
 		if state:
 			try:
-				self.HWP.cleanUpAPT()
+				#self.HWP.cleanUpAPT()
+				self.scan3DisAlive = True
 				self.fast3DScan2()
 			except:
 				traceback.print_exc()
@@ -1359,7 +1373,8 @@ class microV(QtGui.QMainWindow):
 			self.ui.fast3DScan.setChecked(False)
 			self.ui.fast3DScan.blockSignals(False)
 		else:
-			self.pico_control_queue.put('kill')
+			self.scan3DisAlive = False
+			#self.pico_control_queue.put('kill')
 			#self.pico_reader_proc.terminate()
 			self.ui.fast3DScan.blockSignals(True)
 			self.ui.fast3DScan.setChecked(False)
@@ -1659,6 +1674,9 @@ class microV(QtGui.QMainWindow):
 
 
 
+
+		wait = self.ui.Pi_wait.isChecked()
+
 		z_start = float(self.ui.scan3D_config.item(0,1).text())
 		z_end = float(self.ui.scan3D_config.item(0,2).text())
 		z_step = float(self.ui.scan3D_config.item(0,3).text())
@@ -1682,58 +1700,74 @@ class microV(QtGui.QMainWindow):
 
 		Range_x = np.arange(x_start,x_end,x_step)
 		Range_xi = np.arange(len(Range_x))
+		self.piStage.MOV([Range_x.min()],axis=b'1',waitUntilReady=1)
+		vel = self.ui.Pi_Velocity.value()
+		fs_table = np.loadtxt('hardware/fastScan_table.txt',skiprows=1)
+		eq=interp1d(fs_table[:,1],fs_table[:,0],kind='quadratic',bounds_error=False,fill_value="extrapolate")
+		calibr = eq(self.rectROI.size()[0])
 
-		self.piStage.MOV([0],axis=b'1',waitUntilReady=1)
-		scan_t = []
-		for i in range(10):
-			t0 = time.time()
-			self.piStage.MOV([100],axis=b'1',waitUntilReady=1)
-			self.piStage.MOV([0],axis=b'1',waitUntilReady=1)
-			t1 = time.time()
-			scan_t.append((t1-t0)/2)
-		scan_t = np.mean(scan_t)
-		vel = 100/scan_t
-		print('scan_t',scan_t, vel,(Range_x.max()-Range_x.min())/vel)
-		#self.ui.pico_samplingDuration.setText(str((Range_x.max()-Range_x.min())/vel/10))
-		#self.pico_set()
+		self.ui.fastScan_time_calibr.setValue(calibr)
+		print('time_calibr',calibr)
+		#calibr = self.ui.fastScan_time_calibr.value()
+		time_for_scan = (Range_x.max()-Range_x.min())/vel*calibr
+		pico_frame_time = 15e-7
+		n_frames = int(time_for_scan/pico_frame_time)
+		print('time_for_scan',time_for_scan)
+
+		self.ui.pico_samplingDuration.setText(str(pico_frame_time))
+		self.ui.pico_n_captures.setValue(n_frames)
+		self.pico_set()
+
+		#scan_t = []
+		#for i in range(10):
+		#	t0 = time.time()
+		#	self.piStage.MOV([100],axis=b'1',waitUntilReady=1)
+		#	self.piStage.MOV([0],axis=b'1',waitUntilReady=1)
+		#	t1 = time.time()
+		#	scan_t.append((t1-t0)/2)
+		#scan_t = np.mean(scan_t)
+		#vel = 100/scan_t
+		#print('scan_t',scan_t, vel,(Range_x.max()-Range_x.min())/vel)
 
 		layerIndex = 0
 
 		inRange = 0
 		data_pmtA = []
 		data_pmtB = []
-		def move(x):
-			#time.sleep(0.001)
-			self.piStage.MOV([x],axis=b'1',waitUntilReady=1)
 
 		for z,zi in zip(Range_z,Range_zi):
-			#if not self.scan3DisAlive: break
+			if not self.scan3DisAlive: break
 			print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 			#fname = path+"Z"+str(z)+"_"+str(round(time.time()))+'.txt'
 			#with open(fname,'a') as f:
 			#	f.write("#X\tY\tZ\tpmtA_signal\tpmtB_signal\ttime\n")
-			data_pmtA_ = []
-			data_pmtB_ = []
+			data_pmtA_ = np.array([])
+			data_pmtB_ = np.array([])
 
 			forward = True
+			t0=time.time()
 			for y,yi in zip(Range_y,Range_yi):
-				#if not self.scan3DisAlive: break
-				Range_x_tmp = Range_x
-				if forward:
-					Range_x_tmp = Range_x[::-1]
-					Range_xi_tmp = Range_xi[::-1]
+				if not self.scan3DisAlive: break
+				#Range_x_tmp = Range_x
+				#if forward:
+				#	Range_x_tmp = Range_x[::-1]
+				#	Range_xi_tmp = Range_xi[::-1]
 					#forward = False
-				else:
-					Range_x_tmp = Range_x
-					Range_xi_tmp = Range_xi
+				#else:
+				#	Range_x_tmp = Range_x
+				#	Range_xi_tmp = Range_xi
 					#forward = True
-				r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
+				r = self.piStage.MOV([x_start,y],axis=b'1 2',waitUntilReady=True)
 
-				x=Range_x_tmp.max()
-				thr = threading.Thread(target=move,args=[x])
-				thr.start()
-				r = self.ps.capture_prep_block(return_scaled_array=1)
-				thr.join()
+				x = x_end
+				#thr = threading.Thread(target=move,args=[x])
+				#thr.start()
+				t0_,t1_,t_ind = self.ps.capture_prep_block_start(return_scaled_array=1)
+
+				self.piStage.MOV([x],axis=b'1',waitUntilReady=wait)
+
+				r = self.ps.capture_prep_block_end(t0_, t1_, return_scaled_array=1)
+				#thr.join()
 				dataA = r[0]['A']
 				dataB = r[0]['B']
 				#dataA = np.hstack(dataA)
@@ -1743,22 +1777,43 @@ class microV(QtGui.QMainWindow):
 				scanA = np.array([])
 				scanB = np.array([])
 
-				a = np.hstack(np.split( dataA[:,:int(dataA.shape[1]//N*N)],N,axis=1))
+				#dataA_= np.hstack(dataA[:,:int(dataA.shape[1]//N*N)])
+				#a=np.array(np.split(dataA_,N*dataA.shape[0]))
+				a = dataA
 				scanA = abs(a.max(axis=1) - a.min(axis=1))
-				b = np.hstack(np.split( dataB[:,:int(dataB.shape[1]//N*N)],N,axis=1))
+				#dataB_= np.hstack(dataB[:,:int(dataB.shape[1]//N*N)])
+				#b=np.array(np.split(dataB_,N*dataB.shape[0]))
+				b = dataB
 				scanB = abs(b.max(axis=1) - b.min(axis=1))
+				#print(scanA.shape)
+				real_position = self.piStage.qPOS()
+				print(real_position)
+				time_delay = int(self.ui.fastScan_time_delay.value()*len(scanA))
+				time_cutoff = int((1-self.ui.fastScan_time_cutoff.value())*len(scanA))
+				print(scanA.shape, time_delay, time_cutoff)
+				scanA = scanA[time_delay:time_cutoff]
+				scanB = scanB[time_delay:time_cutoff]
 
-
-
-				if forward:
-					data_pmtA_.append([i.mean() for i in np.array_split(scanA,len(Range_x))][::-1])
-					data_pmtB_.append([i.mean() for i in np.array_split(scanB,len(Range_x))][::-1])
-					forward = False
+				#if forward:
+				a = np.array([i.mean() for i in np.array_split(scanA,len(Range_x))])
+				if len(data_pmtA_)==0:
+					data_pmtA_ = a
 				else:
-					data_pmtA_.append([i.mean() for i in np.array_split(scanA,len(Range_x))])
-					data_pmtB_.append([i.mean() for i in np.array_split(scanB,len(Range_x))])
-					forward = True
+					data_pmtA_ =np.vstack((data_pmtA_,a))
+				b = np.array([i.mean() for i in np.array_split(scanB,len(Range_x))])
+				if len(data_pmtB_)==0:
+					data_pmtB_ = b
+				else:
+					data_pmtB_ =np.vstack((data_pmtB_,b))
+
+				#	forward = False
+				#else:
+				#	data_pmtA_.append([i.mean() for i in np.array_split(scanA,len(Range_x))][::-1])
+				#	data_pmtB_.append([i.mean() for i in np.array_split(scanB,len(Range_x))][::-1])
+				#	forward = True
 				app.processEvents()
+			t1=time.time()
+			print("dt: %.9f\n"%(t1-t0))
 
 			data_pmtA.append(np.array(data_pmtA_).T)
 			data_pmtB.append(np.array(data_pmtB_).T)
@@ -1769,6 +1824,9 @@ class microV(QtGui.QMainWindow):
 		scale=(x_step,y_step),xvals=Range_z)
 		self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
 		scale=(x_step,y_step),xvals=Range_z)
+
+
+		return data_pmtA, data_pmtB, (Range_x, Range_y, Range_z)
 
 
 	############################################################################

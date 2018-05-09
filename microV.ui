@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>2</number>
+        <number>4</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -1097,7 +1097,7 @@
                   <number>1</number>
                  </property>
                  <property name="maximum">
-                  <number>10000</number>
+                  <number>1000000</number>
                  </property>
                  <property name="value">
                   <number>1</number>
@@ -1141,8 +1141,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>348</height>
+              <width>268</width>
+              <height>309</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1748,17 +1748,59 @@
              </widget>
             </item>
             <item>
-             <widget class="QSpinBox" name="fastScan_n_captures">
-              <property name="minimum">
-               <number>2</number>
-              </property>
-              <property name="maximum">
-               <number>90000</number>
-              </property>
-              <property name="value">
-               <number>710</number>
-              </property>
-             </widget>
+             <layout class="QGridLayout" name="gridLayout_20">
+              <item row="0" column="0">
+               <widget class="QDoubleSpinBox" name="fastScan_time_delay">
+                <property name="toolTip">
+                 <string>delay</string>
+                </property>
+                <property name="decimals">
+                 <number>10</number>
+                </property>
+                <property name="maximum">
+                 <double>9999999999.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QDoubleSpinBox" name="fastScan_time_cutoff">
+                <property name="toolTip">
+                 <string>cutoff</string>
+                </property>
+                <property name="decimals">
+                 <number>10</number>
+                </property>
+                <property name="maximum">
+                 <double>9999999999.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QDoubleSpinBox" name="fastScan_time_calibr">
+                <property name="toolTip">
+                 <string>calibr</string>
+                </property>
+                <property name="decimals">
+                 <number>10</number>
+                </property>
+                <property name="maximum">
+                 <double>9999999999.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </item>
             <item>
              <widget class="QPushButton" name="fast3DScan">
@@ -1956,15 +1998,15 @@
               </property>
               <layout class="QGridLayout" name="gridLayout_19">
                <item row="3" column="0">
-                <layout class="QHBoxLayout" name="horizontalLayout_14">
-                 <item>
+                <layout class="QGridLayout" name="gridLayout_21">
+                 <item row="1" column="0">
                   <widget class="QCheckBox" name="meas_laser_spectra_track">
                    <property name="text">
                     <string>track</string>
                    </property>
                   </widget>
                  </item>
-                 <item>
+                 <item row="1" column="1">
                   <widget class="QComboBox" name="meas_laser_spectra_track_channel">
                    <item>
                     <property name="text">
@@ -1976,6 +2018,13 @@
                      <string>B</string>
                     </property>
                    </item>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QCheckBox" name="meas_laser_spectra_track_fast">
+                   <property name="text">
+                    <string>Fast</string>
+                   </property>
                   </widget>
                  </item>
                 </layout>
