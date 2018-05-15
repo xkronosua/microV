@@ -16,7 +16,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import threading
 #import SharedArray
-
+from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
 
 MODE = 'lab'
@@ -57,6 +57,8 @@ from hardware.pico_multiproc_picopy import *
 
 import traceback
 from multiprocessing import Process, Queue, Array
+
+
 
 
 def photon_count(signal,t,dt_window,threshold):
@@ -679,7 +681,7 @@ class microV(QtGui.QMainWindow):
 
 					w_r = (self.andorCCD_wavelength>w_c[0])&(self.andorCCD_wavelength<w_c[1])
 					data_center = float(data[w_r].mean())
-				self.line_spectra[index].setData(x=self.andorCCD_wavelength, y = data)
+				self.line_spectra[index].setData(x=self.andorCCD_wavelength, y=data)
 				self.ui.andorCameraGetData.setChecked(False)
 			else:
 				self.andorCameraLiveTimer.start(10)
@@ -1071,7 +1073,7 @@ class microV(QtGui.QMainWindow):
 						time.sleep(0.1)
 						print('wait:Laser')
 						app.processEvents()
-						if not self.scan3DisAlive:
+						if not self.ui.n_meas_laser_spectra_go.isChecked():
 							break
 
 					time_list.append(time.time())
@@ -1082,7 +1084,7 @@ class microV(QtGui.QMainWindow):
 
 					spectra_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(1,i).text()) for i in range(3)])
 
-					NP_centers = np.array([[ float(self.ui.n_meas_laser_spectra_probe.item(j,i).text()) for i in range(3)] for j in range(self.ui.n_meas_laser_spectra_probe.rowCount())])
+					NP_centers = np.array([[ float(self.ui.n_meas_laser_spectra_probe.item(j,i).text()) for i in range(3)] for j in range(1,self.ui.n_meas_laser_spectra_probe.rowCount())])
 
 					z_start = self.ui.n_meas_laser_spectra_Z_start.value()
 					z_end = self.ui.n_meas_laser_spectra_Z_end.value()
@@ -1123,7 +1125,7 @@ class microV(QtGui.QMainWindow):
 
 
 
-					if not self.scan3DisAlive:
+					if not self.ui.n_meas_laser_spectra_go.isChecked():
 						break
 					time_list.append(time.time())
 
@@ -1144,7 +1146,7 @@ class microV(QtGui.QMainWindow):
 						pos = self.piStage.qPOS()
 						self.setUiPiPos(pos=pos)
 
-						if not self.scan3DisAlive:
+						if not self.ui.n_meas_laser_spectra_go.isChecked():
 							break
 						#self.andorCameraGetBaseline()
 
@@ -1177,7 +1179,7 @@ class microV(QtGui.QMainWindow):
 
 						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 						app.processEvents()
-						if not self.scan3DisAlive:
+						if not self.ui.n_meas_laser_spectra_go.isChecked():
 							store.put("forceEnd_"+str(wl), df)
 							return
 							break
@@ -2031,8 +2033,9 @@ class microV(QtGui.QMainWindow):
 		num_peaks = self.ui.scan3D_num_peaks.value()
 		threshold_rel = self.ui.scan3D_threshold_rel.value()
 		min_distance = self.ui.Scan3D_min_distance.value()
-		peaks_A = peak_local_max(self.data2D_A, min_distance=min_distance, threshold_rel=threshold_rel,num_peaks=num_peaks)
-		peaks_B = peak_local_max(self.data2D_B, min_distance=min_distance, threshold_rel=threshold_rel,num_peaks=num_peaks)
+
+		peaks_A = peak_local_max(gaussian_filter(self.data2D_A,sigma=2), min_distance=min_distance, threshold_rel=threshold_rel,num_peaks=num_peaks)
+		peaks_B = peak_local_max(gaussian_filter(self.data2D_B,sigma=2), min_distance=min_distance, threshold_rel=threshold_rel,num_peaks=num_peaks)
 
 		Range_y = self.data2D_Range_y
 
@@ -2540,6 +2543,7 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.scan3D_config.item(2,2).setText(str(size[0]+pos[0]))
 		self.ui.scan3D_config.item(1,2).setText(str(size[1]+pos[1]))
+
 		#self.ui.meas_laser_spectra_probe.item(0,0).setText(str(pos[0]))
 		#self.ui.meas_laser_spectra_probe.item(0,0).setText(str(pos[1]))
 
