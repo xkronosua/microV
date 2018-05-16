@@ -18,7 +18,7 @@ import threading
 #import SharedArray
 from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
-
+import csv
 MODE = 'lab'
 
 if len(sys.argv)>1:
@@ -58,7 +58,39 @@ from hardware.pico_multiproc_picopy import *
 import traceback
 from multiprocessing import Process, Queue, Array
 
+from PyQt5.QtCore import QFileInfo, QSettings
+from PyQt5.QtWidgets import qApp
 
+
+list_gui_save_restore_classes = [QtGui.QDoubleSpinBox,QtGui.QSpinBox,QtGui.QCheckBox,QtGui.QLineEdit]
+list_gui_save_restore_properties = ['value','text','currentIndex','checked']
+def restore_gui(settings):
+	finfo = QFileInfo(settings.fileName())
+
+	if finfo.exists() and finfo.isFile():
+		for w in qApp.allWidgets():
+			mo = w.metaObject()
+			if type(w) in list_gui_save_restore_classes:
+				#print(w.objectName())
+
+				for i in range(mo.propertyCount()):
+					name = mo.property(i).name()
+					if name in list_gui_save_restore_properties:
+						val = settings.value("{}/{}".format(w.objectName(), name), w.property(name))
+						w.blockSignals(True)
+						w.setProperty(name, val)
+						w.blockSignals(False)
+
+
+def save_gui(settings):
+
+	for w in qApp.allWidgets():
+		mo = w.metaObject()
+		if type(w) in list_gui_save_restore_classes:
+			for i in range(mo.propertyCount()):
+				name = mo.property(i).name()
+				if name in list_gui_save_restore_properties:
+					settings.setValue("{}/{}".format(w.objectName(), name), w.property(name))
 
 
 def photon_count(signal,t,dt_window,threshold):
@@ -78,6 +110,7 @@ def photon_count(signal,t,dt_window,threshold):
 
 
 class microV(QtGui.QMainWindow):
+	settings = QSettings("gui.ini", QSettings.IniFormat)
 	data = []
 	alive = True
 	piStage = E727()
@@ -537,6 +570,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.Pi_YPos.setText(str(pos[1]))
 		self.ui.Pi_ZPos.setText(str(pos[2]))
 		self.statusBar_Position.setText('[%.5f\t%.5f\t%.5f]'%tuple(pos))
+		self.piStage_position.setData(x=[pos[0]],y=[pos[1]])
+		self.piStage_position1.setData(x=[pos[0]],y=[pos[1]])
 
 	def Pi_X_go(self):
 		pos = self.ui.Pi_X_move_to.value()
@@ -654,7 +689,7 @@ class microV(QtGui.QMainWindow):
 		mode = self.ui.andorCameraReadoutMode.currentText()
 		self.andorCCD.SetReadMode(mode)
 
-	def andorCameraGetData(self,state=False, integr_range = [], index=0):
+	def andorCameraGetData(self,state=False, line_index=0):
 		data_center = 0
 		data = np.array([])
 		if state:
@@ -668,26 +703,26 @@ class microV(QtGui.QMainWindow):
 				print(data)
 
 				if self.ui.shamrockConnect.isChecked():
-					c = float(self.ui.shamrockWavelength.text())
-					w_c = [c-20, c+20]
-					if len(integr_range)>0:
-						w_c = integr_range
-					if not w_c == self.andorCCD_wavelength_center:
-						shape=self.andorCCD.GetDetector()
-						size=self.andorCCD.GetPixelSize()
-						self.shamrock.shamrock.SetPixelWidth(size[0])
-						self.shamrock.shamrock.SetNumberPixels(shape[0])
-						self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
+					#c = float(self.ui.shamrockWavelength.text())
+					#w_c = [c-20, c+20]
+					#if len(integr_range)>0:
+					#	w_c = integr_range
+					#if not w_c == self.andorCCD_wavelength_center:
+					shape=self.andorCCD.GetDetector()
+					size=self.andorCCD.GetPixelSize()
+					self.shamrock.shamrock.SetPixelWidth(size[0])
+					self.shamrock.shamrock.SetNumberPixels(shape[0])
+					self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
 
-					w_r = (self.andorCCD_wavelength>w_c[0])&(self.andorCCD_wavelength<w_c[1])
-					data_center = float(data[w_r].mean())
-				self.line_spectra[index].setData(x=self.andorCCD_wavelength, y=data)
+					#w_r = (self.andorCCD_wavelength>w_c[0])&(self.andorCCD_wavelength<w_c[1])
+					#data_center = float(data[w_r].mean())
+				self.line_spectra[line_index].setData(x=self.andorCCD_wavelength, y=data)
 				self.ui.andorCameraGetData.setChecked(False)
 			else:
 				self.andorCameraLiveTimer.start(10)
 		else:
 			self.andorCameraLiveTimer.stop()
-		return data_center, data, self.andorCCD_wavelength
+		return data, self.andorCCD_wavelength
 
 	def onAndorCameraLiveTimeout(self):
 		self.andorCameraLiveTimer.stop()
@@ -884,7 +919,9 @@ class microV(QtGui.QMainWindow):
 						print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 						real_position = self.piStage.qPOS()
 						z_real = real_position[2]
-						integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
+						intens,wavelength_arr = self.andorCameraGetData(state=1)
+						w = (wavelength_arr>(wl/3-20))&(wavelength_arr<(wl/3+20))
+						integr_intens = intens[w].sum()
 						df[str(z)] = intens
 						self.live_x = np.hstack((self.live_x, z_real))
 						self.live_integr_spectra = np.hstack((self.live_integr_spectra, integr_intens))
@@ -1011,10 +1048,12 @@ class microV(QtGui.QMainWindow):
 					#	real_position = self.piStage.qPOS()
 					#	z_real = real_position[2]
 					time_list.append(time.time())
-					integr_intens_SHG,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/2-20,wl/2+20])
+					intens,wavelength_arr = self.andorCameraGetData(state=1)
 					time_list.append(time.time())
-					w = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
-					integr_intens_THG = intens[w].sum()
+					w3 = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
+					integr_intens_THG = intens[w3].sum()
+					w2 = (wavelength_arr>wl/2-20)&(wavelength_arr>wl/2+20)
+					integr_intens_SHG = intens[w2].sum()
 					df['wavelength'] = wavelength_arr
 					df['intens'] = intens
 
@@ -1111,7 +1150,7 @@ class microV(QtGui.QMainWindow):
 							self.line_pmtB.setData(x=Range_z,y=data_Z)
 						dz = medfilt(data_Z,9)
 						interf_z = Range_z[dz==dz.max()][0]
-						self.ui.n_meas_laser_spectra_Z_interface.setText(str(interf_z))
+						self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
 
 						z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
 
@@ -1133,8 +1172,17 @@ class microV(QtGui.QMainWindow):
 					bg_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(0,i).text()) for i in range(3)])
 
 
+
 					self.ui.shamrockPort.setCurrentIndex(0)
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
+
+					interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
+
+					self.piStage.MOV([interf_z],b'3',waitUntilReady=True)
+					self.andorCameraGetBaseline()
+					df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['Z_interface_'+str(interf_z)])
+					store.put("spectra_"+str(wl)+'_interface', df)
+
 
 					self.piStage.MOV(bg_center,b' 1 2 3',waitUntilReady=True)
 					pos = self.piStage.qPOS()
@@ -1164,20 +1212,22 @@ class microV(QtGui.QMainWindow):
 						#	real_position = self.piStage.qPOS()
 						#	z_real = real_position[2]
 						time_list.append(time.time())
-						integr_intens_SHG,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/2-20,wl/2+20],index=index)
+						intens,wavelength_arr = self.andorCameraGetData(state=1,index=index)
 						time_list.append(time.time())
-						w = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
-						integr_intens_THG = intens[w].sum()
+						w3 = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
+						integr_intens_THG = intens[w3].sum()
+						w2 = (wavelength_arr>wl/2-20)&(wavelength_arr>wl/2+20)
+						integr_intens_SHG = intens[w2].sum()
 						df['wavelength'] = wavelength_arr
 						df['intens'] = intens
 
-						self.live_x = np.hstack((self.live_x, wl))
-						self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
+						#self.live_x = np.hstack((self.live_x, wl))
+						#self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
 
-						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
-						self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
+						#self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+						#self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
 
-						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+						#self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 						app.processEvents()
 						if not self.ui.n_meas_laser_spectra_go.isChecked():
 							store.put("forceEnd_"+str(wl), df)
@@ -1270,7 +1320,7 @@ class microV(QtGui.QMainWindow):
 						forward = True
 					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
 					if not r: break
-					app.processEvents()
+
 					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
 
 						start=time.time()
@@ -1283,6 +1333,8 @@ class microV(QtGui.QMainWindow):
 						pmt_valA, pmt_valB = self.readPico()
 						data_pmtA[zi,xi,yi] = pmt_valA
 						data_pmtB[zi,xi,yi] = pmt_valB
+
+						app.processEvents()
 						#real_position = self.piStage.qPOS()
 						#########################################
 						#if self.ui.andorCameraConnect.isChecked():
@@ -1352,6 +1404,20 @@ class microV(QtGui.QMainWindow):
 			self.scan3DisAlive = False
 
 	def scan3D(self):
+
+		data = []
+		rows = self.ui.scan3D_config.rowCount()
+		columns = self.ui.scan3D_config.columnCount()
+		import csv
+		for r in range(rows):
+			d = []
+			for c in range(columns):
+				d.append(self.ui.scan3D_config.item(r,c).text())
+			data.append(d)
+		with open("scanArea.csv", "w+") as myCsv:
+			csvWriter = csv.writer(myCsv, delimiter='\t')
+			csvWriter.writerows(data)
+
 		wait = self.ui.Pi_wait.isChecked()
 		path = self.ui.scan3D_path.text()
 		if "_" in path:
@@ -2049,7 +2115,7 @@ class microV(QtGui.QMainWindow):
 		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
 		ch_str = 'AB'
 		#self.ui.n_meas_laser_spectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
-		interf_z = float(self.ui.n_meas_laser_spectra_Z_interface.text())
+		interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
 
 		z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
 
@@ -2395,26 +2461,11 @@ class microV(QtGui.QMainWindow):
 		self.spectra_signal_probe.setData(x=[x],y=[y])
 		self.spectra_signal_probe1.setData(x=[x],y=[y])
 
-		self.img.addItem(self.spectra_bg_probe)
-		self.img.addItem(self.spectra_signal_probe)
+		#self.img.addItem(self.spectra_bg_probe)
+		#self.img.addItem(self.spectra_signal_probe)
 
 
 
-		'''
-		x_arrow = pg.ArrowItem(angle=180, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='r')
-		x_arrow.setPos(40,0)
-		self.img.addItem(x_arrow)
-		t1 = pg.TextItem('X')
-		self.img.addItem(t1)
-		t1.setPos(40,-10)
-		t2 = pg.TextItem('Y')
-		self.img.addItem(t2)
-		t2.setPos(-10,40)
-
-		y_arrow = pg.ArrowItem(angle=90, tipAngle=30, baseAngle=20, headLen=20, tailLen=40, tailWidth=2, pen=None, brush='g')
-		y_arrow.setPos(0,40)
-		self.img.addItem(y_arrow)
-		'''
 
 
 		self.img1 = pg.ImageView()  ## giving the plots names allows us to link their axes together
@@ -2432,73 +2483,58 @@ class microV(QtGui.QMainWindow):
 		self.rectROI.sigRegionChanged.connect(self.syncRectROI)
 		self.rectROI_1.sigRegionChanged.connect(self.syncRectROI)
 
-		self.img1.addItem(self.spectra_bg_probe1)
-		self.img1.addItem(self.spectra_signal_probe1)
+		#self.img1.addItem(self.spectra_bg_probe1)
+		#self.img1.addItem(self.spectra_signal_probe1)
 		self.img1.addItem(self.NP_centersB)
 		self.move_scat_flag = False
 		self.move_scat_item = None
 
-		def onImgScatClick(event):
-			#event.accept()
-			items = self.img.scene.items(event.scenePos())
-			pos = event.scenePos()
-			#print(event,event.button, event.pos(), pos)
-			items_id = [id(i) for i in items]
+		def onImgPos(event):
+			pos = self.grid.mapFromScene(event.scenePos())
 
-			if id(self.spectra_bg_probe) in items_id:
-				print('bg')
-				self.move_scat_item = self.spectra_bg_probe
+			if event.modifiers() & QtCore.Qt.ControlModifier:
+				print(pos.x(),pos.y())
+			if event.modifiers() & QtCore.Qt.ShiftModifier:
+				print(pos.x(),pos.y())
+				if pos.x()>0 and pos.x()<100 and pos.y()>0 and pos.y()<100:
+					self.piStage.MOV([pos.x(),pos.y()],b'1 2', waitUntilReady=1)
+					real_position = self.piStage.qPOS()
+					self.setUiPiPos(real_position)
 
-			if id(self.spectra_signal_probe) in items_id:
-				print('NP1')
-				self.move_scat_item = self.spectra_signal_probe
 
-			modifiers = QtGui.QApplication.keyboardModifiers()
-			if modifiers & QtCore.Qt.ControlModifier:
-				if not self.move_scat_item is None:
-					print(pos)
-					self.move_scat_item.setData(x=[pos.x()],y=[pos.y()])
-					self.move_scat_item = None
+		def onImg1Pos(event):
+			pos = self.grid1.mapFromScene(event.scenePos())
 
-		self.img.scene.sigMouseClicked.connect(onImgScatClick)
+			if event.modifiers() & QtCore.Qt.ControlModifier:
+				print(pos.x(),pos.y())
+			if event.modifiers() & QtCore.Qt.ShiftModifier:
+				print(pos.x(),pos.y())
+				if pos.x()>0 and pos.x()<100 and pos.y()>0 and pos.y()<100:
+					self.piStage.MOV([pos.x(),pos.y()],b'1 2', waitUntilReady=1)
+					real_position = self.piStage.qPOS()
+					self.setUiPiPos(real_position)
 
-		def onImg1ScatClick(event):
-			#event.accept()
-			items = self.img1.scene.items(event.scenePos())
-			pos = event.scenePos()
-			print(pos)
-			#print(event,event.button, event.pos(), pos)
-			items_id = [id(i) for i in items]
-			if id(self.spectra_bg_probe1) in items_id:
-				print('bg')
-				self.move_scat_item = self.spectra_bg_probe1
+		self.grid.scene().sigMouseClicked.connect(onImgPos)
+		self.grid1.scene().sigMouseClicked.connect(onImg1Pos)
+		self.piStage_position = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0),symbol='+')
+		self.img.addItem(self.piStage_position)
 
-			if id(self.spectra_signal_probe1) in items_id:
-				print('NP1')
-				self.move_scat_item = self.spectra_signal_probe1
-			modifiers = QtGui.QApplication.keyboardModifiers()
-			if modifiers & QtCore.Qt.ControlModifier:
-				if not self.move_scat_item is None:
-
-					self.move_scat_item.setData(x=[pos.x()],y=[pos.y()])
-
-					if id(self.move_scat_item) == id(self.spectra_bg_probe1):
-						self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(pos.x()))
-						self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(pos.y()))
-					if id(self.move_scat_item) == id(self.spectra_signal_probe1):
-						self.ui.n_meas_laser_spectra_probe.item(1,0).setText(str(pos.x()))
-						self.ui.n_meas_laser_spectra_probe.item(1,1).setText(str(pos.y()))
-						#self.piStage.MOV([pos.x(),pos.y()],b'1 2', waitUntilReady=1)
-						real_position = self.piStage.qPOS()
-						self.setUiPiPos(real_position)
-					self.move_scat_item = None
-
-		self.img1.scene.sigMouseClicked.connect(onImg1ScatClick)
+		self.piStage_position1 = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0),symbol='+')
+		self.img1.addItem(self.piStage_position1)
 
 		self.statusBar_Position = QtGui.QLabel('[nan nan nan]')
 		self.ui.statusbar.addWidget(self.statusBar_Position)
 
-
+		restore_gui(self.settings)
+		#try:
+		data = list(csv.reader(open('scanArea.csv'),delimiter='\t'))[::2]
+		rows = self.ui.scan3D_config.rowCount()
+		columns = self.ui.scan3D_config.columnCount()
+		for r in range(rows):
+			for c in range(columns):
+				self.ui.scan3D_config.item(r,c).setText(data[r][c])
+		#except:
+		#	print('scanArea_recovery_err')
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
 	def syncRectROI(self):
 		sender = self.sender()
@@ -2579,6 +2615,19 @@ class microV(QtGui.QMainWindow):
 
 	def closeEvent(self, evnt):
 		print('closeEvent')
+		save_gui(self.settings)
+		data = []
+		rows = self.ui.scan3D_config.rowCount()
+		columns = self.ui.scan3D_config.columnCount()
+		import csv
+		for r in range(rows):
+			d = []
+			for c in range(columns):
+				d.append(self.ui.scan3D_config.item(r,c).text())
+			data.append(d)
+		with open("scanArea.csv", "w+") as myCsv:
+			csvWriter = csv.writer(myCsv, delimiter='\t')
+			csvWriter.writerows(data)
 		try:
 			self.piStage.CloseConnection()
 		except:
