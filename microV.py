@@ -743,6 +743,8 @@ class microV(QtGui.QMainWindow):
 		self.andorCameraLiveTimer.start(100)
 
 	def andorCameraGetBaseline(self):
+		if not self.ui.andorCameraGetData.isChecked():
+			self.ui.andorCameraGetData.setChecked(True)
 		print('andorCameraGetBaseline')
 		self.andorCCD.StartAcquisition()
 		self.andorCCD.WaitForAcquisition()
@@ -1404,7 +1406,7 @@ class microV(QtGui.QMainWindow):
 			self.scan3DisAlive = False
 
 	def scan3D(self):
-
+		self.calibrTimer.stop()
 		data = []
 		rows = self.ui.scan3D_config.rowCount()
 		columns = self.ui.scan3D_config.columnCount()
@@ -1604,6 +1606,7 @@ class microV(QtGui.QMainWindow):
 		#print(self.piStage.CloseConnection())
 	def start_fast3DScan(self,state):
 		if state:
+			self.calibrTimer.stop()
 			try:
 				#self.HWP.cleanUpAPT()
 				self.scan3DisAlive = True
@@ -2192,6 +2195,8 @@ class microV(QtGui.QMainWindow):
 			self.rotPiezoStage.stop()
 
 	def scan1D(self):
+		self.calibrTimer.stop()
+
 		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
 		with open(fname,'a') as f:
 			f.write("#X\tY\tZ\tHWP_power\tHWP_stepper\tpmtA_signal\tpmtB_signal\ttime\n")
@@ -2210,6 +2215,8 @@ class microV(QtGui.QMainWindow):
 				self.ui.HWP_angle.setText(str(round(pos,6)))
 		elif axis == 'HWP_stepper':
 			def move_function(pos):
+				if not self.ui.HWP_stepper_Connect.isChecked():
+					self.ui.HWP_stepper_Connect.setChecked(True)
 				self.HWP_stepper.moveTo(float(pos),wait=True)
 				pos = self.HWP_stepper.getAngle()
 				self.ui.HWP_stepper_angle.setText(str(round(pos,6)))

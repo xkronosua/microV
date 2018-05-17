@@ -7,6 +7,8 @@ import datetime
 import re
 from threading import RLock, Thread
 import traceback
+from scipy.interpolate import interp1d
+import numpy as np
 
 class laserDaemon(QWidget):
 	resMan = visa.ResourceManager()
@@ -16,6 +18,8 @@ class laserDaemon(QWidget):
 	wavelength_ready = False
 	prev_power = 0
 	current_power = 0
+	focusCounter = 0
+	fineTuneFit = None
 	def __init__(self,parent=None):
 		QWidget.__init__(self, parent)
 		self.ui = uic.loadUi('laser.ui', self)  # Loads all widgets of uifile.ui into self
@@ -35,8 +39,8 @@ class laserDaemon(QWidget):
 		self.ui.switchShutter.clicked.connect(self.setShutter)
 		self.watchdogTimer.timeout.connect(self.onWatchdogTimerTimeout)
 		self.ui.wavelength.editingFinished.connect(self.setWavelength)
-		#self.ui.wavelength.valueChanged[int].connect(self.blockWavelengthEdit)
-
+		self.ui.LCD_brightness.valueChanged[int].connect(self.setLCDBrightness)
+		self.ui.motorPos.valueChanged[float].connect(self.setMotorPos)
 		self.ui.show()
 
 	def statusLog(self,text, dir=''):
@@ -61,6 +65,7 @@ class laserDaemon(QWidget):
 			self.statusLog('close')
 
 	def onWatchdogTimerTimeout(self):
+		print(self.ui.wavelength.hasFocus())
 		with self.lock:
 			laserPower = self.Laser.query("READ:POWer?").replace('\n','')
 			self.ui.powerMeter.setValue(float(laserPower))
@@ -71,6 +76,19 @@ class laserDaemon(QWidget):
 					self.ui.wavelength.setValue(float(wavelength))
 			shutter = self.Laser.query("SHUTter?").replace('\n','')
 			self.ui.shutter.setChecked(shutter=='1')
+			try:
+
+				motor = float(self.Laser.query("CONT:DSMPOS?"))
+				if not self.ui.motorPos.hasFocus() or self.focusCounter>10:
+					self.focusCounter = 0
+					self.ui.motorPos.blockSignals(True)
+					self.ui.motorPos.setValue(motor)
+					self.ui.motorPos.blockSignals(False)
+				else:
+					self.focusCounter+=1
+
+			except:
+				traceback.print_exc()
 			status = self.Laser.query("*STB?").replace('\n','')
 			v = int(status)
 			shutter_ = v.to_bytes(32,byteorder='big')[2]
@@ -114,6 +132,27 @@ class laserDaemon(QWidget):
 			self.statusLog("TIMer:WATChdog 10",dir='>>')
 			with self.lock:
 				self.Laser.write("TIMer:WATChdog 10")
+
+
+
+			self.statusLog("LCD:BRIGhtness?",dir='>>')
+			brightness = 0
+			with self.lock:
+				brightness = float(self.Laser.query("LCD:BRIGhtness?"))
+				self.ui.LCD_brightness.setValue(brightness)
+
+			try:
+				self.statusLog("CONT:DSMPOS?",dir='>>')
+				motor = 0
+				with self.lock:
+					motor = float(self.Laser.query("CONT:DSMPOS?"))
+					self.ui.motorPos.setValue(motor)
+			except:
+				self.statusLog('err',dir='<<')
+
+			table = np.loadtxt('motorFineTune.txt')
+			self.fineTuneFit = interp1d(table[:,0],table[:,1],kind='quadratic',bounds_error=False,fill_value="extrapolate")
+
 			self.watchdogTimer.start(2000)
 		else:
 			self.Laser.close()
@@ -155,6 +194,9 @@ class laserDaemon(QWidget):
 				self.statusLog(on,dir='<<')
 			except:
 				pass
+			wl = self.getWavelength()
+			motor = self.fineTuneFit(wl)
+			self.ui.motorPos.setValue(motor)
 		else:
 			self.statusLog("OFF",dir='>>')
 			self.Laser.write("OFF")
@@ -175,15 +217,8 @@ class laserDaemon(QWidget):
 		self.ui.wavelength.blockSignals(False)
 		return wavelength
 
-	def blockWavelengthEdit(self,val):
-		self.ui.wavelength.blockSignals(True)
-		def unlock(f):
-			for i in range(50):
-				print('locked')
-				time.sleep(0.1)
-			f(False)
-		t = Thread(target=unlock,args=[self.ui.wavelength.blockSignals,])
-		t.start()
+
+
 	def setWavelength(self,val=None):
 		if val is None:
 			val = self.ui.wavelength.value()
@@ -206,11 +241,39 @@ class laserDaemon(QWidget):
 					self.wavelength_ready = (new_power == prev_power and new_wavelength == val)
 					prev_power = new_power
 					print(time.time()-t0, self.wavelength_ready)
+				wl = self.getWavelength()
+				motor = self.fineTuneFit(wl)
+				self.ui.motorPos.setValue(motor)
 			except:
 				traceback.print_exc()
 				self.statusLog("err",dir='<<')
 
 		self.ui.wavelength.blockSignals(False)
+		self.ui.wavelength.clearFocus()
+
+	def setLCDBrightness(self,val=None):
+		if not val is None:
+			with self.lock:
+				self.Laser.write('LCD:BRIGhtness '+str(val))
+
+	def setMotorPos(self,val=None):
+		if val is None:
+			val = self.ui.motorPos.value()
+
+		self.ui.motorPos.blockSignals(True)
+
+		if val>=0 and val<=100:
+			self.statusLog("CONTrol:MTRMOV "+str(val),dir='>>')
+			try:
+				with self.lock:
+					self.Laser.write("CONTrol:MTRMOV %.2f"%(val))
+
+			except:
+				traceback.print_exc()
+				self.statusLog("err",dir='<<')
+
+		self.ui.motorPos.blockSignals(False)
+		self.ui.motorPos.clearFocus()
 
 	def setShutter(self,state=None,manual=False):
 		if not manual:

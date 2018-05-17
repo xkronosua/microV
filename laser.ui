@@ -17,15 +17,8 @@
    <item row="0" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <layout class="QVBoxLayout" name="verticalLayout">
-       <item>
-        <widget class="QSpinBox" name="port">
-         <property name="value">
-          <number>9</number>
-         </property>
-        </widget>
-       </item>
-       <item>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="1" column="0" colspan="2">
         <widget class="QPushButton" name="connect">
          <property name="text">
           <string>connect</string>
@@ -35,24 +28,7 @@
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QPushButton" name="onOff">
-         <property name="text">
-          <string>ON</string>
-         </property>
-         <property name="checkable">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="power">
-         <property name="text">
-          <string>Power</string>
-         </property>
-        </widget>
-       </item>
-       <item>
+       <item row="4" column="0" colspan="2">
         <widget class="QProgressBar" name="powerMeter">
          <property name="maximum">
           <number>3</number>
@@ -71,14 +47,24 @@
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QLabel" name="label">
+       <item row="13" column="0" colspan="2">
+        <widget class="QPushButton" name="switchShutter">
          <property name="text">
-          <string>Wavelength</string>
+          <string>SHUTTER</string>
+         </property>
+         <property name="checkable">
+          <bool>false</bool>
          </property>
         </widget>
        </item>
-       <item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="power">
+         <property name="text">
+          <string>Power</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
         <widget class="QSpinBox" name="wavelength">
          <property name="keyboardTracking">
           <bool>false</bool>
@@ -91,17 +77,34 @@
          </property>
         </widget>
        </item>
-       <item>
+       <item row="2" column="0" colspan="2">
+        <widget class="QPushButton" name="onOff">
+         <property name="text">
+          <string>ON</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QSpinBox" name="port">
+         <property name="value">
+          <number>9</number>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="0">
+        <widget class="QPlainTextEdit" name="laserLog"/>
+       </item>
+       <item row="9" column="0">
         <widget class="QLabel" name="status">
          <property name="text">
           <string>STATUS</string>
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QPlainTextEdit" name="laserLog"/>
-       </item>
-       <item>
+       <item row="11" column="0">
         <widget class="QCheckBox" name="shutter">
          <property name="text">
           <string>Shutter</string>
@@ -114,12 +117,46 @@
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QPushButton" name="switchShutter">
-         <property name="text">
-          <string>SHUTTER</string>
+       <item row="7" column="1">
+        <widget class="QSpinBox" name="LCD_brightness">
+         <property name="keyboardTracking">
+          <bool>false</bool>
          </property>
-         <property name="checkable">
+         <property name="minimum">
+          <number>50</number>
+         </property>
+         <property name="maximum">
+          <number>255</number>
+         </property>
+         <property name="value">
+          <number>50</number>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Wavelength</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>LCD:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="0">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>MOTOR</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="1">
+        <widget class="QDoubleSpinBox" name="motorPos">
+         <property name="keyboardTracking">
           <bool>false</bool>
          </property>
         </widget>
