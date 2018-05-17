@@ -1236,11 +1236,11 @@ class microV(QtGui.QMainWindow):
 						store.put("spectra_"+str(wl)+'_NP'+str(index), df)
 						store.put("time_"+str(wl), pd.DataFrame(time_list))
 						if self.ui.n_meas_laser_spectra_track.isChecked():
-							store.put("trackA_"+str(wl), panelA)
-							store.put("trackB_"+str(wl), panelB)
+							store.put("scanA_"+str(wl), panelA)
+							store.put("scanB_"+str(wl), panelB)
 							store.put("center_"+str(wl), pd.DataFrame(NP_centers))
 							store.put("bg_center_"+str(wl), pd.DataFrame(bg_center))
-							store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z))
+							store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z, indices=Range_z),columns=['Z'])
 
 
 
