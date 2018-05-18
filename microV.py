@@ -50,6 +50,7 @@ else:
 	from hardware.andor.Shamrock import *
 	from hardware.andor.AndorCamera import *
 	from hardware.HWP_stepper import *
+	from hardware.moco import MOCO
 
 from hardware.pico_radar import fastScan
 from hardware.pico_multiproc_picopy import *
@@ -127,6 +128,8 @@ class microV(QtGui.QMainWindow):
 		traceback.print_exc()
 		HWP = None
 	rotPiezoStage = AG_UC2()
+	moco = None
+	mocoSections = [0,100000,200000,300000]
 	#ps = ps3000a.PS3000a(connect=False)
 	ps = None
 	n_captures = None
@@ -844,6 +847,49 @@ class microV(QtGui.QMainWindow):
 		return data
 
 	############################################################################
+	###############################   MOCO	##########################
+
+	def mocoConnect(self,state):
+		if state:
+			self.moco = MOCO()
+
+			self.ui.mocoPosition.setValue(self.moco.getPosition())
+			self.mocoGetSection()
+		else:
+			if not self.moco is None:
+				self.moco.close()
+				self.moco = None
+
+	def mocoGetSection(self):
+		index = -1
+		if not self.moco is None:
+			pos = self.moco.getPosition()
+			self.ui.mocoPosition.setValue(pos)
+			for j,section in enumerate(self.mocoSections):
+				if abs(pos-section)<10000:
+					index = j
+
+		if index!=-1:
+			self.ui.mocoSection.setCurrentIndex(index)
+
+		return index
+	def mocoMoveAbs(self,state=1,pos=None):
+		if not self.moco is None:
+			if pos is None:
+				pos = self.ui.mocoMoveAbs_target.value()
+			print(pos)
+			self.moco.moveAbs(pos,True)
+			self.mocoGetSection()
+			pos = self.moco.getPosition()
+			self.ui.mocoPosition.setValue(pos)
+
+	def mocoSetSection(self, section):
+		if not self.moco is None:
+			self.moco.moveAbs(self.mocoSections[section],True)
+			pos = self.moco.getPosition()
+			self.ui.mocoPosition.setValue(pos)
+
+	############################################################################
 	###############################   scan3D	################################
 
 	def scan3D_path_dialog(self):
@@ -1149,7 +1195,7 @@ class microV(QtGui.QMainWindow):
 						self.shamrockSetWavelength(wl/3)
 
 
-						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked()
+						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked():
 							print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 
 							for zi,z in enumerate(Range_z):
@@ -1276,7 +1322,7 @@ class microV(QtGui.QMainWindow):
 						paramsDf['HWP_power'] = float(self.ui.HWP_angle.text())
 						paramsDf['HWP_stepper'] = float(self.ui.HWP_stepper_angle.text())
 						paramsDf['endTime'] = time.time()
-						
+
 						store.put("params_"+str(wl), paramsDf)
 
 
@@ -2333,6 +2379,10 @@ class microV(QtGui.QMainWindow):
 		self.laserStatus.start(1000)
 
 		self.ui.actionExit.toggled.connect(self.closeEvent)
+
+		self.ui.mocoConnect.toggled[bool].connect(self.mocoConnect)
+		self.ui.mocoSection.currentIndexChanged[int].connect(self.mocoSetSection)
+		self.ui.mocoMoveAbs.clicked.connect(self.mocoMoveAbs)
 
 		self.ui.scan3D_config.cellChanged[int,int].connect(self.syncRectROI_table)
 		self.ui.meas_laser_spectra_probe.cellChanged[int,int].connect(self.meas_laser_spectra_probe_update)
