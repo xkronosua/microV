@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>6</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -142,7 +142,7 @@
          <item>
           <widget class="QToolBox" name="toolBox">
            <property name="currentIndex">
-            <number>3</number>
+            <number>1</number>
            </property>
            <widget class="QWidget" name="page">
             <property name="geometry">
@@ -208,8 +208,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>259</width>
-              <height>155</height>
+              <width>356</width>
+              <height>436</height>
              </rect>
             </property>
             <attribute name="label">
@@ -306,8 +306,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>255</width>
-              <height>121</height>
+              <width>356</width>
+              <height>436</height>
              </rect>
             </property>
             <attribute name="label">
@@ -567,14 +567,14 @@
             <number>2</number>
            </property>
            <property name="currentIndex">
-            <number>2</number>
+            <number>3</number>
            </property>
            <widget class="QWidget" name="CCS200">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>229</width>
+              <width>225</width>
               <height>122</height>
              </rect>
             </property>
@@ -1141,8 +1141,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>268</width>
-              <height>309</height>
+              <width>356</width>
+              <height>348</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1370,7 +1370,7 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>156</width>
+              <width>152</width>
               <height>111</height>
              </rect>
             </property>
@@ -2246,7 +2246,7 @@
                    <property name="maximum">
                     <number>620</number>
                    </property>
-                   <property name="displayIntegerBase">
+                   <property name="displayIntegerBase" stdset="0">
                     <number>10</number>
                    </property>
                   </widget>
@@ -2339,7 +2339,7 @@
                 <property name="maximum">
                  <number>620</number>
                 </property>
-                <property name="displayIntegerBase">
+                <property name="displayIntegerBase" stdset="0">
                  <number>10</number>
                 </property>
                </widget>
@@ -2565,12 +2565,15 @@
             <string>MultiScan</string>
            </property>
            <layout class="QGridLayout" name="gridLayout_22">
-            <item row="6" column="0">
+            <item row="7" column="0">
              <layout class="QGridLayout" name="gridLayout_23">
               <item row="1" column="0">
                <widget class="QCheckBox" name="n_meas_laser_spectra_track">
                 <property name="text">
                  <string>track</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
                 </property>
                </widget>
               </item>
@@ -2586,6 +2589,16 @@
                   <string>B</string>
                  </property>
                 </item>
+                <item>
+                 <property name="text">
+                  <string>AB</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>BA</string>
+                 </property>
+                </item>
                </widget>
               </item>
               <item row="2" column="0">
@@ -2594,13 +2607,13 @@
                  <string>Fast</string>
                 </property>
                 <property name="checked">
-                 <bool>true</bool>
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
              </layout>
             </item>
-            <item row="9" column="0">
+            <item row="10" column="0">
              <widget class="QPushButton" name="n_meas_laser_spectra_go">
               <property name="text">
                <string>Start</string>
@@ -2610,7 +2623,7 @@
               </property>
              </widget>
             </item>
-            <item row="4" column="0">
+            <item row="5" column="0">
              <widget class="QTableWidget" name="n_meas_laser_spectra_probe">
               <attribute name="horizontalHeaderCascadingSectionResizes">
                <bool>false</bool>
@@ -2925,13 +2938,6 @@
                 </property>
                </widget>
               </item>
-              <item row="3" column="0">
-               <widget class="QLabel" name="labela">
-                <property name="text">
-                 <string>nan</string>
-                </property>
-               </widget>
-              </item>
               <item row="3" column="1">
                <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_interface">
                 <property name="decimals">
@@ -2955,7 +2961,36 @@
                 </property>
                </widget>
               </item>
+              <item row="3" column="0">
+               <widget class="QCheckBox" name="n_meas_laser_spectra_Z_interface_optim">
+                <property name="text">
+                 <string>Z optim.</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
              </layout>
+            </item>
+            <item row="3" column="0">
+             <widget class="QPushButton" name="n_meas_laser_spectra_set_point">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                <horstretch>3</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>Set Point</string>
+              </property>
+              <property name="checkable">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="0" column="0">
              <widget class="QGroupBox" name="groupBox_15">
@@ -3020,7 +3055,7 @@
                    <property name="maximum">
                     <number>620</number>
                    </property>
-                   <property name="displayIntegerBase">
+                   <property name="displayIntegerBase" stdset="0">
                     <number>10</number>
                    </property>
                   </widget>
@@ -3030,19 +3065,35 @@
               </layout>
              </widget>
             </item>
-            <item row="3" column="0">
-             <widget class="QPushButton" name="n_meas_laser_spectra_set_point">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                <horstretch>3</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
+            <item row="4" column="0">
+             <layout class="QGridLayout" name="gridLayout_27">
+              <item row="0" column="0">
+               <widget class="QCheckBox" name="n_meas_laser_spectra_grid">
+                <property name="text">
+                 <string>gridScan</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QSpinBox" name="n_meas_laser_spectra_grid_x">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="2">
+               <widget class="QSpinBox" name="n_meas_laser_spectra_grid_y">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="11" column="0">
+             <widget class="QPushButton" name="n_meas_laser_spectra_pause">
               <property name="text">
-               <string>Set Point</string>
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
+               <string>Pause</string>
               </property>
              </widget>
             </item>

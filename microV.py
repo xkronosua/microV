@@ -1106,6 +1106,10 @@ class microV(QtGui.QMainWindow):
 				self.live_integr_spectra = np.array([])
 
 				for wl in wl_range:
+					if self.ui.n_meas_laser_spectra_pause.isChecked():
+						while self.ui.n_meas_laser_spectra_pause.isChecked():
+							time.sleep(0.02)
+							app.processEvents()
 					time_list = []
 					time_list.append(time.time())
 					self.laserSetWavelength_(status=1,wavelength=wl)
@@ -1145,34 +1149,36 @@ class microV(QtGui.QMainWindow):
 						self.shamrockSetWavelength(wl/3)
 
 
+						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked()
+							print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 
-						print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
+							for zi,z in enumerate(Range_z):
+								self.piStage.MOV([z],axis=b'3',waitUntilReady=True)
+								real_position = self.piStage.qPOS()
+								print(real_position)
+								self.setUiPiPos(real_position)
+								pmt_valA, pmt_valB = self.readPico()
+								data_Z[zi] = pmt_valB
+								self.line_pmtB.setData(x=Range_z,y=data_Z)
+							dz = medfilt(data_Z,9)
+							interf_z = Range_z[dz==dz.max()][0]
+							if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
 
-						for zi,z in enumerate(Range_z):
-							self.piStage.MOV([z],axis=b'3',waitUntilReady=True)
-							real_position = self.piStage.qPOS()
-							print(real_position)
-							self.setUiPiPos(real_position)
-							pmt_valA, pmt_valB = self.readPico()
-							data_Z[zi] = pmt_valB
-							self.line_pmtB.setData(x=Range_z,y=data_Z)
-						dz = medfilt(data_Z,9)
-						interf_z = Range_z[dz==dz.max()][0]
-						if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
+								gmodel = Model(gaussian)
+								result = gmodel.fit(dz, x=Range_z, amp=dz.max(), cen=interf_z, wid=2,bg=dz.min())
+								print(result.params)
+								store.put("scan_Z_"+str(wl), pd.DataFrame(np.vstack([data_Z,result.best_fit]).T,index=Range_z,columns=['scan_Z','fit']))
+								print(interf_z,result.params['cen'].value)
+								interf_z = result.params['cen'].value
+								self.line_pmtA.setData(x=Range_z,y=result.best_fit)
 
-							gmodel = Model(gaussian)
-							result = gmodel.fit(dz, x=Range_z, amp=dz.max(), cen=interf_z, wid=2,bg=dz.min())
-							print(result.params)
-							store.put("scan_Z_"+str(wl), pd.DataFrame(np.vstack([data_Z,result.best_fit]).T,index=Range_z,columns=['scan_Z','fit']))
-							print(interf_z,result.params['cen'].value)
-							interf_z = result.params['cen'].value
+							else:
+								store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z,index=Range_z,columns=['scan_Z']))
 
+
+							self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
 						else:
-							store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z,index=Range_z,columns=['scan_Z']))
-
-
-						self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
-
+							interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
 						z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
 
 						np_scan_Z = interf_z + z_offset
@@ -1209,6 +1215,8 @@ class microV(QtGui.QMainWindow):
 					pos = self.piStage.qPOS()
 					self.setUiPiPos(pos=pos)
 					self.andorCameraGetBaseline()
+					params_to_store = ['andorCameraExposure','laserBultInPower','endTime']
+					paramsDf = pd.DataFrame(np.zeros((1,len(params))),columns=params_to_store)
 
 					for index,NP_c in enumerate(NP_centers):
 						self.piStage.MOV(NP_c,b'1 2',waitUntilReady=True)
@@ -1259,9 +1267,17 @@ class microV(QtGui.QMainWindow):
 						if self.ui.n_meas_laser_spectra_track.isChecked():
 							store.put("scanA_"+str(wl), panelA)
 							store.put("scanB_"+str(wl), panelB)
-							store.put("center_"+str(wl), pd.DataFrame(NP_centers))
-							store.put("bg_center_"+str(wl), pd.DataFrame(bg_center))
 
+						store.put("NPsCenters_"+str(wl), pd.DataFrame(NP_centers))
+						store.put("bgCenter_"+str(wl), pd.DataFrame(bg_center))
+
+						paramsDf['andorCameraExposure'] = self.ui.andorCameraExposure.value()
+						paramsDf['laserBultInPower'] = self.ui.laserPower_internal.value()
+						paramsDf['HWP_power'] = float(self.ui.HWP_angle.text())
+						paramsDf['HWP_stepper'] = float(self.ui.HWP_stepper_angle.text())
+						paramsDf['endTime'] = time.time()
+						
+						store.put("params_"+str(wl), paramsDf)
 
 
 
@@ -1289,8 +1305,23 @@ class microV(QtGui.QMainWindow):
 		#self.img.addItem(self.spectra_signal_probe)
 
 
-	def center_optim(self, z_start=None, z_end=None,z_step=None ):
-		self.scan3DisAlive = True
+	def center_optim(self, x_start=None, x_end=None, x_step=None, y_start=None, y_end=None, y_step=None, z_start=None, z_end=None,z_step=None ):
+		#self.scan3DisAlive = True
+
+		if x_start is None:
+			x_start = float(self.ui.scan3D_config.item(2,1).text())
+		if x_end is None:
+			x_end = float(self.ui.scan3D_config.item(2,2).text())
+		if x_step is None:
+			x_step = float(self.ui.scan3D_config.item(2,3).text())
+
+		if y_start is None:
+			y_start = float(self.ui.scan3D_config.item(1,1).text())
+		if y_end is None:
+			y_end = float(self.ui.scan3D_config.item(1,2).text())
+		if y_step is None:
+			y_step = float(self.ui.scan3D_config.item(1,3).text())
+
 		if z_start is None:
 			z_start = float(self.ui.scan3D_config.item(0,1).text())
 		if z_end is None:
@@ -2132,10 +2163,14 @@ class microV(QtGui.QMainWindow):
 		centers = {}
 		centers["A"] = np.array([Range_x[peaks_A[:,0]], Range_y[peaks_A[:,1]]]).T
 		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]]]).T
+		centers["AB"] = np.vstack((centers["A"],centers["B"]))
+		centers["mid"] = (centers["A"]+centers["B"])/2
+
 		self.NP_centersA.setData(x=centers["A"][:,0],y=centers["A"][:,1])
 		self.NP_centersB.setData(x=centers["B"][:,0],y=centers["B"][:,1])
+
 		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
-		ch_str = 'AB'
+		ch_str = ['A','B','AB','mid']
 		#self.ui.n_meas_laser_spectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
 		interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
 
