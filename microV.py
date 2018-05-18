@@ -18,6 +18,7 @@ import threading
 #import SharedArray
 from scipy.ndimage import gaussian_filter
 from skimage.feature.peak import peak_local_max
+from lmfit import Model
 import csv
 MODE = 'lab'
 
@@ -60,6 +61,11 @@ from multiprocessing import Process, Queue, Array
 
 from PyQt5.QtCore import QFileInfo, QSettings
 from PyQt5.QtWidgets import qApp
+
+
+def gaussian(x, amp, cen, wid,bg=0):
+	"""1-d gaussian: gaussian(x, amp, cen, wid, bg)"""
+	return bg + (amp / (np.sqrt(2*np.pi) * wid)) * np.exp(-(x-cen)**2 / (2*wid**2))
 
 
 list_gui_save_restore_classes = [QtGui.QDoubleSpinBox,QtGui.QSpinBox,QtGui.QCheckBox,QtGui.QLineEdit]
@@ -1152,6 +1158,19 @@ class microV(QtGui.QMainWindow):
 							self.line_pmtB.setData(x=Range_z,y=data_Z)
 						dz = medfilt(data_Z,9)
 						interf_z = Range_z[dz==dz.max()][0]
+						if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
+
+							gmodel = Model(gaussian)
+							result = gmodel.fit(dz, x=Range_z, amp=dz.max(), cen=interf_z, wid=2,bg=dz.min())
+							print(result.params)
+							store.put("scan_Z_"+str(wl), pd.DataFrame(np.vstack([data_Z,result.best_fit]).T,index=Range_z,columns=['scan_Z','fit']))
+							print(interf_z,result.params['cen'].value)
+							interf_z = result.params['cen'].value
+
+						else:
+							store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z,index=Range_z,columns=['scan_Z']))
+
+
 						self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
 
 						z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
@@ -1214,7 +1233,7 @@ class microV(QtGui.QMainWindow):
 						#	real_position = self.piStage.qPOS()
 						#	z_real = real_position[2]
 						time_list.append(time.time())
-						intens,wavelength_arr = self.andorCameraGetData(state=1,index=index)
+						intens,wavelength_arr = self.andorCameraGetData(state=1,line_index=index)
 						time_list.append(time.time())
 						w3 = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
 						integr_intens_THG = intens[w3].sum()
@@ -1242,7 +1261,7 @@ class microV(QtGui.QMainWindow):
 							store.put("scanB_"+str(wl), panelB)
 							store.put("center_"+str(wl), pd.DataFrame(NP_centers))
 							store.put("bg_center_"+str(wl), pd.DataFrame(bg_center))
-							store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z, indices=Range_z),columns=['Z'])
+
 
 
 
@@ -2534,7 +2553,8 @@ class microV(QtGui.QMainWindow):
 
 		restore_gui(self.settings)
 		#try:
-		data = list(csv.reader(open('scanArea.csv'),delimiter='\t'))[::2]
+		with open('scanArea.csv') as f:
+			data = list(csv.reader(f,delimiter='\t'))[::2]
 		rows = self.ui.scan3D_config.rowCount()
 		columns = self.ui.scan3D_config.columnCount()
 		for r in range(rows):

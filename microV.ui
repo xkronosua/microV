@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>3</number>
+        <number>6</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -2945,6 +2945,13 @@
                 </property>
                 <property name="value">
                  <double>0.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="2">
+               <widget class="QCheckBox" name="n_meas_laser_spectra_Z_interface_fit">
+                <property name="text">
+                 <string>fit</string>
                 </property>
                </widget>
               </item>
