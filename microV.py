@@ -35,6 +35,8 @@ if len(sys.argv)>1:
 		from hardware.sim.andor.Shamrock import *
 		from hardware.sim.andor.AndorCamera import *
 		#from hardware.sim.PM100 import visa
+		from hardware.sim.moco import MOCO
+		from hardware.sim.HWP_stepper import HWP_stepper
 else:
 	from hardware.ni1 import *
 	from hardware.CCS200 import *
@@ -49,7 +51,7 @@ else:
 	import picopy
 	from hardware.andor.Shamrock import *
 	from hardware.andor.AndorCamera import *
-	from hardware.HWP_stepper import *
+	from hardware.HWP_stepper import HWP_stepper
 	from hardware.moco import MOCO
 
 from hardware.pico_radar import fastScan
@@ -60,44 +62,13 @@ from hardware.pico_multiproc_picopy import *
 import traceback
 from multiprocessing import Process, Queue, Array
 
+from gui_save_restore import save_gui, restore_gui
 from PyQt5.QtCore import QFileInfo, QSettings
-from PyQt5.QtWidgets import qApp
-
 
 def gaussian(x, amp, cen, wid,bg=0):
 	"""1-d gaussian: gaussian(x, amp, cen, wid, bg)"""
 	return bg + (amp / (np.sqrt(2*np.pi) * wid)) * np.exp(-(x-cen)**2 / (2*wid**2))
 
-
-list_gui_save_restore_classes = [QtGui.QDoubleSpinBox,QtGui.QSpinBox,QtGui.QCheckBox,QtGui.QLineEdit]
-list_gui_save_restore_properties = ['value','text','currentIndex','checked']
-def restore_gui(settings):
-	finfo = QFileInfo(settings.fileName())
-
-	if finfo.exists() and finfo.isFile():
-		for w in qApp.allWidgets():
-			mo = w.metaObject()
-			if type(w) in list_gui_save_restore_classes:
-				#print(w.objectName())
-
-				for i in range(mo.propertyCount()):
-					name = mo.property(i).name()
-					if name in list_gui_save_restore_properties:
-						val = settings.value("{}/{}".format(w.objectName(), name), w.property(name))
-						w.blockSignals(True)
-						w.setProperty(name, val)
-						w.blockSignals(False)
-
-
-def save_gui(settings):
-
-	for w in qApp.allWidgets():
-		mo = w.metaObject()
-		if type(w) in list_gui_save_restore_classes:
-			for i in range(mo.propertyCount()):
-				name = mo.property(i).name()
-				if name in list_gui_save_restore_properties:
-					settings.setValue("{}/{}".format(w.objectName(), name), w.property(name))
 
 
 def photon_count(signal,t,dt_window,threshold):
@@ -137,7 +108,6 @@ class microV(QtGui.QMainWindow):
 	shamrock = ShamRockController()
 	andorCCD = AndorCamera()
 	HWP_stepper = None
-	#inst = visa.instrument('USB0::0x0000::0x0000::DG5Axxxxxxxxx::INSTR', term_chars='\n', timeout=1)
 	power_meter = None
 	power_meter_instr = None#ThorlabsPM100(inst=inst)
 	#DAQmx = nidaqmx.Task()
@@ -189,16 +159,9 @@ class microV(QtGui.QMainWindow):
 		sa = Array('d', int(np.prod(self.pico_shared_buf_shape)))
 		self.pico_shared_buf = {'data':sa, 'shape':self.pico_shared_buf_shape}
 
+	###############################   Laser	####################################
 	############################################################################
-	###############################   DAQmx	#################################
-	def connect_DAQmx(self,state):
-		if state:
-			self.initDAQmx()
-		else:
-			try:
-				self.DAQmx.close()
-			except:
-				traceback.print_exc()
+
 	def laserSetShutter(self):
 		self.laserStatus.stop()
 		state = self.ui.laserShutter.isChecked()
@@ -243,12 +206,29 @@ class microV(QtGui.QMainWindow):
 			wavelength_ready = status[5] == 'True'
 			self.ui.laserPower_internal.setValue(power_int)
 			self.ui.laserWavelength.setValue(wavelength)
+			self.statusBar_ExWavelength.setText("[Ex: %d nm]" % wavelength)
 			self.ui.laserShutter.setChecked(shutter!=0)
+			if shutter!=0:
+				self.statusBar_Shutter.setStyleSheet('color:red;')
+			else:
+				self.statusBar_Shutter.setStyleSheet('color:gray;')
 			self.ui.laserWavelength_ready.setChecked(wavelength_ready)
+
 
 		except:
 			traceback.print_exc()
 			print('Laser: noData')
+
+	############################################################################
+	###############################   DAQmx	#################################
+	def connect_DAQmx(self,state):
+		if state:
+			self.initDAQmx()
+		else:
+			try:
+				self.DAQmx.close()
+			except:
+				traceback.print_exc()
 
 	def initDAQmx(self):
 		self.DAQmx.ai_channels.add_ai_voltage_chan("Dev1/ai0,Dev1/ai2,Dev1/ai3", max_val=10, min_val=-10)
@@ -414,87 +394,88 @@ class microV(QtGui.QMainWindow):
 		#self.ps.runBlock()
 		try:
 			r = self.ps.capture_prep_block(return_scaled_array=1)
+
+
+
+			if self.pico_config['n_captures'] == 1:
+				N = int(self.pico_config['samplingDuration']*self.pico_config['pulseFreq'])
+
+				if self.ui.pico_photon_counter.isChecked():
+					dataA = r[0]['A']
+					dataB = r[0]['B']
+					dataA = dataA[0]
+					dataB = dataB[0]
+					dataT = r[2]
+					scanA, scanT, dt = photon_count(dataA,dataT,15e-8,float(self.ui.pico_photon_counter_threshold.text()))
+					scanB, scanT, dt = photon_count(dataB,dataT,15e-8,float(self.ui.pico_photon_counter_threshold.text()))
+					print(dt)
+
+
+				else:
+					dataA = r[0]['A']
+					dataB = r[0]['B']
+					#print(dataA, dataA.shape)
+					a = np.array(np.split( dataA[:,:int(dataA.shape[1]//N*N)],N,axis=1)).mean(axis=1)
+					scanA = abs(a.max(axis=1) - a.min(axis=1))
+					b = np.array(np.split( dataB[:,:int(dataB.shape[1]//N*N)],N,axis=1)).mean(axis=1)
+					scanB = abs(b.max(axis=1) - b.min(axis=1))
+
+					dataA = dataA.mean(axis=0)[:int(dataA.shape[1]//N*N)]
+					dataB = dataB.mean(axis=0)[:int(dataB.shape[1]//N*N)]
+
+					scanT = r[2][:len(dataB)]
+					scanT = np.linspace(scanT.min(),scanT.max(),len(scanA))
+			else:
+				dataA = r[0]['A'].mean(axis=0)
+				dataB = r[0]['B'].mean(axis=0)
+				scanT = r[1]
+
+			if self.ui.raw_data_preview.isChecked():
+				t = np.linspace(0,float(self.ui.pico_samplingDuration.text()),len(dataA))
+				self.line_pico_ChA.setData(x=t,y=dataA)
+				self.line_pico_ChB.setData(x=t,y=dataB)
+
+			if self.ui.pico_AutoRange.isChecked():
+
+				indexChA = self.ui.pico_ChA_VRange.currentIndex()
+				ChA_VRange = self.pico_VRange_dict[self.ui.pico_ChA_VRange.currentText()]
+				if abs(dataA.min())> ChA_VRange*0.9 and indexChA<8:
+					indexChA += 1
+
+				self.ui.pico_ChA_VRange.setCurrentIndex(indexChA)
+				ChA_VRange = self.ui.pico_ChA_VRange.currentText()
+				#print('AutoA',ChA_VRange)
+				ChA_Offset = self.ui.pico_ChA_offset.value()
+				self.ps.setChannel(channel="A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
+
+
+
+				indexChB = self.ui.pico_ChB_VRange.currentIndex()
+				ChB_VRange = self.pico_VRange_dict[self.ui.pico_ChB_VRange.currentText()]
+				if abs(dataB.min())> ChB_VRange*0.9 and indexChB<8:
+					indexChB += 1
+
+				self.ui.pico_ChB_VRange.setCurrentIndex(indexChB)
+
+				ChB_VRange = self.ui.pico_ChB_VRange.currentText()
+				#ChB_VRange = self.pico_VRange_dict[ChB_VRange]
+				ChB_Offset = self.ui.pico_ChB_offset.value()
+				self.ps.setChannel(channel="B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
+
+			#dataA = self.ps.rawToV(channel="A", dataRaw=dataA)
+			#dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
+			if self.pico_config['n_captures'] == 1:
+				dataA_p2p = scanA.mean()
+				dataB_p2p = scanB.mean()
+			else:
+				dataA_p2p = abs(dataA.max() - dataA.min())
+				dataB_p2p = abs(dataB.max() - dataB.min())
+
+			self.ui.pico_ChA_value.setText(str(round(dataA_p2p,8)))
+			self.ui.pico_ChB_value.setText(str(round(dataB_p2p,8)))
 		except:
 			traceback.print_exc()
 			return [0,0]
-
-
-		if self.pico_config['n_captures'] == 1:
-			N = int(self.pico_config['samplingDuration']*self.pico_config['pulseFreq'])
-
-			if self.ui.pico_photon_counter.isChecked():
-				dataA = r[0]['A']
-				dataB = r[0]['B']
-				dataA = dataA[0]
-				dataB = dataB[0]
-				dataT = r[2]
-				scanA, scanT, dt = photon_count(dataA,dataT,15e-8,float(self.ui.pico_photon_counter_threshold.text()))
-				scanB, scanT, dt = photon_count(dataB,dataT,15e-8,float(self.ui.pico_photon_counter_threshold.text()))
-				print(dt)
-
-
-			else:
-				dataA = r[0]['A']
-				dataB = r[0]['B']
-				#print(dataA, dataA.shape)
-				a = np.array(np.split( dataA[:,:int(dataA.shape[1]//N*N)],N,axis=1)).mean(axis=1)
-				scanA = abs(a.max(axis=1) - a.min(axis=1))
-				b = np.array(np.split( dataB[:,:int(dataB.shape[1]//N*N)],N,axis=1)).mean(axis=1)
-				scanB = abs(b.max(axis=1) - b.min(axis=1))
-
-				dataA = dataA.mean(axis=0)[:int(dataA.shape[1]//N*N)]
-				dataB = dataB.mean(axis=0)[:int(dataB.shape[1]//N*N)]
-
-				scanT = r[2][:len(dataB)]
-				scanT = np.linspace(scanT.min(),scanT.max(),len(scanA))
-		else:
-			dataA = r[0]['A'].mean(axis=0)
-			dataB = r[0]['B'].mean(axis=0)
-			scanT = r[1]
-
-		if self.ui.raw_data_preview.isChecked():
-			t = np.linspace(0,float(self.ui.pico_samplingDuration.text()),len(dataA))
-			self.line_pico_ChA.setData(x=t,y=dataA)
-			self.line_pico_ChB.setData(x=t,y=dataB)
-
-		if self.ui.pico_AutoRange.isChecked():
-
-			indexChA = self.ui.pico_ChA_VRange.currentIndex()
-			ChA_VRange = self.pico_VRange_dict[self.ui.pico_ChA_VRange.currentText()]
-			if abs(dataA.min())> ChA_VRange*0.9 and indexChA<8:
-				indexChA += 1
-
-			self.ui.pico_ChA_VRange.setCurrentIndex(indexChA)
-			ChA_VRange = self.ui.pico_ChA_VRange.currentText()
-			#print('AutoA',ChA_VRange)
-			ChA_Offset = self.ui.pico_ChA_offset.value()
-			self.ps.setChannel(channel="A", coupling="DC", VRange=ChA_VRange, VOffset=ChA_Offset)
-
-
-
-			indexChB = self.ui.pico_ChB_VRange.currentIndex()
-			ChB_VRange = self.pico_VRange_dict[self.ui.pico_ChB_VRange.currentText()]
-			if abs(dataB.min())> ChB_VRange*0.9 and indexChB<8:
-				indexChB += 1
-
-			self.ui.pico_ChB_VRange.setCurrentIndex(indexChB)
-
-			ChB_VRange = self.ui.pico_ChB_VRange.currentText()
-			#ChB_VRange = self.pico_VRange_dict[ChB_VRange]
-			ChB_Offset = self.ui.pico_ChB_offset.value()
-			self.ps.setChannel(channel="B", coupling="DC", VRange=ChB_VRange, VOffset=ChB_Offset)
-
-		#dataA = self.ps.rawToV(channel="A", dataRaw=dataA)
-		#dataB = self.ps.rawToV(channel="B", dataRaw=dataB)
-		if self.pico_config['n_captures'] == 1:
-			dataA_p2p = scanA.mean()
-			dataB_p2p = scanB.mean()
-		else:
-			dataA_p2p = abs(dataA.max() - dataA.min())
-			dataB_p2p = abs(dataB.max() - dataB.min())
-
-		self.ui.pico_ChA_value.setText(str(round(dataA_p2p,8)))
-		self.ui.pico_ChB_value.setText(str(round(dataB_p2p,8)))
 
 		return dataA_p2p, dataB_p2p
 
@@ -570,6 +551,9 @@ class microV(QtGui.QMainWindow):
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=2,waitUntilReady=True))
 		#time.sleep(0.2)
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=3,waitUntilReady=True))
+		pos = self.piStage.qPOS()
+		if pos[2]<-100:
+			print(self.piStage.ATZ())
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 		time.sleep(1)
@@ -647,6 +631,11 @@ class microV(QtGui.QMainWindow):
 		self.shamrock.shamrock.SetWavelength(wl)
 		wavelength = self.shamrock.shamrock.GetWavelength()
 		self.ui.shamrockWavelength.setText(str(wavelength))
+		if self.ui.shamrock_use_MOCO.isChecked():
+			if wavelength < self.ui.shamrock_MOCO_limit.value():
+				self.ui.mocoSection.setCurrentIndex(1)
+			if wavelength > self.ui.shamrock_MOCO_limit.value():
+				self.ui.mocoSection.setCurrentIndex(2)
 
 	def shamrockSetPort(self,val):
 		if not self.ui.shamrockConnect.isChecked():
@@ -657,6 +646,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.shamrockPort.blockSignals(True)
 		self.ui.shamrockPort.setCurrentIndex(port)
 		self.ui.shamrockPort.blockSignals(False)
+		self.statusBar_ShamrockPort.setText('['+self.ui.shamrockPort.currentText()+']')
 
 	def shamrockSetGrating(self,val):
 		if not self.ui.shamrockConnect.isChecked():
@@ -671,7 +661,7 @@ class microV(QtGui.QMainWindow):
 	############################################################################
 	###############################   AndorCamera	############################
 
-	def andorCameraConnect(self, state):
+	def andorCameraConnect(self, state=True):
 		if state:
 
 			self.andorCCD.Initialize()
@@ -690,15 +680,20 @@ class microV(QtGui.QMainWindow):
 			self.andorCCD.ShutDown()
 
 	def andorCameraSetExposure(self,val):
-
+		if not self.ui.andorCameraConnect.isChecked():
+			self.ui.andorCameraConnect.setChecked(True)
 		self.andorCCD.SetExposureTime(val)
 		val = self.andorCCD.GetAcquisitionTimings()[0]
 
 	def andorCameraSetReadoutMode(self,val):
+		if not self.ui.andorCameraConnect.isChecked():
+			self.ui.andorCameraConnect.setChecked(True)
 		mode = self.ui.andorCameraReadoutMode.currentText()
 		self.andorCCD.SetReadMode(mode)
 
 	def andorCameraGetData(self,state=False, line_index=0):
+		if not self.ui.andorCameraConnect.isChecked():
+			self.ui.andorCameraConnect.setChecked(True)
 		data_center = 0
 		data = np.array([])
 		if state:
@@ -734,6 +729,8 @@ class microV(QtGui.QMainWindow):
 		return data, self.andorCCD_wavelength
 
 	def onAndorCameraLiveTimeout(self):
+		if not self.ui.andorCameraConnect.isChecked():
+			self.ui.andorCameraConnect.setChecked(True)
 		self.andorCameraLiveTimer.stop()
 		self.andorCCD.StartAcquisition()
 		self.andorCCD.WaitForAcquisition()
@@ -773,8 +770,14 @@ class microV(QtGui.QMainWindow):
 
 	def HWP_stepper_Connect(self,state):
 		if state:
-			self.HWP_stepper = HWP_stepper(4000,0.01, "dev1/ctr1", reset=True)
-			self.ui.HWP_stepper_angle.setText('0')
+			angle = 0
+			try:
+				angle = self.settings.value('HWP_stepper_angle',type=float)
+			except:
+				traceback.print_exc()
+			self.HWP_stepper = HWP_stepper(4000,0.01, "dev1/ctr1", reset=True,currentAngle=angle)
+
+			self.ui.HWP_stepper_angle.setText(str(angle))
 
 		else:
 			try:
@@ -782,6 +785,13 @@ class microV(QtGui.QMainWindow):
 			except:
 				traceback.print_exc()
 			self.HWP_stepper = None
+	def HWP_stepper_moveTo(self,angle,wait=True):
+		if not self.ui.HWP_stepper_Connect.isChecked():
+			self.ui.HWP_stepper_Connect.setChecked(True)
+		self.settings.setValue('HWP_stepper_angle',angle)
+		self.ui.HWP_stepper_angle.setText(str(angle))
+		self.HWP_stepper.moveTo(float(angle),wait=True)
+
 	def HWP_stepper_MoveTo_Go(self):
 		if not self.ui.HWP_stepper_Connect.isChecked():
 			self.ui.HWP_stepper_Connect.setChecked(True)
@@ -791,6 +801,7 @@ class microV(QtGui.QMainWindow):
 			wait = self.ui.HWP_stepper_wait.isChecked()
 			self.HWP_stepper.moveTo(angle,wait=wait)
 			angle_ = self.HWP_stepper.getAngle()
+			self.settings.setValue('HWP_stepper_angle',angle_)
 			self.ui.HWP_stepper_angle.setText(str(angle_))
 	def HWP_stepper_CW(self):
 		if not self.ui.HWP_stepper_Connect.isChecked():
@@ -801,6 +812,7 @@ class microV(QtGui.QMainWindow):
 			wait = self.ui.HWP_stepper_wait.isChecked()
 			self.HWP_stepper.start(step=step,wait=wait)
 			angle_ = self.HWP_stepper.getAngle()
+			self.settings.setValue('HWP_stepper_angle',angle_)
 			self.ui.HWP_stepper_angle.setText(str(angle_))
 	def HWP_stepper_CCW(self):
 		if not self.ui.HWP_stepper_Connect.isChecked():
@@ -811,11 +823,16 @@ class microV(QtGui.QMainWindow):
 			wait = self.ui.HWP_stepper_wait.isChecked()
 			self.HWP_stepper.start(step=step,wait=wait)
 			angle_ = self.HWP_stepper.getAngle()
+			self.settings.setValue('HWP_stepper_angle',angle_)
 			self.ui.HWP_stepper_angle.setText(str(angle_))
 
 	def HWP_stepper_Reset(self):
+		if not self.ui.HWP_stepper_Connect.isChecked():
+			self.ui.HWP_stepper_Connect.setChecked(True)
 		if not self.HWP_stepper is None:
 			self.HWP_stepper.resetAngel()
+			self.settings.setValue('HWP_stepper_angle',0)
+			self.ui.HWP_stepper_angle.setText(str(0))
 
 	############################################################################
 	###############################   rotPiezoStage	#########################
@@ -874,6 +891,9 @@ class microV(QtGui.QMainWindow):
 
 		return index
 	def mocoMoveAbs(self,state=1,pos=None):
+		if not self.ui.mocoConnect.isChecked():
+			self.ui.mocoConnect.setChecked(True)
+
 		if not self.moco is None:
 			if pos is None:
 				pos = self.ui.mocoMoveAbs_target.value()
@@ -884,10 +904,14 @@ class microV(QtGui.QMainWindow):
 			self.ui.mocoPosition.setValue(pos)
 
 	def mocoSetSection(self, section):
+		if not self.ui.mocoConnect.isChecked():
+			self.ui.mocoConnect.setChecked(True)
+
 		if not self.moco is None:
 			self.moco.moveAbs(self.mocoSections[section],True)
 			pos = self.moco.getPosition()
 			self.ui.mocoPosition.setValue(pos)
+			self.statusBar_Filter.setText('['+self.ui.mocoSection.currentText()+']')
 
 	############################################################################
 	###############################   scan3D	################################
@@ -1194,6 +1218,8 @@ class microV(QtGui.QMainWindow):
 						self.ui.shamrockPort.setCurrentIndex(1)
 						self.shamrockSetWavelength(wl/3)
 
+						if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
+							self.ui.mocoSection.setCurrentIndex(3)
 
 						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked():
 							print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
@@ -1257,15 +1283,14 @@ class microV(QtGui.QMainWindow):
 					store.put("spectra_"+str(wl)+'_interface', df)
 
 
-					self.piStage.MOV(bg_center,b' 1 2 3',waitUntilReady=True)
+					self.piStage.MOV(bg_center,b'1 2 3',waitUntilReady=True)
 					pos = self.piStage.qPOS()
 					self.setUiPiPos(pos=pos)
 					self.andorCameraGetBaseline()
-					params_to_store = ['andorCameraExposure','laserBultInPower','endTime']
-					paramsDf = pd.DataFrame(np.zeros((1,len(params))),columns=params_to_store)
 
 					for index,NP_c in enumerate(NP_centers):
 						self.piStage.MOV(NP_c,b'1 2',waitUntilReady=True)
+						pos = self.piStage.qPOS()
 						pos = self.piStage.qPOS()
 						self.setUiPiPos(pos=pos)
 
@@ -1308,7 +1333,17 @@ class microV(QtGui.QMainWindow):
 							store.put("forceEnd_"+str(wl), df)
 							return
 							break
-						store.put("spectra_"+str(wl)+'_NP'+str(index), df)
+						spectra_name = "spectra_"+str(wl)+'_NP'+str(index)
+						store.put(spectra_name, df)
+						store.get_storer(spectra_name).attrs.centerXYZ = pos
+						store.get_storer(spectra_name).attrs.exposure = self.ui.andorCameraExposure.value()
+						store.get_storer(spectra_name).attrs.laserBultInPower = float(self.ui.HWP_angle.text())
+						store.get_storer(spectra_name).attrs.HWP_power = float(self.ui.HWP_angle.text())
+						store.get_storer(spectra_name).attrs.HWP_stepper = float(self.ui.HWP_stepper_angle.text())
+						store.get_storer(spectra_name).attrs.endTime = time.time()
+						store.get_storer(spectra_name).attrs.filter = self.ui.mocoSection.currentText()
+
+
 						store.put("time_"+str(wl), pd.DataFrame(time_list))
 						if self.ui.n_meas_laser_spectra_track.isChecked():
 							store.put("scanA_"+str(wl), panelA)
@@ -1316,14 +1351,6 @@ class microV(QtGui.QMainWindow):
 
 						store.put("NPsCenters_"+str(wl), pd.DataFrame(NP_centers))
 						store.put("bgCenter_"+str(wl), pd.DataFrame(bg_center))
-
-						paramsDf['andorCameraExposure'] = self.ui.andorCameraExposure.value()
-						paramsDf['laserBultInPower'] = self.ui.laserPower_internal.value()
-						paramsDf['HWP_power'] = float(self.ui.HWP_angle.text())
-						paramsDf['HWP_stepper'] = float(self.ui.HWP_stepper_angle.text())
-						paramsDf['endTime'] = time.time()
-
-						store.put("params_"+str(wl), paramsDf)
 
 
 
@@ -2317,7 +2344,7 @@ class microV(QtGui.QMainWindow):
 			def move_function(pos):
 				if not self.ui.HWP_stepper_Connect.isChecked():
 					self.ui.HWP_stepper_Connect.setChecked(True)
-				self.HWP_stepper.moveTo(float(pos),wait=True)
+				self.HWP_stepper_moveTo(float(pos),wait=True)
 				pos = self.HWP_stepper.getAngle()
 				self.ui.HWP_stepper_angle.setText(str(round(pos,6)))
 
@@ -2467,18 +2494,7 @@ class microV(QtGui.QMainWindow):
 		########################################################################
 
 
-		if MODE == 'sim':
-			self.ui.pico_n_captures.setValue(10)
 
-			self.ui.pico_ChA_VRange.setCurrentIndex(4)
-			self.ui.pico_ChB_VRange.setCurrentIndex(4)
-			self.ui.pico_sampleInterval.setText('0.000001')
-			self.ui.pico_samplingDuration.setText('0.007')
-
-			self.ui.pico_TrigSource.setCurrentIndex(2)
-			self.ui.pico_TrigThreshold.setValue(-0.330)
-			self.pico_pretrig = 0.0004
-			self.ui.pico_pretrig.setText('0.0004')
 
 		self.tabColors = {
 			0: 'green',
@@ -2635,6 +2651,20 @@ class microV(QtGui.QMainWindow):
 
 		self.statusBar_Position = QtGui.QLabel('[nan nan nan]')
 		self.ui.statusbar.addWidget(self.statusBar_Position)
+		self.statusBar_ExWavelength = QtGui.QLabel('[exWl]')
+		self.ui.statusbar.addWidget(self.statusBar_ExWavelength)
+		self.statusBar_Shutter = QtGui.QLabel('[SHUTTER]')
+		self.ui.statusbar.addWidget(self.statusBar_Shutter)
+
+		self.statusBar_Filter = QtGui.QLabel('[Filter/PMT]')
+		self.ui.statusbar.addWidget(self.statusBar_Filter)
+
+		self.statusBar_ShamrockPort = QtGui.QLabel('[Shamrock]')
+		self.statusBar_ShamrockPort.setStyleSheet('color:orange;')
+		self.ui.statusbar.addWidget(self.statusBar_ShamrockPort)
+
+
+
 
 		restore_gui(self.settings)
 		#try:
@@ -2644,7 +2674,12 @@ class microV(QtGui.QMainWindow):
 		columns = self.ui.scan3D_config.columnCount()
 		for r in range(rows):
 			for c in range(columns):
-				self.ui.scan3D_config.item(r,c).setText(data[r][c])
+				try:
+					self.ui.scan3D_config.item(r,c).setText(data[r][c])
+				except:
+					self.ui.scan3D_config.item(r,1).setText('0')
+					self.ui.scan3D_config.item(r,2).setText('100')
+					self.ui.scan3D_config.item(r,3).setText('10')
 		#except:
 		#	print('scanArea_recovery_err')
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
@@ -2691,6 +2726,19 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.scan3D_config.item(2,2).setText(str(size[0]+pos[0]))
 		self.ui.scan3D_config.item(1,2).setText(str(size[1]+pos[1]))
+
+		if MODE == 'sim':
+			self.ui.pico_n_captures.setValue(10)
+
+			self.ui.pico_ChA_VRange.setCurrentIndex(4)
+			self.ui.pico_ChB_VRange.setCurrentIndex(4)
+			self.ui.pico_sampleInterval.setText('0.000001')
+			self.ui.pico_samplingDuration.setText('0.007')
+
+			self.ui.pico_TrigSource.setCurrentIndex(2)
+			self.ui.pico_TrigThreshold.setValue(-0.330)
+			self.pico_pretrig = 0.0004
+			self.ui.pico_pretrig.setText('0.0004')
 
 		#self.ui.meas_laser_spectra_probe.item(0,0).setText(str(pos[0]))
 		#self.ui.meas_laser_spectra_probe.item(0,0).setText(str(pos[1]))

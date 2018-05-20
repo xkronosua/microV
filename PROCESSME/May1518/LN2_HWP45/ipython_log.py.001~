@@ -1,0 +1,124 @@
+# IPython log file
+
+import pandas as pd
+s=pd.HDFStore('measLaserSpectra1526391046.h5')
+get_ipython().run_line_magic('ls', '')
+NP=[]
+for i in s.keys():
+    if 'spectra' in i:
+        if 'NP0' in i:
+            d = s[i]
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline
+            plot(wl,intens,'-',label=i)
+        else:
+            d = s[i]     
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline    
+            plot(wl,intens,'--',label=i)
+        
+        txt,ex_wl,np = i.split('_')
+        centers = s['/center_'+ex_wl]
+        index = int(np[-1])
+        cn=centers[index]
+        ex_wl = float(ex_wl)
+        w = (wl>ex_wl/2-15)&(wl<(ex_wl/2+20))
+        integr_SHG = intens[w].sum()
+        NP.append([cn[0],cn[1],ex_wl,integr_SHG])
+        
+for i in s.keys():
+    if 'spectra' in i:
+        if 'NP0' in i:
+            d = s[i]
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline
+            plot(wl,intens,'-',label=i)
+        else:
+            d = s[i]     
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline    
+            plot(wl,intens,'--',label=i)
+        
+        txt,ex_wl,np = i.split('_')
+        centers = s['/center_'+ex_wl]
+        index = int(np[-1])
+        cn=centers[index]
+        ex_wl = float(ex_wl)
+        w = (wl>ex_wl/2-15)&(wl<(ex_wl/2+20))
+        integr_SHG = intens[w].sum()
+        NP.append([cn[0],cn[1],ex_wl,integr_SHG])
+        
+for i in s.keys():
+    if 'spectra' in i:
+        if 'NP0' in i:
+            d = s[i]
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline
+            plot(wl,intens,'-',label=i)
+        else:
+            d = s[i]     
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline    
+            plot(wl,intens,'--',label=i)
+        
+        txt,ex_wl,np = i.split('_')
+        centers = s['/center_'+ex_wl]
+        index = int(np[-1])
+        cn=centers[index]
+        ex_wl = float(ex_wl)
+        w = (wl>ex_wl/2-15)&(wl<(ex_wl/2+20))
+        integr_SHG = intens[w].sum()
+        try:
+            NP.append([cn[0],cn[1],ex_wl,integr_SHG])
+        except:
+            pass
+        
+NP=[]
+for i in s.keys():
+    if 'spectra' in i:
+        if 'NP0' in i:
+            d = s[i]
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline
+            plot(wl,intens,'-',label=i)
+        else:
+            d = s[i]     
+            intens = d.intens
+            wl = d.wavelength
+            bg = d.baseline    
+            plot(wl,intens,'--',label=i)
+        
+        txt,ex_wl,np = i.split('_')
+        centers = s['/center_'+ex_wl]
+        index = int(np[-1])
+        cn=centers[index]
+        ex_wl = float(ex_wl)
+        w = (wl>ex_wl/2-15)&(wl<(ex_wl/2+20))
+        integr_SHG = intens[w].sum()
+        try:
+            NP.append([cn[0],cn[1],ex_wl,integr_SHG])
+        except:
+            pass
+        
+NP=array(NP)
+plot(NP[:,1])
+w=NP[:,1]>52
+NP0=NP[w]
+NP1=NP[~w]
+NP0=NP0[NP0[:,2].argsort()]
+NP1=NP1[NP1[:,2].argsort()]
+plot(NP1[:,2],NP1[:,3],'--',label='NP1')
+plot(NP0[:,2],NP0[:,3],'-',label='NP0')
+xlabel('Ex, wavelength, nm')
+ylabel('SHG')
+get_ipython().run_line_magic('logstart', '')
+NP
+plot(NP[:,:2])
+get_ipython().run_line_magic('cd', '../ZnO90-200Eth/')

@@ -22,7 +22,7 @@ class HWP_stepper():
 	steps_deg = 1.8
 	calibr = 8.92*2
 	currentAngle = 0
-	def __init__(self, freq=10.,duty_cycle=0.5, counter="Dev1/ctr1", reset=False, enableTimeout=10):
+	def __init__(self, freq=10.,duty_cycle=0.5, counter="Dev1/ctr1", reset=False, enableTimeout=10, currentAngle=0):
 		self.reset = reset
 		if reset:
 			self.currentAngle = 0
@@ -41,6 +41,7 @@ class HWP_stepper():
 		DAQmxCreateDOChan(taskHandle1,"/Dev1/port0/line6:7","",DAQmx_Val_ChanForAllLines)
 		self.taskHandleDirEnable = taskHandle1
 		self.enableTimeout = enableTimeout
+		self.currentAngle = currentAngle
 
 
 	def onEnableTimeout(self):

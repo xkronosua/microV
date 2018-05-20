@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>688</width>
-    <height>627</height>
+    <height>773</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>6</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -149,8 +149,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>115</height>
+              <width>224</width>
+              <height>148</height>
              </rect>
             </property>
             <attribute name="label">
@@ -208,8 +208,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>259</width>
-              <height>155</height>
+              <width>294</width>
+              <height>198</height>
              </rect>
             </property>
             <attribute name="label">
@@ -306,8 +306,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>255</width>
-              <height>121</height>
+              <width>285</width>
+              <height>143</height>
              </rect>
             </property>
             <attribute name="label">
@@ -378,8 +378,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>409</height>
+              <width>353</width>
+              <height>528</height>
              </rect>
             </property>
             <attribute name="label">
@@ -547,6 +547,14 @@
             </layout>
            </widget>
            <widget class="QWidget" name="page_3">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>353</width>
+              <height>528</height>
+             </rect>
+            </property>
             <attribute name="label">
              <string>MOCO</string>
             </attribute>
@@ -656,15 +664,15 @@
             <number>2</number>
            </property>
            <property name="currentIndex">
-            <number>2</number>
+            <number>4</number>
            </property>
            <widget class="QWidget" name="CCS200">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>229</width>
-              <height>122</height>
+              <width>353</width>
+              <height>451</height>
              </rect>
             </property>
             <attribute name="label">
@@ -768,8 +776,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>174</width>
-              <height>70</height>
+              <width>186</width>
+              <height>86</height>
              </rect>
             </property>
             <attribute name="label">
@@ -805,13 +813,87 @@
              </item>
             </layout>
            </widget>
+           <widget class="QWidget" name="page_2">
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+              <y>0</y>
+              <width>178</width>
+              <height>138</height>
+             </rect>
+            </property>
+            <attribute name="label">
+             <string>Thorlabs PM100</string>
+            </attribute>
+            <layout class="QFormLayout" name="formLayout_2">
+             <item row="0" column="0">
+              <widget class="QPushButton" name="pm100Connect">
+               <property name="text">
+                <string>Connect</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <layout class="QVBoxLayout" name="verticalLayout_11">
+               <item>
+                <widget class="QLabel" name="label_21">
+                 <property name="text">
+                  <string>Average</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QSpinBox" name="pm100Average">
+                 <property name="minimum">
+                  <number>1</number>
+                 </property>
+                 <property name="maximum">
+                  <number>10000</number>
+                 </property>
+                 <property name="value">
+                  <number>100</number>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="pm100Live">
+               <property name="text">
+                <string>Live</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <layout class="QHBoxLayout" name="horizontalLayout_13">
+               <item>
+                <widget class="QLabel" name="pm100Power">
+                 <property name="text">
+                  <string>nan</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_22">
+                 <property name="text">
+                  <string>W</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
            <widget class="QWidget" name="Picoscope">
             <property name="geometry">
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>348</height>
+              <width>353</width>
+              <height>451</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1230,8 +1312,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>268</width>
-              <height>309</height>
+              <width>333</width>
+              <height>508</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1250,26 +1332,12 @@
                 <string>Shamrock</string>
                </property>
                <layout class="QFormLayout" name="formLayout">
-                <item row="0" column="0">
-                 <widget class="QPushButton" name="shamrockConnect">
-                  <property name="text">
-                   <string>Connect</string>
-                  </property>
-                  <property name="checkable">
-                   <bool>true</bool>
-                  </property>
-                 </widget>
-                </item>
-                <item row="1" column="0">
-                 <layout class="QHBoxLayout" name="horizontalLayout_8">
-                  <item>
-                   <widget class="QPushButton" name="shamrockSetWavelength">
-                    <property name="text">
-                     <string>Set</string>
-                    </property>
-                   </widget>
+                <item row="2" column="0" colspan="2">
+                 <layout class="QGridLayout" name="gridLayout_28">
+                  <item row="1" column="1">
+                   <widget class="QDoubleSpinBox" name="shamrockWavelengthShift"/>
                   </item>
-                  <item>
+                  <item row="0" column="1">
                    <widget class="QDoubleSpinBox" name="shamrockWavelength_to_set">
                     <property name="maximum">
                      <double>2000.000000000000000</double>
@@ -1279,23 +1347,47 @@
                     </property>
                    </widget>
                   </item>
-                  <item>
-                   <widget class="QLineEdit" name="shamrockWavelength">
-                    <property name="readOnly">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
+                  <item row="0" column="3">
                    <widget class="QLabel" name="nm">
                     <property name="text">
                      <string>nm</string>
                     </property>
                    </widget>
                   </item>
+                  <item row="0" column="2">
+                   <widget class="QLineEdit" name="shamrockWavelength">
+                    <property name="readOnly">
+                     <bool>true</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="0">
+                   <widget class="QPushButton" name="shamrockSetWavelength">
+                    <property name="text">
+                     <string>Set</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="0">
+                   <widget class="QLabel" name="label_42">
+                    <property name="text">
+                     <string>Shift</string>
+                    </property>
+                   </widget>
+                  </item>
                  </layout>
                 </item>
-                <item row="2" column="0">
+                <item row="1" column="0" colspan="2">
+                 <widget class="QPushButton" name="shamrockConnect">
+                  <property name="text">
+                   <string>Connect</string>
+                  </property>
+                  <property name="checkable">
+                   <bool>true</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item row="4" column="0" colspan="2">
                  <layout class="QHBoxLayout" name="horizontalLayout_7">
                   <item>
                    <widget class="QLabel" name="label_17">
@@ -1320,7 +1412,7 @@
                   </item>
                  </layout>
                 </item>
-                <item row="3" column="0">
+                <item row="5" column="0" colspan="2">
                  <layout class="QHBoxLayout" name="horizontalLayout_9">
                   <item>
                    <widget class="QLabel" name="label_18">
@@ -1345,10 +1437,35 @@
                   </item>
                  </layout>
                 </item>
+                <item row="7" column="0" colspan="2">
+                 <layout class="QHBoxLayout" name="horizontalLayout_14">
+                  <item>
+                   <widget class="QCheckBox" name="shamrock_use_MOCO">
+                    <property name="text">
+                     <string>ChangeFilterAt</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="shamrock_MOCO_limit">
+                    <property name="minimum">
+                     <double>100.000000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>1600.000000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>320.000000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
                </layout>
+               <zorder></zorder>
+               <zorder></zorder>
                <zorder>shamrockConnect</zorder>
-               <zorder></zorder>
-               <zorder></zorder>
+               <zorder>horizontalLayoutWidget_2</zorder>
               </widget>
              </item>
              <item>
@@ -1451,80 +1568,6 @@
                 </item>
                </layout>
               </widget>
-             </item>
-            </layout>
-           </widget>
-           <widget class="QWidget" name="page_2">
-            <property name="geometry">
-             <rect>
-              <x>0</x>
-              <y>0</y>
-              <width>156</width>
-              <height>111</height>
-             </rect>
-            </property>
-            <attribute name="label">
-             <string>Thorlabs PM100</string>
-            </attribute>
-            <layout class="QFormLayout" name="formLayout_2">
-             <item row="0" column="0">
-              <widget class="QPushButton" name="pm100Connect">
-               <property name="text">
-                <string>Connect</string>
-               </property>
-               <property name="checkable">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <layout class="QVBoxLayout" name="verticalLayout_11">
-               <item>
-                <widget class="QLabel" name="label_21">
-                 <property name="text">
-                  <string>Average</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QSpinBox" name="pm100Average">
-                 <property name="minimum">
-                  <number>1</number>
-                 </property>
-                 <property name="maximum">
-                  <number>10000</number>
-                 </property>
-                 <property name="value">
-                  <number>100</number>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </item>
-             <item row="2" column="0">
-              <widget class="QCheckBox" name="pm100Live">
-               <property name="text">
-                <string>Live</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1">
-              <layout class="QHBoxLayout" name="horizontalLayout_13">
-               <item>
-                <widget class="QLabel" name="pm100Power">
-                 <property name="text">
-                  <string>nan</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="label_22">
-                 <property name="text">
-                  <string>W</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
              </item>
             </layout>
            </widget>
@@ -1746,63 +1789,27 @@
              </widget>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBox">
-              <property name="title">
-               <string>Readout</string>
-              </property>
-              <layout class="QVBoxLayout" name="verticalLayout_5">
-               <item>
-                <layout class="QHBoxLayout" name="horizontalLayout_3">
-                 <item>
-                  <widget class="QPushButton" name="addReadoutSource">
-                   <property name="text">
-                    <string>Add</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="rmReadoutSource">
-                   <property name="text">
-                    <string>Del</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="upReadoutSource">
-                   <property name="text">
-                    <string>Up</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QPushButton" name="downReadoutSource">
-                   <property name="text">
-                    <string>Down</string>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </item>
-               <item>
-                <widget class="QTableWidget" name="readoutSources">
-                 <row>
-                  <property name="text">
-                   <string>0</string>
-                  </property>
-                 </row>
-                 <column>
-                  <property name="text">
-                   <string>Source</string>
-                  </property>
-                 </column>
-                 <item row="0" column="0">
-                  <property name="text">
-                   <string>Picoscope</string>
-                  </property>
-                 </item>
-                </widget>
-               </item>
-              </layout>
+             <widget class="QComboBox" name="readoutSources">
+              <item>
+               <property name="text">
+                <string>Picoscope</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>AndorCamera</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Powermeter</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>DAQmx</string>
+               </property>
+              </item>
              </widget>
             </item>
             <item>
@@ -2661,6 +2668,9 @@
                 <property name="text">
                  <string>track</string>
                 </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
               <item row="1" column="1">
@@ -2683,7 +2693,7 @@
                  <string>Fast</string>
                 </property>
                 <property name="checked">
-                 <bool>true</bool>
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
@@ -3014,15 +3024,11 @@
                 </property>
                </widget>
               </item>
-              <item row="3" column="0">
-               <widget class="QLabel" name="labela">
-                <property name="text">
-                 <string>nan</string>
-                </property>
-               </widget>
-              </item>
               <item row="3" column="1">
                <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_interface">
+                <property name="toolTip">
+                 <string>interface Z position</string>
+                </property>
                 <property name="decimals">
                  <number>4</number>
                 </property>
@@ -3041,6 +3047,26 @@
                <widget class="QCheckBox" name="n_meas_laser_spectra_Z_interface_fit">
                 <property name="text">
                  <string>fit</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QCheckBox" name="n_meas_laser_spectra_Z_interface_optim">
+                <property name="text">
+                 <string>optimZ</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QCheckBox" name="n_meas_laser_spectra_MOCO_PMT">
+                <property name="text">
+                 <string>MOCO_PMT</string>
                 </property>
                </widget>
               </item>
@@ -3170,7 +3196,7 @@
      <x>0</x>
      <y>0</y>
      <width>688</width>
-     <height>21</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -3228,11 +3254,6 @@
   <tabstop>pico_n_captures</tabstop>
   <tabstop>raw_data_preview</tabstop>
   <tabstop>startCalibr</tabstop>
-  <tabstop>addReadoutSource</tabstop>
-  <tabstop>rmReadoutSource</tabstop>
-  <tabstop>upReadoutSource</tabstop>
-  <tabstop>downReadoutSource</tabstop>
-  <tabstop>readoutSources</tabstop>
   <tabstop>scan3D_path</tabstop>
   <tabstop>upActionSource</tabstop>
   <tabstop>addActionSource</tabstop>
