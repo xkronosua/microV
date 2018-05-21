@@ -31,7 +31,7 @@
         <enum>QTabWidget::West</enum>
        </property>
        <property name="currentIndex">
-        <number>6</number>
+        <number>3</number>
        </property>
        <widget class="QWidget" name="Laser">
         <attribute name="title">
@@ -378,8 +378,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>353</width>
-              <height>528</height>
+              <width>285</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -671,8 +671,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>353</width>
-              <height>451</height>
+              <width>259</width>
+              <height>162</height>
              </rect>
             </property>
             <attribute name="label">
@@ -892,8 +892,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>353</width>
-              <height>451</height>
+              <width>293</width>
+              <height>398</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1463,9 +1463,7 @@
                 </item>
                </layout>
                <zorder></zorder>
-               <zorder></zorder>
                <zorder>shamrockConnect</zorder>
-               <zorder>horizontalLayoutWidget_2</zorder>
               </widget>
              </item>
              <item>
@@ -1610,38 +1608,6 @@
             <string>Action</string>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_2">
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayout_2">
-              <item>
-               <widget class="QPushButton" name="addActionSource">
-                <property name="text">
-                 <string>Add</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="rmActionSource">
-                <property name="text">
-                 <string>Del</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="upActionSource">
-                <property name="text">
-                 <string>Up</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="downActionSource">
-                <property name="text">
-                 <string>Down</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
             <item>
              <widget class="QTableWidget" name="scan3D_config">
               <property name="verticalScrollBarPolicy">
@@ -1844,142 +1810,219 @@
              </widget>
             </item>
             <item>
-             <layout class="QGridLayout" name="gridLayout_20">
-              <item row="0" column="0">
-               <widget class="QDoubleSpinBox" name="fastScan_time_delay">
-                <property name="toolTip">
-                 <string>delay</string>
-                </property>
-                <property name="decimals">
-                 <number>10</number>
-                </property>
-                <property name="maximum">
-                 <double>9999999999.000000000000000</double>
-                </property>
-                <property name="singleStep">
-                 <double>1.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="1">
-               <widget class="QDoubleSpinBox" name="fastScan_time_cutoff">
-                <property name="toolTip">
-                 <string>cutoff</string>
-                </property>
-                <property name="decimals">
-                 <number>10</number>
-                </property>
-                <property name="maximum">
-                 <double>9999999999.000000000000000</double>
-                </property>
-                <property name="singleStep">
-                 <double>1.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="1" column="0">
-               <widget class="QDoubleSpinBox" name="fastScan_time_calibr">
-                <property name="toolTip">
-                 <string>calibr</string>
-                </property>
-                <property name="decimals">
-                 <number>10</number>
-                </property>
-                <property name="maximum">
-                 <double>9999999999.000000000000000</double>
-                </property>
-                <property name="singleStep">
-                 <double>1.000000000000000</double>
-                </property>
-                <property name="value">
-                 <double>1.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <widget class="QComboBox" name="fastScan_pattern">
-              <item>
-               <property name="text">
-                <string>single</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Zigzag</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="fast3DScan">
-              <property name="text">
+             <widget class="QGroupBox" name="groupBox">
+              <property name="title">
                <string>FastScan</string>
               </property>
-              <property name="checkable">
-               <bool>true</bool>
-              </property>
+              <layout class="QGridLayout" name="gridLayout_30">
+               <item row="0" column="0">
+                <widget class="QDoubleSpinBox" name="fastScan_time_delay">
+                 <property name="toolTip">
+                  <string>delay</string>
+                 </property>
+                 <property name="decimals">
+                  <number>10</number>
+                 </property>
+                 <property name="maximum">
+                  <double>9999999999.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QDoubleSpinBox" name="fastScan_time_cutoff">
+                 <property name="toolTip">
+                  <string>cutoff</string>
+                 </property>
+                 <property name="decimals">
+                  <number>10</number>
+                 </property>
+                 <property name="maximum">
+                  <double>9999999999.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QDoubleSpinBox" name="fastScan_time_calibr">
+                 <property name="toolTip">
+                  <string>calibr</string>
+                 </property>
+                 <property name="decimals">
+                  <number>10</number>
+                 </property>
+                 <property name="maximum">
+                  <double>9999999999.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>1.000000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QComboBox" name="fastScan_pattern">
+                 <item>
+                  <property name="text">
+                   <string>single</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>Zigzag</string>
+                  </property>
+                 </item>
+                </widget>
+               </item>
+               <item row="3" column="0" colspan="2">
+                <widget class="QPushButton" name="fast3DScan">
+                 <property name="text">
+                  <string>FastScan</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
              </widget>
             </item>
             <item>
-             <layout class="QGridLayout" name="gridLayout_26">
-              <item row="0" column="1">
-               <widget class="QDoubleSpinBox" name="scan3D_threshold_rel">
-                <property name="toolTip">
-                 <string>threshold_rel</string>
-                </property>
-                <property name="minimum">
-                 <double>0.010000000000000</double>
-                </property>
-                <property name="value">
-                 <double>0.500000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="0">
-               <widget class="QSpinBox" name="scan3D_num_peaks">
-                <property name="toolTip">
-                 <string>num_peaks</string>
-                </property>
-                <property name="minimum">
-                 <number>1</number>
-                </property>
-                <property name="maximum">
-                 <number>10</number>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="2">
-               <widget class="QSpinBox" name="Scan3D_min_distance">
-                <property name="toolTip">
-                 <string>min_distance</string>
-                </property>
-                <property name="minimum">
-                 <number>1</number>
-                </property>
-                <property name="maximum">
-                 <number>999</number>
-                </property>
-                <property name="value">
-                 <number>1</number>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <widget class="QPushButton" name="scan3D_peak_find">
-              <property name="text">
-               <string>PeakFind</string>
+             <widget class="QGroupBox" name="groupBox_16">
+              <property name="title">
+               <string>Peak</string>
               </property>
+              <layout class="QGridLayout" name="gridLayout_31">
+               <item row="0" column="0">
+                <widget class="QSpinBox" name="scan3D_num_peaks">
+                 <property name="toolTip">
+                  <string>num_peaks</string>
+                 </property>
+                 <property name="minimum">
+                  <number>1</number>
+                 </property>
+                 <property name="maximum">
+                  <number>10</number>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QPushButton" name="scan3D_peak_find">
+                 <property name="text">
+                  <string>PeakFind</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QDoubleSpinBox" name="scan3D_threshold_rel">
+                 <property name="toolTip">
+                  <string>threshold_rel</string>
+                 </property>
+                 <property name="minimum">
+                  <double>0.010000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>0.500000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QSpinBox" name="Scan3D_min_distance">
+                 <property name="toolTip">
+                  <string>min_distance</string>
+                 </property>
+                 <property name="minimum">
+                  <number>1</number>
+                 </property>
+                 <property name="maximum">
+                  <number>999</number>
+                 </property>
+                 <property name="value">
+                  <number>1</number>
+                 </property>
+                </widget>
+               </item>
+              </layout>
              </widget>
             </item>
             <item>
-             <widget class="QCheckBox" name="start3DScan_center">
-              <property name="text">
-               <string>center</string>
+             <widget class="QGroupBox" name="groupBox_17">
+              <property name="title">
+               <string>mask</string>
               </property>
+              <layout class="QGridLayout" name="gridLayout_20">
+               <item row="1" column="1">
+                <widget class="QDoubleSpinBox" name="scan3D_maskThreshold">
+                 <property name="toolTip">
+                  <string>threshold</string>
+                 </property>
+                 <property name="decimals">
+                  <number>3</number>
+                 </property>
+                 <property name="minimum">
+                  <double>0.001000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>99.998999999999995</double>
+                 </property>
+                 <property name="value">
+                  <double>60.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="0">
+                <widget class="QCheckBox" name="scan3D_byMask">
+                 <property name="text">
+                  <string>maskScan</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="2">
+                <widget class="QSpinBox" name="scan3D_maskStep">
+                 <property name="toolTip">
+                  <string>skip by mask</string>
+                 </property>
+                 <property name="minimum">
+                  <number>2</number>
+                 </property>
+                 <property name="maximum">
+                  <number>1000</number>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1" colspan="2">
+                <widget class="QPushButton" name="scan3D_generateMask">
+                 <property name="text">
+                  <string>Generate Mask</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QDoubleSpinBox" name="scan3D_maskSigma">
+                 <property name="toolTip">
+                  <string>sigma</string>
+                 </property>
+                 <property name="readOnly">
+                  <bool>false</bool>
+                 </property>
+                 <property name="showGroupSeparator" stdset="0">
+                  <bool>false</bool>
+                 </property>
+                 <property name="minimum">
+                  <double>1.000000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>9999.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+              </layout>
              </widget>
             </item>
            </layout>
@@ -3255,13 +3298,9 @@
   <tabstop>raw_data_preview</tabstop>
   <tabstop>startCalibr</tabstop>
   <tabstop>scan3D_path</tabstop>
-  <tabstop>upActionSource</tabstop>
-  <tabstop>addActionSource</tabstop>
   <tabstop>scan3D_path_dialog</tabstop>
-  <tabstop>downActionSource</tabstop>
   <tabstop>start3DScan</tabstop>
   <tabstop>scan3D_config</tabstop>
-  <tabstop>rmActionSource</tabstop>
  </tabstops>
  <resources/>
  <connections/>

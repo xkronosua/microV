@@ -69,6 +69,37 @@ def gaussian(x, amp, cen, wid,bg=0):
 	"""1-d gaussian: gaussian(x, amp, cen, wid, bg)"""
 	return bg + (amp / (np.sqrt(2*np.pi) * wid)) * np.exp(-(x-cen)**2 / (2*wid**2))
 
+def generate2Dtoolpath(Range_x, Range_y, mask=None,skip=2):
+	'''zigzag toolpath by X axis with higher desity by mask'''
+	Y,X = np.meshgrid(Range_y,Range_x)
+	print("gen:",X.shape,Y.shape)
+	Yi,Xi = np.meshgrid(np.arange(len(Range_y)),np.arange(len(Range_x)))
+
+	if not mask is None and mask.shape == X.shape:
+		newGrid = np.full(X.shape,np.nan)
+		newGrid[::skip,::skip] = X[::skip,::skip]
+		newGrid[skip//2::skip,skip//2::skip] = X[skip//2::skip,skip//2::skip]
+		newGrid[mask]=X[mask]
+	else:
+		newGrid = X.copy()
+	newGrid = newGrid.T
+	newGrid[::2]=newGrid[::2].T[::-1].T
+	newGrid = newGrid.T
+	Xi = Xi.T
+	Xi[::2]=Xi[::2].T[::-1].T
+	Xi = Xi.T
+
+	n,m = X.shape
+	for i in range(m):
+		yield b'2', i, Range_y[i]
+		for j in range(n):
+			val = newGrid[j,i]
+			xi = Xi[j,i]
+			if not np.isnan(val):
+				yield b'1', xi, val
+			else:
+				continue
+
 
 
 def photon_count(signal,t,dt_window,threshold):
@@ -128,6 +159,7 @@ class microV(QtGui.QMainWindow):
 	pico_config = {}
 	data2D_A = np.array([])
 	data2D_B = np.array([])
+	dataMask = None
 
 	processOut = Queue()
 	def __init__(self, parent=None):
@@ -341,6 +373,8 @@ class microV(QtGui.QMainWindow):
 		self.n_captures = self.ui.pico_n_captures.value()
 		self.pico_config['n_captures'] = self.n_captures
 		self.pico_config['pulseFreq'] = 80e6
+		if MODE == 'sim':
+			self.pico_config['pulseFreq'] = 1666.
 		ChA_VRange = self.ui.pico_ChA_VRange.currentText()
 		#ChA_VRange = self.pico_VRange_dict[ChA_VRange]
 		self.pico_config['ChA_VRange'] = ChA_VRange
@@ -1260,7 +1294,8 @@ class microV(QtGui.QMainWindow):
 						centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
 						NP_centers = self.scan3D_peak_find()
 
-
+						if self.ui.scan3D_byMask.isChecked():
+							self.generate2Dmask(view=False)
 
 
 					if not self.ui.n_meas_laser_spectra_go.isChecked():
@@ -1429,29 +1464,22 @@ class microV(QtGui.QMainWindow):
 
 			for z,zi in zip(Range_z,Range_zi):
 				if not self.scan3DisAlive: break
-				print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
-
-				forward = True
-				for y,yi in zip(Range_y,Range_yi):
+				self.piStage.MOV(z,axis=3,waitUntilReady=True)
+				yi = 0
+				xi = 0
+				for target in generate2Dtoolpath(Range_x,Range_y,self.dataMask,self.ui.scan3D_maskStep.value()):
+					#print('target',target)
 					if not self.scan3DisAlive: break
-					Range_x_tmp = Range_x
-					if forward:
-						Range_x_tmp = Range_x[::-1]
-						Range_xi_tmp = Range_xi[::-1]
-						forward = False
-					else:
-						Range_x_tmp = Range_x
-						Range_xi_tmp = Range_xi
-						forward = True
-					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
-					if not r: break
-
-					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
-
+					if target[0] == b'2':
+						axis, yi, t_pos = target
+						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=True)
+						if not r: break
+					elif target[0] == b'1':
+						axis, xi, t_pos = target
 						start=time.time()
 						#print('Start',start)
 						if not self.scan3DisAlive: break
-						r = self.piStage.MOV([x],axis=b'1',waitUntilReady=True)
+						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=True)
 						if not r: break
 
 						#real_position0 = self.piStage.qPOS()
@@ -1476,6 +1504,7 @@ class microV(QtGui.QMainWindow):
 		scale=(x_step,y_step),xvals=Range_z)
 		self.data2D_A = np.array(data_pmtA[zi])
 		self.data2D_B = np.array(data_pmtB[zi])
+
 		self.data2D_Range_x = Range_x
 		self.data2D_Range_y = Range_y
 
@@ -1575,8 +1604,10 @@ class microV(QtGui.QMainWindow):
 
 			Range_x = np.arange(x_start,x_end,x_step)
 			Range_xi = np.arange(len(Range_x))
-			data_pmtA = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
-			data_pmtB = np.zeros((len(Range_z),len(Range_xi),len(Range_yi)))
+
+			data_pmtA = np.zeros((len(Range_z),len(Range_x),len(Range_y)))
+			data_pmtB = np.zeros((len(Range_z),len(Range_x),len(Range_y)))
+			print(data_pmtA.shape)
 			layerIndex = 0
 			for z,zi in zip(Range_z,Range_zi):
 				if not self.scan3DisAlive: break
@@ -1593,31 +1624,32 @@ class microV(QtGui.QMainWindow):
 
 
 				forward = True
-				for y,yi in zip(Range_y,Range_yi):
+				xi = 0
+				yi = 0
+				mask = self.dataMask
+				if not self.ui.scan3D_byMask.isChecked():
+					mask = None
+				for target in generate2Dtoolpath(Range_x,Range_y,mask,self.ui.scan3D_maskStep.value()):
+					#print('target',target)
 					if not self.scan3DisAlive: break
-					Range_x_tmp = Range_x
-					if forward:
-						Range_x_tmp = Range_x[::-1]
-						Range_xi_tmp = Range_xi[::-1]
-						forward = False
-					else:
-						Range_x_tmp = Range_x
-						Range_xi_tmp = Range_xi
-						forward = True
-					r = self.piStage.MOV(y,axis=2,waitUntilReady=True)
-					if not r: break
-					self.live_pmtA = np.array([])
-					self.live_pmtB = np.array([])
-					self.live_x = np.array([])
-					self.live_y = np.array([])
+					axis, index_pos, t_pos = target
+					if axis == b'2':
+						yi = index_pos
+						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=True)
+					elif axis == b'1':
+						if not r: break
+						self.live_pmtA = np.array([])
+						self.live_pmtB = np.array([])
+						self.live_x = np.array([])
+						self.live_y = np.array([])
 
-					self.live_integr_spectra = []
-					for x,xi in zip(Range_x_tmp, Range_xi_tmp):
+						self.live_integr_spectra = []
 
+						xi = index_pos
 						start=time.time()
 						#print('Start',start)
 						if not self.scan3DisAlive: break
-						r = self.piStage.MOV([x],axis=b'1',waitUntilReady=wait)
+						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=wait)
 						if not r: break
 
 						real_position0 = self.piStage.qPOS()
@@ -1650,13 +1682,13 @@ class microV(QtGui.QMainWindow):
 							xi_ = xi
 							yi_ = yi
 						else:
-							xi_ = int(round((self.live_x[-1]-Range_x[0])*len(Range_xi_tmp)/(Range_x_tmp.max()-Range_x_tmp.min())))
-							yi_ = int(round((self.live_y[-1]-Range_y[0])*len(Range_yi)/(Range_y.max()-Range_y.min())))
+							xi_ = int(round((self.live_x[-1]-Range_x[0])*len(Range_x)/(Range_x.max()-Range_x.min())))
+							yi_ = int(round((self.live_y[-1]-Range_y[0])*len(Range_y)/(Range_y.max()-Range_y.min())))
 							#data_spectra[yi_,xi_] = np.sum(spectra[s_from:s_to])
-							if xi_>= len(Range_xi_tmp):
-								xi_ = len(Range_xi_tmp)-1
-							if yi_>= len(Range_yi):
-								yi_ = len(Range_yi)-1
+							if xi_>= len(Range_x):
+								xi_ = len(Range_x)-1
+							if yi_>= len(Range_y):
+								yi_ = len(Range_y)-1
 						data_pmtA[zi,xi_,yi_] = pmt_valA
 						data_pmtB[zi,xi_,yi_] = pmt_valB
 						#print(self.live_x[-1], x, xi_,xi, yi_, yi)
@@ -1727,6 +1759,44 @@ class microV(QtGui.QMainWindow):
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
+	def generate2Dmask(self, state, view=True):
+		y_start = float(self.ui.scan3D_config.item(1,1).text())
+		y_end = float(self.ui.scan3D_config.item(1,2).text())
+		y_step = float(self.ui.scan3D_config.item(1,3).text())
+
+		x_start = float(self.ui.scan3D_config.item(2,1).text())
+		x_end = float(self.ui.scan3D_config.item(2,2).text())
+		x_step = float(self.ui.scan3D_config.item(2,3).text())
+		'''
+		if MODE == 'sim':
+			xr = np.arange(x_start,x_end,x_step)
+			yr = np.arange(y_start,y_end,y_step)
+			self.data2D_A = np.zeros((len(xr),len(yr)))+1
+			self.data2D_B = np.zeros((len(xr),len(yr)))+1
+			self.data2D_A[len(xr)//3,len(yr)//4] = 100
+			self.data2D_A[len(xr)//2,len(yr)//2] = 30
+			self.data2D_B[2+len(xr)//3,3+len(yr)//4] = 80
+			self.data2D_B[2+len(xr)//2,1+len(yr)//2] = 40
+			self.data2D_A = gaussian_filter(self.data2D_A,sigma=10)
+			self.data2D_B = gaussian_filter(self.data2D_B,sigma=18)
+		'''
+		data = self.data2D_A * self.data2D_B
+		s = self.ui.scan3D_maskSigma.value()
+		t = self.ui.scan3D_maskThreshold.value()
+		d = gaussian_filter(data,sigma=s)
+		d_min = d[d>0].min()
+		d = abs(d - d_min)
+		self.dataMask = d>d.max()*t/100.
+
+		if view:
+
+
+			self.img.setImage(self.dataMask*self.data2D_A,pos=(x_start,y_start),
+			scale=(x_step,y_step))
+			self.img1.setImage(self.dataMask*self.data2D_B,pos=(x_start,y_start),
+			scale=(x_step,y_step))
+
+
 	def start_fast3DScan(self,state):
 		if state:
 			self.calibrTimer.stop()
@@ -2237,8 +2307,14 @@ class microV(QtGui.QMainWindow):
 		centers["A"] = np.array([Range_x[peaks_A[:,0]], Range_y[peaks_A[:,1]]]).T
 		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]]]).T
 		centers["AB"] = np.vstack((centers["A"],centers["B"]))
-		centers["mid"] = (centers["A"]+centers["B"])/2
-
+		try:
+			centers["mid"] = (centers["A"]+centers["B"])/2
+		except:
+			traceback.print_exc()
+			if len(centers['A'])>len(centers['B']):
+				centers["mid"] = (centers["A"][:len(centers['B'])]+centers["B"])/2
+			elif len(centers['A'])<len(centers['B']):
+				centers["mid"] = (centers["A"]+centers["B"][:len(centers['A'])])/2
 		self.NP_centersA.setData(x=centers["A"][:,0],y=centers["A"][:,1])
 		self.NP_centersB.setData(x=centers["B"][:,0],y=centers["B"][:,1])
 
@@ -2407,6 +2483,8 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.actionExit.toggled.connect(self.closeEvent)
 
+
+
 		self.ui.mocoConnect.toggled[bool].connect(self.mocoConnect)
 		self.ui.mocoSection.currentIndexChanged[int].connect(self.mocoSetSection)
 		self.ui.mocoMoveAbs.clicked.connect(self.mocoMoveAbs)
@@ -2419,6 +2497,8 @@ class microV(QtGui.QMainWindow):
 		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
 
 		self.ui.scan3D_peak_find.clicked.connect(self.scan3D_peak_find)
+
+		self.ui.scan3D_generateMask.clicked.connect(self.generate2Dmask)
 
 		self.ui.usbSpectr_set_integr_time.clicked.connect(self.usbSpectr_set_integr_time)
 
@@ -2667,21 +2747,23 @@ class microV(QtGui.QMainWindow):
 
 
 		restore_gui(self.settings)
-		#try:
-		with open('scanArea.csv') as f:
-			data = list(csv.reader(f,delimiter='\t'))[::2]
-		rows = self.ui.scan3D_config.rowCount()
-		columns = self.ui.scan3D_config.columnCount()
-		for r in range(rows):
-			for c in range(columns):
-				try:
-					self.ui.scan3D_config.item(r,c).setText(data[r][c])
-				except:
-					self.ui.scan3D_config.item(r,1).setText('0')
-					self.ui.scan3D_config.item(r,2).setText('100')
-					self.ui.scan3D_config.item(r,3).setText('10')
-		#except:
-		#	print('scanArea_recovery_err')
+		try:
+			with open('scanArea.csv') as f:
+				data = list(csv.reader(f,delimiter='\t'))
+			print(data)
+			rows = self.ui.scan3D_config.rowCount()
+			columns = self.ui.scan3D_config.columnCount()
+			for r in range(rows):
+				for c in range(columns):
+					try:
+						self.ui.scan3D_config.item(r,c).setText(data[r][c])
+					except:
+						traceback.print_exc()
+						self.ui.scan3D_config.item(r,1).setText('0')
+						self.ui.scan3D_config.item(r,2).setText('100')
+						self.ui.scan3D_config.item(r,3).setText('10')
+		except:
+			print('scanArea_recovery_err')
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
 	def syncRectROI(self):
 		sender = self.sender()
