@@ -160,6 +160,7 @@ class microV(QtGui.QMainWindow):
 	data2D_A = np.array([])
 	data2D_B = np.array([])
 	dataMask = None
+	NPsCenters = []
 
 	processOut = Queue()
 	def __init__(self, parent=None):
@@ -471,7 +472,8 @@ class microV(QtGui.QMainWindow):
 					self.line_pico_ChA.setData(x=t,y=dataA)
 					self.line_pico_ChB.setData(x=t,y=dataB)
 				except :
-					traceback.print_exc()
+					pass
+					#traceback.print_exc()
 
 
 			if self.ui.pico_AutoRange.isChecked():
@@ -1198,6 +1200,14 @@ class microV(QtGui.QMainWindow):
 
 		else:
 			self.scan3DisAlive = False
+	def n_meas_laser_spectra_filePath_find(self):
+		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.n_meas_laser_spectra_filePath.text())
+		if type(fname)==tuple:
+			fname = fname[0]
+		try:
+			self.ui.n_meas_laser_spectra_filePath.setText(fname)
+		except:
+			traceback.print_exc()
 
 	def n_meas_laser_spectra_go(self,state):
 		if state:
@@ -1208,7 +1218,7 @@ class microV(QtGui.QMainWindow):
 			step_wavelength = self.ui.n_meas_laser_spectra_step.value()
 			self.scan3DisAlive = True
 			wl_range = np.arange(start_wavelength,end_wavelength,step_wavelength)
-			with pd.HDFStore('data/measLaserSpectra'+str(round(time.time()))+'.h5') as store:
+			with pd.HDFStore(self.ui.n_meas_laser_spectra_filePath.text()+str(round(time.time()))+'.h5') as store:
 				store.keys()
 				self.live_x = np.array([])
 				self.live_integr_spectra = np.array([])
@@ -1272,6 +1282,7 @@ class microV(QtGui.QMainWindow):
 								pmt_valA, pmt_valB = self.readPico()
 								data_Z[zi] = pmt_valB
 								self.line_pmtB.setData(x=Range_z,y=data_Z)
+								app.processEvents()
 							dz = medfilt(data_Z,9)
 							interf_z = Range_z[dz==dz.max()][0]
 							if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
@@ -1300,6 +1311,16 @@ class microV(QtGui.QMainWindow):
 						centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
 						NP_centers = self.scan3D_peak_find()
 
+						if self.n_meas_laser_spectra_FloatingWindow.isChecked():
+							center_tmp = NP_centers.mean(axis=0)
+							pos = np.array(self.rectROI.pos())
+							size = self.rectROI.size()
+							prev_center = np.array([size[0]/2+pos[0],size[1]/2+pos[1]])
+							shift = center_tmp - prev_center
+							self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]+shift[0]))
+							self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]+shift[1]))
+							self.rectROI.setPos(pos+shift)
+
 						if self.ui.scan3D_byMask.isChecked():
 							self.generate2Dmask(view=False)
 
@@ -1317,7 +1338,7 @@ class microV(QtGui.QMainWindow):
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
 
 					interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
-
+					self.piStage.MOV(bg_center,b'1 2 3',waitUntilReady=True)
 					self.piStage.MOV([interf_z],b'3',waitUntilReady=True)
 					self.andorCameraGetBaseline()
 					df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['Z_interface_'+str(interf_z)])
@@ -1473,19 +1494,21 @@ class microV(QtGui.QMainWindow):
 				self.piStage.MOV(z,axis=3,waitUntilReady=True)
 				yi = 0
 				xi = 0
+				y = 0
+				x = 0
 				for target in generate2Dtoolpath(Range_x,Range_y,self.dataMask,self.ui.scan3D_maskStep.value()):
 					#print('target',target)
 					if not self.scan3DisAlive: break
 					if target[0] == b'2':
-						axis, yi, t_pos = target
-						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=True)
+						axis, yi, y = target
+						r = self.piStage.MOV([y],axis=axis,waitUntilReady=True)
 						if not r: break
 					elif target[0] == b'1':
-						axis, xi, t_pos = target
+						axis, xi, x = target
 						start=time.time()
 						#print('Start',start)
 						if not self.scan3DisAlive: break
-						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=True)
+						r = self.piStage.MOV([x],axis=axis,waitUntilReady=True)
 						if not r: break
 
 						#real_position0 = self.piStage.qPOS()
@@ -1494,6 +1517,7 @@ class microV(QtGui.QMainWindow):
 						data_pmtB[zi,xi,yi] = pmt_valB
 						print(xi,yi,zi)
 						app.processEvents()
+						self.setUiPiPos([x,y,z])
 						#real_position = self.piStage.qPOS()
 						#########################################
 						#if self.ui.andorCameraConnect.isChecked():
@@ -1700,12 +1724,8 @@ class microV(QtGui.QMainWindow):
 						#print(self.live_x[-1], x, xi_,xi, yi_, yi)
 
 						#self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
-						try:
-							print(1)
-							#self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
-							#self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
-						except:
-							traceback.print_exc()
+						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 						#self.line_spectra.setData(self.live_integr_spectra)
 
 						#self.setLine(spectra)
@@ -1722,16 +1742,14 @@ class microV(QtGui.QMainWindow):
 						wait = self.ui.Pi_wait.isChecked()
 						#print(time.time()-start)
 					#self.setImage(data_spectra)
-					try:
-						print(3)
-						self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
-						scale=(x_step,y_step),xvals=Range_z)
-						self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
-						scale=(x_step,y_step),xvals=Range_z)
-						self.img.setCurrentIndex(layerIndex)
-						self.img1.setCurrentIndex(layerIndex)
-					except:
-						traceback.print_exc()
+
+					self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+					scale=(x_step,y_step),xvals=Range_z)
+					self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+					scale=(x_step,y_step),xvals=Range_z)
+					self.img.setCurrentIndex(layerIndex)
+					self.img1.setCurrentIndex(layerIndex)
+
 					self.data2D_A = np.array(data_pmtA[zi])
 					self.data2D_B = np.array(data_pmtB[zi])
 					self.data2D_Range_x = Range_x
@@ -1744,19 +1762,16 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			try:
-				print(4)
-				data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
-				data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
 
-				imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
-				imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
+			data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
 
-				print(self.spectrometer.close())
-				print(self.piStage.CloseConnection())
-				return
-			except:
-				traceback.print_exc()
+			imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+
+			print(self.spectrometer.close())
+			print(self.piStage.CloseConnection())
+			return
 
 		data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
 		data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
@@ -1775,7 +1790,7 @@ class microV(QtGui.QMainWindow):
 		#imsave(fname+"_pmtB.tif",data_pmtB_16.astype(np.int16), imagej=True)
 		try:
 			imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
-			imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True,resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
 		except :
 			traceback.print_exc()
 
@@ -1783,7 +1798,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
-	def generate2Dmask(self, state=True, view=True):
+	def generate2Dmask(self, state=True, view=True,NPsCenters = []):
 		y_start = float(self.ui.scan3D_config.item(1,1).text())
 		y_end = float(self.ui.scan3D_config.item(1,2).text())
 		y_step = float(self.ui.scan3D_config.item(1,3).text())
@@ -1791,10 +1806,11 @@ class microV(QtGui.QMainWindow):
 		x_start = float(self.ui.scan3D_config.item(2,1).text())
 		x_end = float(self.ui.scan3D_config.item(2,2).text())
 		x_step = float(self.ui.scan3D_config.item(2,3).text())
-		'''
+		xr = np.arange(x_start,x_end,x_step)
+		yr = np.arange(y_start,y_end,y_step)
+
 		if MODE == 'sim':
-			xr = np.arange(x_start,x_end,x_step)
-			yr = np.arange(y_start,y_end,y_step)
+
 			self.data2D_A = np.zeros((len(xr),len(yr)))+1
 			self.data2D_B = np.zeros((len(xr),len(yr)))+1
 			self.data2D_A[len(xr)//3,len(yr)//4] = 100
@@ -1803,7 +1819,10 @@ class microV(QtGui.QMainWindow):
 			self.data2D_B[2+len(xr)//2,1+len(yr)//2] = 40
 			self.data2D_A = gaussian_filter(self.data2D_A,sigma=10)
 			self.data2D_B = gaussian_filter(self.data2D_B,sigma=18)
-		'''
+			self.data2D_Range_x = xr
+			self.data2D_Range_y = yr
+
+
 		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
 		if ch==0:
 			data = self.data2D_A
@@ -1813,17 +1832,27 @@ class microV(QtGui.QMainWindow):
 			data = self.data2D_A * self.data2D_B
 		s = self.ui.scan3D_maskSigma.value()
 		t = self.ui.scan3D_maskThreshold.value()
-		d = gaussian_filter(data,sigma=s)
-		d_min = d[d>0].min()
-		d = abs(d - d_min)
-		self.dataMask = d>d.max()*t/100.
+		if len(NPsCenters)==0:
+			NPsCenters = self.NPsCenters
+		if len(NPsCenters)==0:
+			d = gaussian_filter(data,sigma=s)
+			d_min = d[d>0].min()
+			d = abs(d - d_min)
+			self.dataMask = d>d.max()*t/100.
+
+		else:
+			Y,X = np.meshgrid(yr,xr)
+			mask = np.zeros(data.shape)
+			for c in NPsCenters:
+				print(c)
+				mask = mask + (((X-c[0])**2+(Y-c[1])**2)<=s**2).astype(np.int16)
+			self.dataMask = mask>0
+
 
 		if view:
-
-
-			self.img.setImage(self.dataMask*self.data2D_A,pos=(x_start,y_start),
+			self.img.setImage(self.dataMask,pos=(x_start,y_start),
 			scale=(x_step,y_step))
-			self.img1.setImage(self.dataMask*self.data2D_B,pos=(x_start,y_start),
+			self.img1.setImage(self.data2D_B,pos=(x_start,y_start),
 			scale=(x_step,y_step))
 
 
@@ -2366,6 +2395,8 @@ class microV(QtGui.QMainWindow):
 			self.ui.n_meas_laser_spectra_probe.item(i,2).setText(str(np_scan_Z))
 		print(centers)
 
+		self.NPsCenters = centers[ch_str[ch]]
+
 		return centers[ch_str[ch]]
 
 
@@ -2523,6 +2554,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.meas_laser_spectra_probe.cellChanged[int,int].connect(self.meas_laser_spectra_probe_update)
 
 		self.ui.scan1D_filePath_find.clicked.connect(self.scan1D_filePath_find)
+		self.ui.n_meas_laser_spectra_filePath_find.clicked.connect(self.n_meas_laser_spectra_filePath_find)
 
 		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
 

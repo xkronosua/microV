@@ -149,8 +149,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>196</width>
-              <height>115</height>
+              <width>224</width>
+              <height>148</height>
              </rect>
             </property>
             <attribute name="label">
@@ -208,8 +208,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>259</width>
-              <height>155</height>
+              <width>294</width>
+              <height>198</height>
              </rect>
             </property>
             <attribute name="label">
@@ -306,8 +306,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>255</width>
-              <height>121</height>
+              <width>285</width>
+              <height>143</height>
              </rect>
             </property>
             <attribute name="label">
@@ -378,8 +378,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>241</width>
-              <height>197</height>
+              <width>285</width>
+              <height>272</height>
              </rect>
             </property>
             <attribute name="label">
@@ -551,8 +551,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>555</height>
+              <width>353</width>
+              <height>528</height>
              </rect>
             </property>
             <attribute name="label">
@@ -671,8 +671,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>229</width>
-              <height>122</height>
+              <width>259</width>
+              <height>162</height>
              </rect>
             </property>
             <attribute name="label">
@@ -776,8 +776,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>174</width>
-              <height>70</height>
+              <width>186</width>
+              <height>86</height>
              </rect>
             </property>
             <attribute name="label">
@@ -818,8 +818,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>156</width>
-              <height>111</height>
+              <width>178</width>
+              <height>138</height>
              </rect>
             </property>
             <attribute name="label">
@@ -892,8 +892,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>240</width>
-              <height>295</height>
+              <width>293</width>
+              <height>398</height>
              </rect>
             </property>
             <attribute name="label">
@@ -1312,8 +1312,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>356</width>
-              <height>494</height>
+              <width>333</width>
+              <height>508</height>
              </rect>
             </property>
             <attribute name="label">
@@ -2705,6 +2705,27 @@
            </property>
            <layout class="QGridLayout" name="gridLayout_22">
             <item row="0" column="0">
+             <layout class="QHBoxLayout" name="horizontalLayout_8">
+              <property name="sizeConstraint">
+               <enum>QLayout::SetDefaultConstraint</enum>
+              </property>
+              <item>
+               <widget class="QLineEdit" name="n_meas_laser_spectra_Path">
+                <property name="text">
+                 <string>./data/multiScan</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="n_meas_laser_spectra_filePath_find">
+                <property name="text">
+                 <string>...</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item row="1" column="0">
              <widget class="QGroupBox" name="groupBox_15">
               <property name="title">
                <string>Laser_wavelength</string>
@@ -2777,7 +2798,7 @@
               </layout>
              </widget>
             </item>
-            <item row="6" column="0">
+            <item row="7" column="0">
              <layout class="QGridLayout" name="gridLayout_23">
               <item row="1" column="0">
                <widget class="QCheckBox" name="n_meas_laser_spectra_track">
@@ -2823,9 +2844,19 @@
                 </property>
                </widget>
               </item>
+              <item row="2" column="1">
+               <widget class="QCheckBox" name="n_meas_laser_spectra_FloatingWindow">
+                <property name="text">
+                 <string>FloatingWindow</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
              </layout>
             </item>
-            <item row="9" column="0">
+            <item row="10" column="0">
              <widget class="QPushButton" name="n_meas_laser_spectra_go">
               <property name="text">
                <string>Start</string>
@@ -2835,7 +2866,7 @@
               </property>
              </widget>
             </item>
-            <item row="4" column="0">
+            <item row="5" column="0">
              <widget class="QTableWidget" name="n_meas_laser_spectra_probe">
               <attribute name="horizontalHeaderCascadingSectionResizes">
                <bool>false</bool>
@@ -3089,7 +3120,7 @@
               </item>
              </widget>
             </item>
-            <item row="2" column="0">
+            <item row="3" column="0">
              <layout class="QGridLayout" name="gridLayout_25">
               <item row="2" column="1">
                <widget class="QLabel" name="label_23">
@@ -3194,11 +3225,14 @@
                 <property name="text">
                  <string>MOCO_PMT</string>
                 </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
              </layout>
             </item>
-            <item row="3" column="0">
+            <item row="4" column="0">
              <widget class="QPushButton" name="n_meas_laser_spectra_set_point">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -3214,7 +3248,7 @@
               </property>
              </widget>
             </item>
-            <item row="10" column="0">
+            <item row="11" column="0">
              <widget class="QPushButton" name="n_meas_laser_spectra_pause">
               <property name="text">
                <string>Pause</string>
@@ -3259,7 +3293,7 @@
      <x>0</x>
      <y>0</y>
      <width>688</width>
-     <height>21</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
