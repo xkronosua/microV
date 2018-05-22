@@ -131,7 +131,7 @@ class microV(QtGui.QMainWindow):
 		HWP = None
 	rotPiezoStage = AG_UC2()
 	moco = None
-	mocoSections = [0,100000,200000,300000]
+	mocoSections = [0,30000,650000,1450000]
 	#ps = ps3000a.PS3000a(connect=False)
 	ps = None
 	n_captures = None
@@ -466,8 +466,13 @@ class microV(QtGui.QMainWindow):
 
 			if self.ui.raw_data_preview.isChecked():
 				t = np.linspace(0,float(self.ui.pico_samplingDuration.text()),len(dataA))
-				self.line_pico_ChA.setData(x=t,y=dataA)
-				self.line_pico_ChB.setData(x=t,y=dataB)
+				try:
+					#print(6)
+					self.line_pico_ChA.setData(x=t,y=dataA)
+					self.line_pico_ChB.setData(x=t,y=dataB)
+				except :
+					traceback.print_exc()
+
 
 			if self.ui.pico_AutoRange.isChecked():
 
@@ -668,7 +673,7 @@ class microV(QtGui.QMainWindow):
 		if self.ui.shamrock_use_MOCO.isChecked():
 			if wavelength < self.ui.shamrock_MOCO_limit.value():
 				self.ui.mocoSection.setCurrentIndex(1)
-			if wavelength > self.ui.shamrock_MOCO_limit.value():
+			if wavelength >= self.ui.shamrock_MOCO_limit.value():
 				self.ui.mocoSection.setCurrentIndex(2)
 
 	def shamrockSetPort(self,val):
@@ -903,7 +908,6 @@ class microV(QtGui.QMainWindow):
 	def mocoConnect(self,state):
 		if state:
 			self.moco = MOCO()
-
 			self.ui.mocoPosition.setValue(self.moco.getPosition())
 			self.mocoGetSection()
 		else:
@@ -1249,11 +1253,13 @@ class microV(QtGui.QMainWindow):
 					data_Z = np.zeros(len(Range_z))
 
 					if self.ui.n_meas_laser_spectra_track.isChecked():
-						self.ui.shamrockPort.setCurrentIndex(1)
-						self.shamrockSetWavelength(wl/3)
+
 
 						if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
 							self.ui.mocoSection.setCurrentIndex(3)
+						else:
+							self.ui.shamrockPort.setCurrentIndex(1)
+							self.shamrockSetWavelength(wl/3)
 
 						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked():
 							print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
@@ -1305,7 +1311,7 @@ class microV(QtGui.QMainWindow):
 					self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(np_scan_Z))
 					bg_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(0,i).text()) for i in range(3)])
 
-
+					self.ui.mocoSection.setCurrentIndex(1)
 
 					self.ui.shamrockPort.setCurrentIndex(0)
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
@@ -1486,7 +1492,7 @@ class microV(QtGui.QMainWindow):
 						pmt_valA, pmt_valB = self.readPico()
 						data_pmtA[zi,xi,yi] = pmt_valA
 						data_pmtB[zi,xi,yi] = pmt_valB
-
+						print(xi,yi,zi)
 						app.processEvents()
 						#real_position = self.piStage.qPOS()
 						#########################################
@@ -1694,28 +1700,38 @@ class microV(QtGui.QMainWindow):
 						#print(self.live_x[-1], x, xi_,xi, yi_, yi)
 
 						#self.live_integr_spectra.append(np.sum(spectra[s_from:s_to]))
-
-						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
-						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
-
+						try:
+							print(1)
+							#self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+							#self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+						except:
+							traceback.print_exc()
 						#self.line_spectra.setData(self.live_integr_spectra)
 
 						#self.setLine(spectra)
 						#print(time.time()-start)
 						self.setUiPiPos(real_position)
 						print("[\t%.5f\t%.5f\t%.5f\t]\t%.5f"%tuple(list(real_position)+[time.time()-start]))
-						app.processEvents()
+
+						try:
+							app.processEvents()
+						except:
+							print(2)
+							traceback.print_exc()
 						#time.sleep(0.01)
 						wait = self.ui.Pi_wait.isChecked()
 						#print(time.time()-start)
 					#self.setImage(data_spectra)
-
-					self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
-					scale=(x_step,y_step),xvals=Range_z)
-					self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
-					scale=(x_step,y_step),xvals=Range_z)
-					self.img.setCurrentIndex(layerIndex)
-					self.img1.setCurrentIndex(layerIndex)
+					try:
+						print(3)
+						self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+						scale=(x_step,y_step),xvals=Range_z)
+						self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+						scale=(x_step,y_step),xvals=Range_z)
+						self.img.setCurrentIndex(layerIndex)
+						self.img1.setCurrentIndex(layerIndex)
+					except:
+						traceback.print_exc()
 					self.data2D_A = np.array(data_pmtA[zi])
 					self.data2D_B = np.array(data_pmtB[zi])
 					self.data2D_Range_x = Range_x
@@ -1728,15 +1744,19 @@ class microV(QtGui.QMainWindow):
 				layerIndex+=1
 
 		except KeyboardInterrupt:
-			data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
-			data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
+			try:
+				print(4)
+				data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
+				data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
 
-			imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
-			imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+				imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+				imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
 
-			print(self.spectrometer.close())
-			print(self.piStage.CloseConnection())
-			return
+				print(self.spectrometer.close())
+				print(self.piStage.CloseConnection())
+				return
+			except:
+				traceback.print_exc()
 
 		data_pmtA = data_pmtA[data_pmtA.sum(axis=2).sum(axis=1)!=0]
 		data_pmtB = data_pmtB[data_pmtB.sum(axis=2).sum(axis=1)!=0]
@@ -1753,13 +1773,17 @@ class microV(QtGui.QMainWindow):
 		#data_pmtB_16 = data_pmtB/data_pmtB.max()*32768*2-32768
 		#imsave(fname+"_pmtA.tif",data_pmt_16.astype(np.int16), imagej=True)
 		#imsave(fname+"_pmtB.tif",data_pmtB_16.astype(np.int16), imagej=True)
-		imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
-		imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True,resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+		try:
+			imsave(fname+"_pmtA.tif",data_pmtA.astype(np.float32), imagej=True, resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+			imsave(fname+"_pmtB.tif",data_pmtB.astype(np.float32), imagej=True,resolution=(x_step*1e-4,y_step*1e-4,'cm'))
+		except :
+			traceback.print_exc()
+
 
 		self.ui.start3DScan.setChecked(False)
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
-	def generate2Dmask(self, state, view=True):
+	def generate2Dmask(self, state=True, view=True):
 		y_start = float(self.ui.scan3D_config.item(1,1).text())
 		y_end = float(self.ui.scan3D_config.item(1,2).text())
 		y_step = float(self.ui.scan3D_config.item(1,3).text())
@@ -1780,7 +1804,13 @@ class microV(QtGui.QMainWindow):
 			self.data2D_A = gaussian_filter(self.data2D_A,sigma=10)
 			self.data2D_B = gaussian_filter(self.data2D_B,sigma=18)
 		'''
-		data = self.data2D_A * self.data2D_B
+		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
+		if ch==0:
+			data = self.data2D_A
+		elif ch==1:
+			data = self.data2D_B
+		else:
+			data = self.data2D_A * self.data2D_B
 		s = self.ui.scan3D_maskSigma.value()
 		t = self.ui.scan3D_maskThreshold.value()
 		d = gaussian_filter(data,sigma=s)
@@ -2751,6 +2781,11 @@ class microV(QtGui.QMainWindow):
 			with open('scanArea.csv') as f:
 				data = list(csv.reader(f,delimiter='\t'))
 			print(data)
+			d = []
+			for i in data:
+				if not len(i)==0:
+					d.append(i)
+			data = d
 			rows = self.ui.scan3D_config.rowCount()
 			columns = self.ui.scan3D_config.columnCount()
 			for r in range(rows):

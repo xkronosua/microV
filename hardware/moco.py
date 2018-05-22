@@ -4,9 +4,16 @@ import time
 class MOCO():
 	inst = None
 	position = 0
+	rm = None
+	id = None
 	def __init__(self, id='ASRL7::INSTR'):
-		rm = visa.ResourceManager()
-		self.inst =  rm.open_resource(id,baud_rate=9600)
+		self.rm = visa.ResourceManager()
+		self.id = id
+		self.init()
+	def init(self):
+		self.inst =  self.rm.open_resource(self.id,baud_rate=9600)
+		p = self.inst.query("*IDN?")
+		print(p)
 		self.getPosition()
 
 	def close(self):
@@ -14,7 +21,13 @@ class MOCO():
 
 	def getPosition(self):
 		p = self.inst.query("'")
-		self.position = int(p.split(':')[1])
+		#p = self.inst.query("'")
+		#print(p)
+		try:
+			self.position = int(p.split(':')[1])
+		except:
+			print('PosErr:',p)
+			return None
 		return self.position
 
 	def moveRel(self, incr, waitUntilReady=False):
@@ -36,28 +49,78 @@ class MOCO():
 	def isMoving(self):
 		p = self.inst.query("%")
 		try:
-			val = int(p.split(':')[1].split(' ')[0])
+			print(":",p)
+			x = p.split(':')[1].split(' ')[0]
+			if x =='4C':
+				return True
+			elif x == '0C':
+				return True
+			elif x == '40':
+				return True
+			#elif x == '04':
+			#	return True
+			val = int(x)
+			#print(p,val)
 		except:
-			return True
+			print('isMovingErr:',p)
+			return False
+		#p = self.inst.query("%")
+		#print(p)
 		if val==0:
 			return True
 		else:
 			return False
+	def reset(self):
+		self.inst.close()
+		del self.rm
+		self.rm = visa.ResourceManager()
+		self.init()
 
 	def calibr(self,waitUntilReady=False):
-		self.inst.write('mc2')
+		try:
+			r = self.inst.query('mc2')
+		except:
+			print('Timeout')
+		time.sleep(3)
 		if waitUntilReady:
-			while self.isMoving():
+			while True:
+				s = self.isMoving()
+				if not s:
+					s = self.isMoving()
+					print(s)
+					try:
+						r = self.inst.query('ab2')
+					except:
+						print('Timeout')
+					break
 				time.sleep(0.01)
+				#pos = self.getPosition()
+				#print(pos)
+
 		pos = self.getPosition()
+		#self.reset()
 		return pos
 
 	def __del__(self):
 		self.close()
 
 if __name__=='__main__':
+	try: del moco
+	except: pass
 	moco = MOCO()
 	print(moco.getPosition())
-	print(moco.calibr(True))
+	print(moco.getPosition())
+	#print(moco.calibr(True))
+	print(moco.moveAbs(200000,True))
+	time.sleep(3)
+	#print(moco.calibr(True))
+	print('='*10)
 	print(moco.moveAbs(100000,True))
-	#moco.close()
+	time.sleep(3)
+	print('---'*10)
+
+	print(moco.calibr(True))
+	del moco
+	moco = MOCO()
+	print(moco.moveAbs(150000,True))
+	moco.close()
