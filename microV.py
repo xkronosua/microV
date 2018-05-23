@@ -593,7 +593,7 @@ class microV(QtGui.QMainWindow):
 		#time.sleep(0.2)
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=3,waitUntilReady=True))
 		pos = self.piStage.qPOS()
-		if pos[2]<-100:
+		if pos[2]<-100 or  pos[2]>130:
 			print(self.piStage.ATZ())
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
@@ -674,9 +674,9 @@ class microV(QtGui.QMainWindow):
 		self.ui.shamrockWavelength.setText(str(wavelength))
 		if self.ui.shamrock_use_MOCO.isChecked():
 			if wavelength < self.ui.shamrock_MOCO_limit.value():
-				self.ui.mocoSection.setCurrentIndex(1)
-			if wavelength >= self.ui.shamrock_MOCO_limit.value():
 				self.ui.mocoSection.setCurrentIndex(2)
+			if wavelength >= self.ui.shamrock_MOCO_limit.value():
+				self.ui.mocoSection.setCurrentIndex(1)
 
 	def shamrockSetPort(self,val):
 		if not self.ui.shamrockConnect.isChecked():
@@ -786,7 +786,8 @@ class microV(QtGui.QMainWindow):
 			self.shamrock.shamrock.GetCalibration()
 			wavelength = self.shamrock.shamrock.GetCalibration()
 		self.line_spectra[0].setData(x=wavelength, y = data)
-
+		if data.max()>40000 and self.ui.andorCameraExposureAdaptive.isChecked():
+			self.ui.andorCameraExposure.setValue(self.ui.andorCameraExposur.value()*0.8)
 		self.andorCameraLiveTimer.start(100)
 
 	def andorCameraGetBaseline(self):
@@ -1311,15 +1312,16 @@ class microV(QtGui.QMainWindow):
 						centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
 						NP_centers = self.scan3D_peak_find()
 
-						if self.n_meas_laser_spectra_FloatingWindow.isChecked():
+						if self.ui.n_meas_laser_spectra_FloatingWindow.isChecked():
 							center_tmp = NP_centers.mean(axis=0)
-							pos = np.array(self.rectROI.pos())
-							size = self.rectROI.size()
-							prev_center = np.array([size[0]/2+pos[0],size[1]/2+pos[1]])
-							shift = center_tmp - prev_center
-							self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]+shift[0]))
-							self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]+shift[1]))
-							self.rectROI.setPos(pos+shift)
+							if len(center_tmp)>0:
+								pos = np.array(self.rectROI.pos())
+								size = self.rectROI.size()
+								prev_center = np.array([size[0]/2+pos[0],size[1]/2+pos[1]])
+								shift = center_tmp - prev_center
+								self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]+shift[0]))
+								self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]+shift[1]))
+								self.rectROI.setPos(pos+shift)
 
 						if self.ui.scan3D_byMask.isChecked():
 							self.generate2Dmask(view=False)
@@ -1332,7 +1334,7 @@ class microV(QtGui.QMainWindow):
 					self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(np_scan_Z))
 					bg_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(0,i).text()) for i in range(3)])
 
-					self.ui.mocoSection.setCurrentIndex(1)
+					self.ui.mocoSection.setCurrentIndex(2)
 
 					self.ui.shamrockPort.setCurrentIndex(0)
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
@@ -1350,6 +1352,8 @@ class microV(QtGui.QMainWindow):
 					self.setUiPiPos(pos=pos)
 					self.andorCameraGetBaseline()
 
+					exposure = self.ui.andorCameraExposure.value()
+					intens = 0
 					for index,NP_c in enumerate(NP_centers):
 						self.piStage.MOV(NP_c,b'1 2',waitUntilReady=True)
 						pos = self.piStage.qPOS()
@@ -1413,8 +1417,9 @@ class microV(QtGui.QMainWindow):
 
 						store.put("NPsCenters_"+str(wl), pd.DataFrame(NP_centers))
 						store.put("bgCenter_"+str(wl), pd.DataFrame(bg_center))
-
-
+						exposure = self.ui.andorCameraExposure.value()
+					if intens.max()>40000 and self.ui.andorCameraExposureAdaptive.isChecked():
+						self.ui.andorCameraExposure.setValue(exposure*0.8)
 
 
 		else:
@@ -1799,61 +1804,65 @@ class microV(QtGui.QMainWindow):
 		#print(self.spectrometer.close())
 		#print(self.piStage.CloseConnection())
 	def generate2Dmask(self, state=True, view=True,NPsCenters = []):
-		y_start = float(self.ui.scan3D_config.item(1,1).text())
-		y_end = float(self.ui.scan3D_config.item(1,2).text())
-		y_step = float(self.ui.scan3D_config.item(1,3).text())
+		try:
+			y_start = float(self.ui.scan3D_config.item(1,1).text())
+			y_end = float(self.ui.scan3D_config.item(1,2).text())
+			y_step = float(self.ui.scan3D_config.item(1,3).text())
 
-		x_start = float(self.ui.scan3D_config.item(2,1).text())
-		x_end = float(self.ui.scan3D_config.item(2,2).text())
-		x_step = float(self.ui.scan3D_config.item(2,3).text())
-		xr = np.arange(x_start,x_end,x_step)
-		yr = np.arange(y_start,y_end,y_step)
+			x_start = float(self.ui.scan3D_config.item(2,1).text())
+			x_end = float(self.ui.scan3D_config.item(2,2).text())
+			x_step = float(self.ui.scan3D_config.item(2,3).text())
+			xr = np.arange(x_start,x_end,x_step)
+			yr = np.arange(y_start,y_end,y_step)
 
-		if MODE == 'sim':
+			if MODE == 'sim':
 
-			self.data2D_A = np.zeros((len(xr),len(yr)))+1
-			self.data2D_B = np.zeros((len(xr),len(yr)))+1
-			self.data2D_A[len(xr)//3,len(yr)//4] = 100
-			self.data2D_A[len(xr)//2,len(yr)//2] = 30
-			self.data2D_B[2+len(xr)//3,3+len(yr)//4] = 80
-			self.data2D_B[2+len(xr)//2,1+len(yr)//2] = 40
-			self.data2D_A = gaussian_filter(self.data2D_A,sigma=10)
-			self.data2D_B = gaussian_filter(self.data2D_B,sigma=18)
-			self.data2D_Range_x = xr
-			self.data2D_Range_y = yr
-
-
-		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
-		if ch==0:
-			data = self.data2D_A
-		elif ch==1:
-			data = self.data2D_B
-		else:
-			data = self.data2D_A * self.data2D_B
-		s = self.ui.scan3D_maskSigma.value()
-		t = self.ui.scan3D_maskThreshold.value()
-		if len(NPsCenters)==0:
-			NPsCenters = self.NPsCenters
-		if len(NPsCenters)==0:
-			d = gaussian_filter(data,sigma=s)
-			d_min = d[d>0].min()
-			d = abs(d - d_min)
-			self.dataMask = d>d.max()*t/100.
-
-		else:
-			Y,X = np.meshgrid(yr,xr)
-			mask = np.zeros(data.shape)
-			for c in NPsCenters:
-				print(c)
-				mask = mask + (((X-c[0])**2+(Y-c[1])**2)<=s**2).astype(np.int16)
-			self.dataMask = mask>0
+				self.data2D_A = np.zeros((len(xr),len(yr)))+1
+				self.data2D_B = np.zeros((len(xr),len(yr)))+1
+				self.data2D_A[len(xr)//3,len(yr)//4] = 100
+				self.data2D_A[len(xr)//2,len(yr)//2] = 30
+				self.data2D_B[2+len(xr)//3,3+len(yr)//4] = 80
+				self.data2D_B[2+len(xr)//2,1+len(yr)//2] = 40
+				self.data2D_A = gaussian_filter(self.data2D_A,sigma=10)
+				self.data2D_B = gaussian_filter(self.data2D_B,sigma=18)
+				self.data2D_Range_x = xr
+				self.data2D_Range_y = yr
 
 
-		if view:
-			self.img.setImage(self.dataMask,pos=(x_start,y_start),
-			scale=(x_step,y_step))
-			self.img1.setImage(self.data2D_B,pos=(x_start,y_start),
-			scale=(x_step,y_step))
+			ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
+			if ch==0:
+				data = self.data2D_A
+			elif ch==1:
+				data = self.data2D_B
+			else:
+				data = self.data2D_A * self.data2D_B
+			s = self.ui.scan3D_maskSigma.value()
+			t = self.ui.scan3D_maskThreshold.value()
+			if len(NPsCenters)==0:
+				NPsCenters = self.NPsCenters
+			if len(NPsCenters)==0:
+				d = gaussian_filter(data,sigma=s)
+				d_min = d[d>0].min()
+				d = abs(d - d_min)
+				self.dataMask = d>d.max()*t/100.
+
+			else:
+				Y,X = np.meshgrid(yr,xr)
+				mask = np.zeros(data.shape)
+				for c in NPsCenters:
+					print(c)
+					mask = mask + (((X-c[0])**2+(Y-c[1])**2)<=s**2).astype(np.int16)
+				self.dataMask = mask>0
+
+
+			if view:
+				self.img.setImage(self.dataMask*self.data2D_A,pos=(x_start,y_start),
+				scale=(x_step,y_step))
+				self.img1.setImage(self.dataMask*self.data2D_B,pos=(x_start,y_start),
+				scale=(x_step,y_step))
+		except:
+			traceback.print_exc()
+			self.dataMask = None
 
 
 	def start_fast3DScan(self,state):

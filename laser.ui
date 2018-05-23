@@ -7,11 +7,15 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>339</height>
+    <height>372</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(16, 5, 52);
+color: rgb(255, 250, 85);</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
@@ -20,6 +24,9 @@
       <layout class="QGridLayout" name="gridLayout_2">
        <item row="1" column="0" colspan="2">
         <widget class="QPushButton" name="connect">
+         <property name="styleSheet">
+          <string notr="true">border: 2px solid olive;</string>
+         </property>
          <property name="text">
           <string>connect</string>
          </property>
@@ -49,6 +56,15 @@
        </item>
        <item row="13" column="0" colspan="2">
         <widget class="QPushButton" name="switchShutter">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>40</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">border: 2px solid yellow;</string>
+         </property>
          <property name="text">
           <string>SHUTTER</string>
          </property>
@@ -79,6 +95,9 @@
        </item>
        <item row="2" column="0" colspan="2">
         <widget class="QPushButton" name="onOff">
+         <property name="styleSheet">
+          <string notr="true">border: 2px solid blue;</string>
+         </property>
          <property name="text">
           <string>ON</string>
          </property>
@@ -93,9 +112,6 @@
           <number>9</number>
          </property>
         </widget>
-       </item>
-       <item row="10" column="0">
-        <widget class="QPlainTextEdit" name="laserLog"/>
        </item>
        <item row="9" column="0">
         <widget class="QLabel" name="status">
@@ -160,6 +176,9 @@
           <bool>false</bool>
          </property>
         </widget>
+       </item>
+       <item row="10" column="0" colspan="2">
+        <widget class="QPlainTextEdit" name="laserLog"/>
        </item>
       </layout>
      </item>
