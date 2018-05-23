@@ -20,7 +20,7 @@ class E727():
 	ID = 0
 	iError = None
 	pos = np.array([0,0,0])
-
+	vel = [100,100,100]
 	def __init__(self):
 		pass
 	def EnumerateUSB(self):
@@ -121,7 +121,7 @@ class E727():
 		'''
 		return self.szAxes#.value
 
-	def SVO(self,a,b):
+	def SVO(self,a='',b=''):
 		'''
 		for axis in range(1,4):
 			bFlags = (c_bool*3)()
@@ -151,7 +151,12 @@ class E727():
 
 	def MOV(self, dPos,axis=1, waitUntilReady=False):
 		self.prev_pos = self.pos
-		self.pos=np.array(dPos)
+		if type(axis)==int:
+			self.pos[axis-1]=dPos
+		else:
+			ax = [int(i)-1 for i in axis.split(b' ')]
+			for i,a in enumerate(ax):
+				self.pos[a]=dPos[i]
 		'''
 		PI_MOV = self.libDLL['PI_MOV']
 		PI_MOV.argtypes = (c_int,c_char_p, ctypes.POINTER(c_double))
@@ -210,7 +215,7 @@ class E727():
 			print("IsMoving> ERROR ",iError, szErrorMesage)
 			#self.CloseConnection()
 		'''
-		dr = np.sqrt(sum((self.prev_pos-self.pos)**2))
+		dr = np.sqrt(np.sum((self.prev_pos-self.pos)**2))
 		t = dr/100/self.vel[0]
 		#print(">>>>>",t,dr)
 		time.sleep(t)

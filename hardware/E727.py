@@ -3,6 +3,7 @@ import traceback
 try:
 	from .E727Wrapper import *
 except:
+	from E727Wrapper import *
 	traceback.print_exc()
 import time, re, os, sys
 import traceback
@@ -20,6 +21,7 @@ def errorTranslator(f):
 			args[0].CloseConnection()
 		return out
 	return wrapper
+
 '''
 def errorTranslator(f):
 	if not r:
@@ -179,15 +181,15 @@ class E727():
 
 
 		if waitUntilReady:
-			m = self.IsMoving()
+			m = self.IsMoving(axis)
 			#print(m)
 			N_max = 1000000
 			n = 0
 			while sum(m)!=0 or n>N_max:
 				n=n+1
-				m = self.IsMoving()
+				m = self.IsMoving(axis)
 				#print(m)
-				time.sleep(0.001)
+				#time.sleep(0.001)
 		return self.err_out
 
 	@errorTranslator
@@ -196,6 +198,30 @@ class E727():
 		self.err_out = PI_qPOS(self.ID, axis, val)
 
 		return [v for v in val]
+
+
+	@errorTranslator
+	def DCO(self, flags=[1,1,1],axis=b'1 2 3'):
+		if type(axis)==bytes:
+			flags_ = (c_bool*len(flags))()
+			for i in range(len(flags)):
+				flags_[i] = c_bool(flags[i])
+		else:
+			axis=str(axis).encode()
+			flags_ = c_double(flags)
+
+		self.err_out = PI_DCO(self.ID, axis, flags_)
+
+		return self.err_out
+
+	@errorTranslator
+	def qDCO(self,axis=b"1 2 3"):
+		val = (c_bool*3)()
+		self.err_out = PI_qDCO(self.ID, axis, val)
+
+		return [v for v in val]
+
+
 
 	@errorTranslator
 	def IsMoving(self,axis=b""):
@@ -275,9 +301,24 @@ class E727():
 		for i,val in enumerate(iDataRecorderOptions):
 			piRecordOptionsArray[i] = c_int(val)
 
-		r = PI_DRC(self.ID, piRecordTableIdsArray, szDataRecorderChannelSources, piRecordOptionsArray)
+		self.err_out = PI_DRC(self.ID, piRecordTableIdsArray, szDataRecorderChannelSources, piRecordOptionsArray)
 
 		return self.err_out
+
+	@errorTranslator
+	def IsGeneratorRunning(self,piWaveGeneratorIdsArray):
+		'''BOOL PI_IsGeneratorRunning (int ID, const int* piWaveGeneratorIdsArray, BOOL* pbValueArray, int iArraySize)
+		Check if wave generators are running
+		'''
+		piWaveGeneratorIdsArray_ = (c_int*len(piWaveGeneratorIdsArray))()
+		for i,val in enumerate(piWaveGeneratorIdsArray):
+			piWaveGeneratorIdsArray_[i] = c_int(val)
+		pbValueArray = (c_bool*len(piWaveGeneratorIdsArray))()
+		iArraySize = c_int(len(piWaveGeneratorIdsArray))
+
+		self.err_out = PI_IsGeneratorRunning(self.ID, piWaveGeneratorIdsArray_, pbValueArray, iArraySize)
+
+		return [v for v in pbValueArray]
 
 	@errorTranslator
 	def WSL(self, iWaveGenerator, iWaveTableIds, iArraySize):
@@ -325,14 +366,14 @@ class E727():
 		for i,val in enumerate(iWaveGenerator):
 			piWaveGeneratorIdsArray[i] = c_int(val)
 
-		iArraySize = len(piWaveGeneratorIdsArray)
+		iArraySize = c_int(len(piWaveGeneratorIdsArray))
 
 		piValueArray = (c_int*len(piWaveGeneratorIdsArray))()
 
 		self.err_out = PI_qWGO(self.ID, piWaveGeneratorIdsArray, piValueArray, iArraySize)
 
 		res = [val for val in piValueArray]
-		return res
+		return res,piValueArray
 
 	@errorTranslator
 	def qDRR(self, iDataRecorderChannelIds, iNReadChannels,
@@ -376,6 +417,20 @@ class E727():
 
 			res = [val for val in pdValueArray]
 			return res
+
+	@errorTranslator
+	def WCL(self, iWaveTableIdsArray):
+			'''
+			BOOL PI_WCL (int ID, int iWaveTableIdsArray, int iArraySize)
+			Clears the content of the given wave table
+			'''
+			iWaveTableIdsArray_ = (c_int*len(iWaveTableIdsArray))()
+			for i,val in enumerate(iWaveTableIdsArray):
+				iWaveTableIdsArray_[i] = c_int(val)
+			iArraySize = c_int(len(iWaveTableIdsArray))
+			self.err_out = PI_WCL(self.ID, iWaveTableIdsArray_, iArraySize)
+
+			return self.err_out
 
 	@errorTranslator
 	def qDTL(self, piDdlTableIdsArray=[1,2,3]):
@@ -474,6 +529,25 @@ class E727():
 			#print("\n");
 		data = np.array(dataTable_out)
 		return data#,x,y,t
+	@errorTranslator
+	def terminal(self,szCommand=b''):
+		'''
+		BOOL PI_GcsCommandset (int ID, const char* szCommand)
+		BOOL PI_GcsGetAnswer (int ID, char* szAnswer, int iBufferSize)
+		BOOL PI_GcsGetAnswerSize (int ID, int* piAnswerSize)
+		'''
+		c=create_string_buffer(len(szCommand),szCommand)
+		self.err_out = PI_GcsCommandset(self.ID, c)
+		ansSize = c_int()
+		while True:
+			self.err_out = PI_GcsGetAnswerSize(self.ID, ansSize)
+			print(ansSize.value)
+			if self.err_out==0:
+				break
+		ans = create_string_buffer(ansSize.value)
+		self.err_out = PI_GcsGetAnswer(self.ID, ans, ansSize.value)
+		return self.err_out#ans.value
+
 
 if __name__ == "__main__":
 	from E727Wrapper import *
@@ -482,8 +556,45 @@ if __name__ == "__main__":
 	try:
 		print(piStage.qSAI())
 		print("SVO:",piStage.qSVO(b'1 2 3'))
+
 		print(piStage.SVO(b'1 2 3',[True, True, True]))
+		#print(piStage.ATZ())
+		iWaveGenerator = [1,2,3]
+		iStatMode= [1,1,1]
+		piStage.WGO( [iWaveGenerator[0]], [iStatMode[0]], 1)
+		print("qWGO:",piStage.qWGO([1,]))
+		iStatMode= [0,0,0]
+		piStage.WGO( iWaveGenerator, iStatMode, 3)
+		print("qWGO:",piStage.qWGO())
+		for V in [100,1000,10000]:
+			print(piStage.VEL([V,V,V],b'1 2 3'))
+			piStage.MOV([0,50,30],b'1 2 3',waitUntilReady=True)
+			t0=time.time()
+			piStage.MOV([100,50,30],b'1 2 3',waitUntilReady=True)
+			t1=time.time()
+			print(t1-t0)
+			t0=time.time()
+			piStage.MOV([0,50,30],b'1 2 3',waitUntilReady=True)
+			t1=time.time()
+			print(t1-t0)
+
+		for V in [100,1000,10000]:
+			print(piStage.VEL([V,V,V],b'1 2 3'))
+			piStage.MOV([0],b'1',waitUntilReady=True)
+			t0=time.time()
+			piStage.MOV([100],b'1',waitUntilReady=True)
+			t1=time.time()
+			print(t1-t0)
+			t0=time.time()
+			piStage.MOV([0],b'1',waitUntilReady=True)
+			t1=time.time()
+			print(t1-t0)
+
 		print("SVO:",piStage.qSVO(b'1 2 3'))
+		print(piStage.VEL([10,10,10],b'1 2 3'))
+		print("qVEL:",piStage.qVEL())
+		#print(piStage.MOV([50,50,30],axis=b'1 2 3', waitUntilReady=True))
+		print(piStage.qPOS())
 
 		print("qTWG:",piStage.qTWG())
 		print("qWGO:",piStage.qWGO())
@@ -495,15 +606,14 @@ if __name__ == "__main__":
 		piStage.WGO( iWaveGenerator, iStatMode, 3)
 
 		#time.sleep(1)
-		#print(piStage.ATZ())
 		#print(piStage.MOV(dPos=[0,0,0],axis=b"1 2 3", waitUntilReady=True))
-		#print(piStage.MOV(dPos=[50,50,50],axis=b"1 2 3", waitUntilReady=True))
+		print(piStage.MOV(dPos=[50,50,30],axis=b"1 2 3", waitUntilReady=True))
 
 		#print('X')
 		#print(piStage.BRA(b'1 2 3',[True, True, True]))
 		#print(piStage.CMO())
 		#print(piStage.qCMO())
-		print(piStage.VEL([1000,1000,1000],b'1 2 3'))
+		print(piStage.VEL([50,50,50],b'1 2 3'))
 		print("qVEL:",piStage.qVEL())
 		'''
 		print(piStage.MOV(dPos=100,axis=1, waitUntilReady=True))
@@ -531,17 +641,18 @@ if __name__ == "__main__":
 		#// Write a sin wave to the wave table 1. //
 		#///////////////////////////////////////////
 		iWaveTableIds = [1,2,3]
-		print(piStage.WAV_SIN_P(iWaveTableIds[0], 1, 1000, 0, 500, 30, 0, 1000))
-		print(piStage.WAV_SIN_P(iWaveTableIds[1], 2, 1000, 0, 500, 15, 0, 1000))
-		print(piStage.WAV_SIN_P(iWaveTableIds[2], 3, 1000, 0, 500, 5, 0, 1000))
+		piStage.WCL(iWaveTableIds)
+		#print(piStage.WAV_SIN_P(iWaveTableIds[0], 1, 1000, 0, 500, 30, 1, 1000))
+		#print(piStage.WAV_SIN_P(iWaveTableIds[1], 2, 1000, 0, 500, 15, 0, 1000))
+		#print(piStage.WAV_SIN_P(iWaveTableIds[2], 3, 1000, 0, 500, 5, 0, 1000))
 		N = 20
 		t = np.arange(0,2*np.pi,0.01)
-		X = [0,100,0,100,0,100]#np.sin(t)*50+50
-		Y = [50]*len(X)#np.sin(2*t)*50+50
-		Z = [20]*len(X)#np.sin(4*t)*50+50
-		#print(piStage.WAV_PNT(iWaveTableIds[0], 0, len(X), 0, X))
-		#print(piStage.WAV_PNT(iWaveTableIds[1], 0, len(Y), 0, Y))
-		#print(piStage.WAV_PNT(iWaveTableIds[2], 0, len(Z), 0, Z))
+		X = [50,70,40,50]#np.sin(t)*50+50
+		Y = [50,50,50,10]#np.sin(2*t)*50+50
+		Z = [30]*len(X)#np.sin(4*t)*50+50
+		print(piStage.WAV_PNT(iWaveTableIds[0], 0, len(X), 2, X))
+		print(piStage.WAV_PNT(iWaveTableIds[1], 0, len(Y), 2, Y))
+		print(piStage.WAV_PNT(iWaveTableIds[2], 0, len(Z), 2, Z))
 
 
 		#////////////////////////////////////////
@@ -552,12 +663,12 @@ if __name__ == "__main__":
 		iDataRecorderChannelIds = [1, 2, 3]
 
 		#// select the corresponding record source id's.
-		szDataRecorderChannelSources = b'1 2 3'
+		#szDataRecorderChannelSources = b'1 2 3'
 
 		#// select the corresponding record mode.
-		iDataRecorderOptions = [0,0,0]
+		#iDataRecorderOptions = [0,0,0]
 
-		print(piStage.DRC(iDataRecorderChannelIds, szDataRecorderChannelSources, iDataRecorderOptions))
+		#print(piStage.DRC(iDataRecorderChannelIds, szDataRecorderChannelSources, iDataRecorderOptions))
 
 
 		#////////////////////////////
@@ -582,15 +693,17 @@ if __name__ == "__main__":
 		#// select the desired wave generators to run (only wave generator 1 is used in this example).
 		#iWaveGenerator[0] = 1;
 		#// select the start mode for the corresponding wave generator.
+		#piStage.WGC(iWaveGenerator,[0,0,0])
 		print('Start')
 		iStatMode= [1,1,1]
-		piStage.WGO( iWaveGenerator, iStatMode, 3)
+		piStage.WGO( iWaveGenerator, iStatMode,3)
+		'''
 		k=0
 		m = sum(piStage.IsMoving())
 		x = []
 		y = []
 		t = []
-		while m and k<10000:
+		while m and k<1000:
 			k+=1
 			p = piStage.qPOS()
 			print(p,k)
@@ -601,7 +714,7 @@ if __name__ == "__main__":
 			y.append(p[1])
 			t.append(time.time())
 
-
+		'''
 		#time.sleep(5)
 		#///////////////////////////////////
 		#// start reading asynchronously. //
@@ -621,14 +734,18 @@ if __name__ == "__main__":
 		print("qWGO:",piStage.qWGO())
 		#dDataTable = np.zeros((iNReadValues,iNReadValues),dtype=np.float64)
 
-		print(piStage.qDRR(iDataRecorderChannelIds, iNReadChannels, 3, iNReadValues, dDataTable, szHeader, 300))
+		#print(piStage.qDRR(iDataRecorderChannelIds, iNReadChannels, 3, iNReadValues, dDataTable, szHeader, 300))
 		#data = piStage.qDRR_SYNC(1, 1, iNReadValues)
 
-		data = piStage.getDataTable()
+		#data = piStage.getDataTable()
 
-		print(piStage.qPOS(),"<<<")
+		#print(piStage.qPOS(),"<<<")
 
 		#table = [i for i in dDataTable]
+
+		for i in range(20):
+			print(piStage.IsGeneratorRunning(iWaveGenerator))
+			time.sleep(0.1)
 		#// select the desired wave generators to run (only wave generator 1 is used in this example).
 		#iWaveGenerator = [1]
 		#// select the start mode for the corresponding wave generator.
@@ -637,8 +754,10 @@ if __name__ == "__main__":
 
 
 		#piStage.SVO(b'1 2 3', flags=[False, False, False])
-		print(piStage.close())
+		#print(piStage.close())
 
+
+		piStage.close()
 	except:
 		traceback.print_exc()
 		print(piStage.CloseConnection())
