@@ -176,7 +176,14 @@ class E727():
 		else:
 			axis=str(axis).encode()
 			dPos_ = c_double(dPos)
-
+		transl = {'1':'1','2':'3','3':'2',' ':' ','\n':'\n'}
+		ax = axis.decode()
+		ax1=[]
+		for i in range(len(ax)):
+			ax1.append(transl[ax[i]])
+		print("ax>",axis)
+		axis= "".join(ax1).encode()
+		print("ax:",axis)
 		self.err_out = PI_MOV(self.ID, axis, dPos_)
 
 
@@ -196,8 +203,8 @@ class E727():
 	def qPOS(self,axis=b"1 2 3"):
 		val = (c_double*3)()
 		self.err_out = PI_qPOS(self.ID, axis, val)
-
-		return [v for v in val]
+		res = np.array([v for v in val])[[0,2,1]]
+		return res
 
 
 	@errorTranslator
