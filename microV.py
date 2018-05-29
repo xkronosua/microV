@@ -585,7 +585,7 @@ class microV(QtGui.QMainWindow):
 		print(self.piStage.SVO(b'1 2 3', [True, True, True]))
 		vel = self.ui.Pi_Velocity.value()
 		self.piStage.VEL([vel]*3,b'1 2 3')
-		print(self.piStage.qVEL())
+		print("VEL:",self.piStage.qVEL())
 		#print(self.piStage.DCO([1,1,1],b'1 2 3'))
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=1,waitUntilReady=True))
 		time.sleep(0.2)
@@ -609,19 +609,19 @@ class microV(QtGui.QMainWindow):
 
 	def Pi_X_go(self):
 		pos = self.ui.Pi_X_move_to.value()
-		print(self.piStage.MOV(pos,axis=1,waitUntilReady=True))
+		print(self.piStage.MOV([pos],axis=b'1',waitUntilReady=True))
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
 	def Pi_Y_go(self):
 		pos = self.ui.Pi_Y_move_to.value()
-		print(self.piStage.MOV(pos,axis=2,waitUntilReady=True))
+		print(self.piStage.MOV([pos],axis=b'2',waitUntilReady=True))
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
 	def Pi_Z_go(self):
 		pos = self.ui.Pi_Z_move_to.value()
-		print(self.piStage.MOV(pos,axis=3,waitUntilReady=True))
+		print(self.piStage.MOV([pos],axis=b'3',waitUntilReady=True))
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
@@ -1024,7 +1024,7 @@ class microV(QtGui.QMainWindow):
 
 
 					self.shamrockSetWavelength(wl/3)
-					self.andorCameraGetBaseline()
+
 					#integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
 
 
@@ -1033,10 +1033,14 @@ class microV(QtGui.QMainWindow):
 					step_Z = self.ui.confParam_scan_step.value()
 					Range_Z = np.arange(start_Z,end_Z,step_Z)
 
+					print(self.piStage.MOV([0],axis=b'3',waitUntilReady=True))
+					self.andorCameraGetBaseline()
+
 					df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['baseline'])
 					for z in Range_Z:
 						print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 						real_position = self.piStage.qPOS()
+						self.setUiPiPos(pos=real_position)
 						z_real = real_position[2]
 						intens,wavelength_arr = self.andorCameraGetData(state=1)
 						w = (wavelength_arr>(wl/3-20))&(wavelength_arr<(wl/3+20))
@@ -1261,7 +1265,8 @@ class microV(QtGui.QMainWindow):
 					z_step = self.ui.n_meas_laser_spectra_Z_step.value()
 
 					Range_z = np.arange(z_start,z_end,z_step)
-					data_Z = np.zeros(len(Range_z))
+					data_ZA = np.zeros(len(Range_z))
+					data_ZB = np.zeros(len(Range_z))
 
 					if self.ui.n_meas_laser_spectra_track.isChecked():
 
@@ -1269,36 +1274,50 @@ class microV(QtGui.QMainWindow):
 						if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
 							self.ui.mocoSection.setCurrentIndex(3)
 						else:
-							self.ui.shamrockPort.setCurrentIndex(1)
+							source = self.ui.readoutSources.currentText()
+							if source == 'AndorCamera':
+								pass
+							elif source == 'Picoscope':
+								self.ui.shamrockPort.setCurrentIndex(1)
 							self.shamrockSetWavelength(wl/3)
 
 						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked():
-							print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
+							if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
+								print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 
-							for zi,z in enumerate(Range_z):
-								self.piStage.MOV([z],axis=b'3',waitUntilReady=True)
-								real_position = self.piStage.qPOS()
-								print(real_position)
-								self.setUiPiPos(real_position)
-								pmt_valA, pmt_valB = self.readPico()
-								data_Z[zi] = pmt_valB
-								self.line_pmtB.setData(x=Range_z,y=data_Z)
-								app.processEvents()
-							dz = medfilt(data_Z,9)
-							interf_z = Range_z[dz==dz.max()][0]
-							if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
+								for zi,z in enumerate(Range_z):
+									self.piStage.MOV([z],axis=b'3',waitUntilReady=True)
+									real_position = self.piStage.qPOS()
+									print(real_position)
+									self.setUiPiPos(real_position)
+									pmt_valA, pmt_valB,pmt_valC = self.getABData()
+									data_ZB[zi] = pmt_valB
+									data_ZA[zi] = pmt_valA
+									self.line_pmtB.setData(x=Range_z,y=data_ZB)
+									self.line_pmtA.setData(x=Range_z,y=data_ZA)
 
-								gmodel = Model(gaussian)
-								result = gmodel.fit(dz, x=Range_z, amp=dz.max(), cen=interf_z, wid=2,bg=dz.min())
-								print(result.params)
-								store.put("scan_Z_"+str(wl), pd.DataFrame(np.vstack([data_Z,result.best_fit]).T,index=Range_z,columns=['scan_Z','fit']))
-								print(interf_z,result.params['cen'].value)
-								interf_z = result.params['cen'].value
-								self.line_pmtA.setData(x=Range_z,y=result.best_fit)
+									app.processEvents()
+								dz = medfilt(data_ZB,9)
+								interf_z = Range_z[dz==dz.max()][0]
+								if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
 
+									gmodel = Model(gaussian)
+									result = gmodel.fit(dz, x=Range_z, amp=dz.max(), cen=interf_z, wid=2,bg=dz.min())
+									print(result.params)
+									store.put("scan_Z_"+str(wl), pd.DataFrame(np.vstack([data_ZB,result.best_fit]).T,index=Range_z,columns=['scan_Z','fit']))
+									print(interf_z,result.params['cen'].value)
+									interf_z = result.params['cen'].value
+									self.line_pmtA.setData(x=Range_z,y=result.best_fit)
+
+								else:
+									store.put("scan_Z_"+str(wl), pd.DataFrame(data_ZB,index=Range_z,columns=['scan_Z']))
 							else:
-								store.put("scan_Z_"+str(wl), pd.DataFrame(data_Z,index=Range_z,columns=['scan_Z']))
-
+								print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
+								self.andorCameraGetBaseline()
+								print(self.piStage.MOV(NP_centers[0],axis=b'1 2 3',waitUntilReady=True))
+								N = self.ui.optim1step_n.value()
+								pos,v = self.center3Doptim(N=N)
+								interf_z = pos[2]
 
 							self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
 						else:
@@ -1353,7 +1372,7 @@ class microV(QtGui.QMainWindow):
 					self.andorCameraGetBaseline()
 
 					exposure = self.ui.andorCameraExposure.value()
-					intens = 0
+					intens = np.array([0]*len(self.andorCCD_wavelength))
 					for index,NP_c in enumerate(NP_centers):
 						self.piStage.MOV(NP_c,b'1 2',waitUntilReady=True)
 						pos = self.piStage.qPOS()
@@ -1517,7 +1536,7 @@ class microV(QtGui.QMainWindow):
 						if not r: break
 
 						#real_position0 = self.piStage.qPOS()
-						pmt_valA, pmt_valB = self.readPico()
+						pmt_valA, pmt_valB,_ = self.getABData()
 						data_pmtA[zi,xi,yi] = pmt_valA
 						data_pmtB[zi,xi,yi] = pmt_valB
 						print(xi,yi,zi)
@@ -1568,7 +1587,85 @@ class microV(QtGui.QMainWindow):
 
 		return centerA, centerB, panelA, panelB
 
+	def center3Doptim(self,center=None,N=1):
+		if center is None:
+			center = self.piStage.qPOS()
+			center = self.piStage.qPOS()
+		else:
+			self.piStage.MOV(center,axis=b'1 2 3', waitUntilReady=True)
+			center = self.piStage.qPOS()
+		data_pos_res = []
+		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
+		col = [3,4,5][ch]
 
+		for n in range(N):
+			pmt_valA, pmt_valB, pmt_valC = self.getABData()
+			x_step = float(self.ui.scan3D_config.item(2,3).text())
+			y_step = float(self.ui.scan3D_config.item(1,3).text())
+			z_step = float(self.ui.scan3D_config.item(0,3).text())
+			pos4test = []
+			for i in [center[2]-z_step,center[2],center[2]+z_step]:
+				tmp = center.copy()
+				tmp[2] = i
+				pos4test.append(tmp)
+				for j in [center[1]-y_step,center[1],center[1]+y_step]:
+					tmp = center.copy()
+					tmp[1] = j
+					pos4test.append(tmp)
+					for k in [center[0]-x_step,center[0],center[0]+x_step]:
+						tmp = center.copy()
+						tmp[0] = k
+						pos4test.append(tmp)
+			pos4test = np.array(pos4test)
+			f=[sum(k==center)!=3 for k in pos4test]
+			pos4test = pos4test[f]
+			print(pos4test)
+			data_pos = [np.hstack([center,pmt_valA, pmt_valB, pmt_valC])]
+			for p in pos4test:
+				self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
+				self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
+				p = self.piStage.qPOS()
+				p = self.piStage.qPOS()
+				self.setUiPiPos(p)
+				pmt_valA, pmt_valB, pmt_valC = self.getABData()
+				data_pos.append(np.hstack([p,pmt_valA, pmt_valB, pmt_valC]))
+				app.processEvents()
+			data_pos = np.array(data_pos)
+
+
+			print(ch,data_pos)
+			optim_pos = data_pos[data_pos[:,col]==data_pos[:,col].max()][0]
+			print(optim_pos)
+			pos = optim_pos[:3]
+			self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
+			self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
+			p = self.piStage.qPOS()
+			center_prev = center.copy()
+			center = self.piStage.qPOS()
+			center_ = 2*center-center_prev
+
+			self.setUiPiPos(center)
+			pmt_valA, pmt_valB, pmt_valC = self.getABData()
+			data_pos_res.append(np.hstack([center,pmt_valA, pmt_valB, pmt_valC]))
+			center = center_
+
+		data_pos_res = np.array(data_pos_res)
+		print(ch,data_pos_res)
+		optim_pos = data_pos_res[data_pos_res[:,col]==data_pos_res[:,col].max()][0]
+		print(optim_pos)
+		pos = optim_pos[:3]
+		self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
+		self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
+		p = self.piStage.qPOS()
+		center = self.piStage.qPOS()
+		self.setUiPiPos(center)
+		pmt_valA, pmt_valB, pmt_valC = self.getABData()
+
+		return center, (pmt_valA, pmt_valB, pmt_valC)
+
+	def optim1step(self):
+		N = self.ui.optim1step_n.value()
+		self.center3Doptim(N=N)
 
 	def start3DScan(self, state):
 		print(state)
@@ -1591,6 +1688,22 @@ class microV(QtGui.QMainWindow):
 			self.live_y = []
 
 			self.scan3DisAlive = False
+	def getABData(self):
+		source = self.ui.readoutSources.currentText()
+		if source == 'Picoscope':
+			A,B = self.readPico()
+			C = np.nan
+		elif source == 'AndorCamera':
+			intens,wavelength_arr = self.andorCameraGetData(state=1)
+			Ex_wl = self.ui.laserWavelength.value()
+			w3 = (wavelength_arr>Ex_wl/3-20)&(wavelength_arr<Ex_wl/3+20)
+			w2 = (wavelength_arr>Ex_wl/2-20)&(wavelength_arr<Ex_wl/2+20)
+			A = intens[w2].sum()
+			B = intens[w3].sum()
+			C = intens.sum()
+		else:
+			A,B,C = [np.nan]*3
+		return A,B,C
 
 	def scan3D(self):
 		self.calibrTimer.stop()
@@ -1688,7 +1801,7 @@ class microV(QtGui.QMainWindow):
 						if not r: break
 
 						real_position0 = self.piStage.qPOS()
-						pmt_valA, pmt_valB = self.readPico()
+						pmt_valA, pmt_valB, _ = self.getABData()#self.readPico()
 						real_position = self.piStage.qPOS()
 						#########################################
 						#if self.ui.andorCameraConnect.isChecked():
@@ -2499,7 +2612,7 @@ class microV(QtGui.QMainWindow):
 								self.ui.scan1D_step.value())
 		for new_pos in steps_range:
 			if not self.alive: break
-			pmt_valA,pmt_valB = self.readPico()#self.readDAQmx(print_dt=True)
+			pmt_valA,pmt_valB,_ = self.getABData()#self.readDAQmx(print_dt=True)
 
 			real_position = [round(p,4) for p in self.piStage.qPOS()]
 			HWP_angle = float(self.ui.HWP_angle.text())
@@ -2553,7 +2666,7 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.actionExit.toggled.connect(self.closeEvent)
 
-
+		self.ui.optim1step.clicked.connect(self.optim1step)
 
 		self.ui.mocoConnect.toggled[bool].connect(self.mocoConnect)
 		self.ui.mocoSection.currentIndexChanged[int].connect(self.mocoSetSection)

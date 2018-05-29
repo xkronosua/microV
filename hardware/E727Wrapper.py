@@ -292,3 +292,11 @@ Clears the content of the given wave table'''
 PI_WCL = libDLL['PI_WCL']
 PI_WCL.argtypes = (c_int, ctypes.POINTER(c_int),c_int)
 PI_WCL.restype = c_bool
+
+'''
+BOOL PI_qONT (int ID, const char* szAxes, BOOL* pbValueArray)
+Get On Target State
+'''
+PI_qONT = libDLL['PI_qONT']
+PI_qONT.argtypes = (c_int, c_char_p, ctypes.POINTER(c_bool))
+PI_qONT.restype = c_bool

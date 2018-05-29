@@ -42,8 +42,31 @@ class E727():
 	iError = None
 	tmp='555'
 	err_out = None
-	def __init__(self):
-		pass
+	axis_order = [0,1,2]
+	axis_transform = {}
+
+	def __init__(self,axis_order = [0,2,1]):
+		self.axis_order = axis_order
+		ax = [b'1',b'2',b'3']
+		self.axis_transform = {ax[i]:ax[axis_order[i]] for i in range(3)}
+		self.axis_transform[b'\n'] = b'\n'
+		self.axis_transform[b'\r'] = b'\r'
+		self.axis_transform[b' '] = b' '
+		self.axis_transform[b''] = b''
+
+
+	def transform_axis(self,axis):
+		if axis == b'':
+			axis = b'1 2 3'
+		tmp=axis.split(b' ')
+		axis = b' '.join([self.axis_transform[i] for i in tmp])
+		return axis
+
+	def transform_output(self,out):
+		out = np.array(out)
+		out = out[self.axis_order]
+		return out
+
 	def EnumerateUSB(self):
 		#print(self.libDLL)
 
@@ -115,7 +138,7 @@ class E727():
 
 
 	def SVO(self,axis=b'1 2 3',flags=[True,True,True]):
-
+		axis =self.transform_axis(axis)
 		ax = axis.split(b' ')
 		for i in range(len(flags)):
 			r = PI_SVO(self.ID, ax[i], c_bool(flags[i]))
@@ -129,6 +152,7 @@ class E727():
 		return self.err_out
 
 	def qSVO(self,axis=b'1 2 3'):
+		axis =self.transform_axis(axis)
 		val = (c_bool*3)()
 		val[0] = c_bool(False)
 		val[1] = c_bool(False)
@@ -167,6 +191,8 @@ class E727():
 		print('PI_ATZ:Done')
 		return self.err_out
 
+
+
 	@errorTranslator
 	def MOV(self, dPos=[50.0,50.0,50.0],axis=b'1 2 3', waitUntilReady=False):
 		if type(axis)==bytes:
@@ -176,34 +202,33 @@ class E727():
 		else:
 			axis=str(axis).encode()
 			dPos_ = c_double(dPos)
-		transl = {'1':'1','2':'3','3':'2',' ':' ','\n':'\n'}
-		ax = axis.decode()
-		ax1=[]
-		for i in range(len(ax)):
-			ax1.append(transl[ax[i]])
-		print("ax>",axis)
-		axis= "".join(ax1).encode()
-		print("ax:",axis)
-		self.err_out = PI_MOV(self.ID, axis, dPos_)
 
+		axis = self.transform_axis(axis)
+
+		self.err_out = PI_MOV(self.ID, axis, dPos_)
+		print(axis)
 
 		if waitUntilReady:
-			m = self.IsMoving(axis)
-			#print(m)
+			#time.sleep(0.001)
+			m = self.onTarget()
+			#m = self.IsMoving()
+			#print(m,t)
 			N_max = 1000000
 			n = 0
-			while sum(m)!=0 or n>N_max:
+			while sum(m)==0 or n>N_max:
 				n=n+1
-				m = self.IsMoving(axis)
-				#print(m)
+				#m = self.IsMoving()
+				m = self.onTarget()
+				#print(m,t)
 				#time.sleep(0.001)
 		return self.err_out
 
 	@errorTranslator
 	def qPOS(self,axis=b"1 2 3"):
+		axis =self.transform_axis(axis)
 		val = (c_double*3)()
 		self.err_out = PI_qPOS(self.ID, axis, val)
-		res = np.array([v for v in val])[[0,2,1]]
+		res = np.array([v for v in val])
 		return res
 
 
@@ -216,13 +241,14 @@ class E727():
 		else:
 			axis=str(axis).encode()
 			flags_ = c_double(flags)
-
+		axis =self.transform_axis(axis)
 		self.err_out = PI_DCO(self.ID, axis, flags_)
 
 		return self.err_out
 
 	@errorTranslator
 	def qDCO(self,axis=b"1 2 3"):
+		axis =self.transform_axis(axis)
 		val = (c_bool*3)()
 		self.err_out = PI_qDCO(self.ID, axis, val)
 
@@ -232,6 +258,7 @@ class E727():
 
 	@errorTranslator
 	def IsMoving(self,axis=b""):
+		axis =self.transform_axis(axis)
 		val = (c_bool*3)()
 
 		self.err_out = PI_IsMoving(self.ID, axis, val)
@@ -239,7 +266,15 @@ class E727():
 		return [v for v in val]
 
 	@errorTranslator
+	def onTarget(self,axis=b""):
+		axis = self.transform_axis(axis)
+		val = (c_bool*3)()
+		self.err_out = PI_qONT(self.ID, axis, val)
+		return [v for v in val]
+
+	@errorTranslator
 	def VEL(self, dVel=[1000,1000,1000],axis=b'1 2 3'):
+		axis = self.transform_axis(axis)
 		if type(axis)==bytes:
 			dVel_ = (c_double*len(dVel))()
 			for i in range(len(dVel)):
@@ -247,7 +282,7 @@ class E727():
 		else:
 			axis=str(axis).encode()
 			dVel_ = c_double(dVel)
-
+		print(axis,[i for i in dVel_])
 		self.err_out = PI_VEL(self.ID, axis, dVel_)
 
 
@@ -255,6 +290,7 @@ class E727():
 
 	@errorTranslator
 	def qVEL(self,axis=b"1 2 3"):
+		axis =self.transform_axis(axis)
 		val = (c_double*3)()
 		self.err_out = PI_qVEL(self.ID, axis, val)
 
