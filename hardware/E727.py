@@ -206,7 +206,7 @@ class E727():
 		axis = self.transform_axis(axis)
 
 		self.err_out = PI_MOV(self.ID, axis, dPos_)
-		print(axis)
+		#print(axis)
 
 		if waitUntilReady:
 			#time.sleep(0.001)

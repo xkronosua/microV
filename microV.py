@@ -205,7 +205,17 @@ class microV(QtGui.QMainWindow):
 
 		with open('laserIn','w+') as f:
 			f.write('SHUTter '+state+'\n')
-		self.laserStatus.start(1000)
+		self.laserStatus.start(500)
+
+	def laserSetShutter_(self,state):
+		self.laserStatus.stop()
+		if state:
+			state = '1'
+		else:
+			state = '0'
+		with open('laserIn','w+') as f:
+			f.write('SHUTter '+state+'\n')
+		self.laserStatus.start(500)
 
 	def laserSetWavelength(self,status=None,wavelength=None):
 		self.laserStatus.stop()
@@ -214,7 +224,7 @@ class microV(QtGui.QMainWindow):
 		print(wavelength)
 		with open('laserIn','w+') as f:
 			f.write('WAVelength '+str(wavelength)+'\n')
-		self.laserStatus.start(1000)
+		self.laserStatus.start(500)
 
 	def laserSetWavelength_(self,status=None,wavelength=None):
 		self.laserStatus.stop()
@@ -222,7 +232,7 @@ class microV(QtGui.QMainWindow):
 		print(wavelength)
 		with open('laserIn','w+') as f:
 			f.write('WAVelength '+str(wavelength)+'\n')
-		self.laserStatus.start(1000)
+		self.laserStatus.start(500)
 
 	def onLaserStatus(self):
 		status = ''
@@ -241,6 +251,9 @@ class microV(QtGui.QMainWindow):
 			self.ui.laserWavelength.setValue(wavelength)
 			self.statusBar_ExWavelength.setText("[Ex: %d nm]" % wavelength)
 			self.ui.laserShutter.setChecked(shutter!=0)
+			self.ui.actionShutter.blockSignals(True)
+			self.ui.actionShutter.setChecked(shutter!=0)
+			self.ui.actionShutter.blockSignals(False)
 			if shutter!=0:
 				self.statusBar_Shutter.setStyleSheet('color:red;')
 			else:
@@ -593,7 +606,7 @@ class microV(QtGui.QMainWindow):
 		#time.sleep(0.2)
 		#print(self.piStage.MOV(self.ui.Pi_X_move_to.value(),axis=3,waitUntilReady=True))
 		pos = self.piStage.qPOS()
-		if pos[2]<-100 or  pos[2]>130:
+		if sum(pos<-100) or sum(pos>130):
 			print(self.piStage.ATZ())
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
@@ -606,6 +619,14 @@ class microV(QtGui.QMainWindow):
 		self.statusBar_Position.setText('[%.5f\t%.5f\t%.5f]'%tuple(pos))
 		self.piStage_position.setData(x=[pos[0]],y=[pos[1]])
 		self.piStage_position1.setData(x=[pos[0]],y=[pos[1]])
+		self.ui.zSlider.blockSignals(True)
+		self.ui.zSlider.setValue(pos[2]*1000)
+		self.ui.zSlider.blockSignals(False)
+
+	def setPiStateZPosition(self,index):
+		print(self.piStage.MOV([index/1000],axis=b'3',waitUntilReady=True))
+		pos = self.piStage.qPOS()
+		self.setUiPiPos(pos=pos)
 
 	def Pi_X_go(self):
 		pos = self.ui.Pi_X_move_to.value()
@@ -648,7 +669,7 @@ class microV(QtGui.QMainWindow):
 			self.shamrock.Connect()
 
 			wavelength = self.shamrock.shamrock.GetWavelength()
-			self.ui.shamrockWavelength.setText(str(wavelength))
+			self.ui.shamrockWavelength.setValue(wavelength)
 			port = self.shamrock.shamrock.GetPort()
 			self.ui.shamrockPort.blockSignals(True)
 			self.ui.shamrockPort.setCurrentIndex(port)
@@ -671,7 +692,7 @@ class microV(QtGui.QMainWindow):
 		print(wl)
 		self.shamrock.shamrock.SetWavelength(wl)
 		wavelength = self.shamrock.shamrock.GetWavelength()
-		self.ui.shamrockWavelength.setText(str(wavelength))
+		self.ui.shamrockWavelength.setValue(wavelength)
 		if self.ui.shamrock_use_MOCO.isChecked():
 			if wavelength < self.ui.shamrock_MOCO_limit.value():
 				self.ui.mocoSection.setCurrentIndex(2)
@@ -710,13 +731,16 @@ class microV(QtGui.QMainWindow):
 			self.andorCCDBaseline = np.array([])
 			size=self.andorCCD.GetPixelSize()
 			self.andorCCD_wavelength = np.arange(size[0])
-			self.andorCCD_wavelength_center = float(self.ui.shamrockWavelength.text())
-			if self.ui.shamrockConnect.isChecked():
-				shape=self.andorCCD.GetDetector()
-				size=self.andorCCD.GetPixelSize()
-				self.shamrock.shamrock.SetPixelWidth(size[0])
-				self.shamrock.shamrock.SetNumberPixels(shape[0])
-				self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
+			self.andorCCD_wavelength_center = self.ui.shamrockWavelength.value()
+			if not self.ui.shamrockConnect.isChecked():
+				self.ui.shamrockConnect.setChecked(True)
+
+			shape=self.andorCCD.GetDetector()
+			size=self.andorCCD.GetPixelSize()
+			self.shamrock.shamrock.SetPixelWidth(size[0])
+			self.shamrock.shamrock.SetNumberPixels(shape[0])
+			self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
+			self.andorCCD_prev_centr_wavelength = self.ui.shamrockWavelength.value()
 		else:
 			self.andorCCD.ShutDown()
 
@@ -747,7 +771,9 @@ class microV(QtGui.QMainWindow):
 					data-= self.andorCCDBaseline
 				print(data)
 
-				if self.ui.shamrockConnect.isChecked():
+				if not self.ui.shamrockConnect.isChecked():
+					self.ui.shamrockConnect.setChecked(True)
+				if self.andorCCD_prev_centr_wavelength != self.ui.shamrockWavelength.value():
 					#c = float(self.ui.shamrockWavelength.text())
 					#w_c = [c-20, c+20]
 					#if len(integr_range)>0:
@@ -758,11 +784,17 @@ class microV(QtGui.QMainWindow):
 					self.shamrock.shamrock.SetPixelWidth(size[0])
 					self.shamrock.shamrock.SetNumberPixels(shape[0])
 					self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
-
+					self.andorCCD_prev_centr_wavelength = self.ui.shamrockWavelength.value()
 					#w_r = (self.andorCCD_wavelength>w_c[0])&(self.andorCCD_wavelength<w_c[1])
 					#data_center = float(data[w_r].mean())
 				self.line_spectra[line_index].setData(x=self.andorCCD_wavelength, y=data)
+				self.ui.andorCameraGetData.blockSignals(True)
+				self.ui.actionSpectra.blockSignals(True)
 				self.ui.andorCameraGetData.setChecked(False)
+				self.ui.actionSpectra.setChecked(False)
+				self.ui.andorCameraGetData.blockSignals(False)
+				self.ui.actionSpectra.blockSignals(False)
+
 			else:
 				self.andorCameraLiveTimer.start(10)
 		else:
@@ -791,22 +823,30 @@ class microV(QtGui.QMainWindow):
 		self.andorCameraLiveTimer.start(100)
 
 	def andorCameraGetBaseline(self):
-		if not self.ui.andorCameraGetData.isChecked():
-			self.ui.andorCameraGetData.setChecked(True)
-		print('andorCameraGetBaseline')
+		print('andorCameraGetBaseline>')
+		if not self.ui.andorCameraConnect.isChecked():
+			self.ui.andorCameraConnect.setChecked(True)
+
 		self.andorCCD.StartAcquisition()
 		self.andorCCD.WaitForAcquisition()
 		data = self.andorCCD.GetMostRecentImage()
 		self.andorCCDBaseline = data
-		wavelength = np.arange(len(data))
-		if self.ui.shamrockConnect.isChecked():
+
+		if not self.ui.shamrockConnect.isChecked():
+			self.ui.shamrockConnect.setChecked(True)
+		if self.andorCCD_prev_centr_wavelength != self.ui.shamrockWavelength.value():
 			shape=self.andorCCD.GetDetector()
 			size=self.andorCCD.GetPixelSize()
 			self.shamrock.shamrock.SetPixelWidth(size[0])
 			self.shamrock.shamrock.SetNumberPixels(shape[0])
 			self.shamrock.shamrock.GetCalibration()
-			wavelength = self.shamrock.shamrock.GetCalibration()
-		self.line_spectra[0].setData(x=wavelength, y = data)
+			self.andorCCD_wavelength = self.shamrock.shamrock.GetCalibration()
+			self.andorCCD_prev_centr_wavelength = self.ui.shamrockWavelength.value()
+		self.line_spectra[-1].setData(x=self.andorCCD_wavelength, y = data)
+		print('<andorCameraGetBaseline')
+	def andorCameraCleanLines(self):
+		for i in range(len(self.line_spectra)):
+			self.line_spectra[i].setData(x=[], y = [])
 	############################################################################
 	###############################   HWP_stepper	############################
 
@@ -1279,7 +1319,7 @@ class microV(QtGui.QMainWindow):
 								pass
 							elif source == 'Picoscope':
 								self.ui.shamrockPort.setCurrentIndex(1)
-							self.shamrockSetWavelength(wl/3)
+							self.shamrockSetWavelength((wl/2+wl/3)/2)
 
 						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked():
 							if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
@@ -1312,12 +1352,27 @@ class microV(QtGui.QMainWindow):
 								else:
 									store.put("scan_Z_"+str(wl), pd.DataFrame(data_ZB,index=Range_z,columns=['scan_Z']))
 							else:
+								self.andorCamera_prevExposure = self.ui.andorCameraExposure.value()
+								self.ui.andorCameraExposure.setValue(self.ui.n_meas_laser_spectra_scanSpectraExp.value())
+								app.processEvents()
+
 								print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 								self.andorCameraGetBaseline()
-								print(self.piStage.MOV(NP_centers[0],axis=b'1 2 3',waitUntilReady=True))
+								current_row = self.ui.n_meas_laser_spectra_probe.currentRow()-1
+								print(self.piStage.MOV(NP_centers[current_row],axis=b'1 2 3',waitUntilReady=True))
 								N = self.ui.optim1step_n.value()
-								pos,v = self.center3Doptim(N=N)
+								pos,v = self.center3Doptim(center=NP_centers[current_row],N=N)
 								interf_z = pos[2]
+								self.ui.andorCameraExposure.setValue(self.andorCamera_prevExposure)
+								app.processEvents()
+								delta = pos - NP_centers[current_row]
+								for i in range(len(NP_centers)):
+									for j in range(3):
+										self.ui.n_meas_laser_spectra_probe.item(i+1,j).setText(str(NP_centers[i,j]+delta[j]))
+								self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]+delta[0]))
+								self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]+delta[1]))
+								self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(bg_center[2]+delta[2]))
+									#self.ui.n_meas_laser_spectra_probe.item(i+1,2).setText(str(np_scan_Z))
 
 							self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
 						else:
@@ -1327,9 +1382,14 @@ class microV(QtGui.QMainWindow):
 						np_scan_Z = interf_z + z_offset
 						print(self.piStage.MOV([np_scan_Z],axis=b'3',waitUntilReady=True))
 
+						if self.ui.n_meas_laser_spectra_rescan2D.isChecked():
+							centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
+							NP_centers = self.scan3D_peak_find()
 
-						centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
-						NP_centers = self.scan3D_peak_find()
+							for i in range(len(NP_centers)):
+								for j in range(2):
+									self.ui.n_meas_laser_spectra_probe.item(i+1,j).setText(str(NP_centers[i,j]))
+								self.ui.n_meas_laser_spectra_probe.item(i+1,2).setText(str(np_scan_Z))
 
 						if self.ui.n_meas_laser_spectra_FloatingWindow.isChecked():
 							center_tmp = NP_centers.mean(axis=0)
@@ -1350,7 +1410,7 @@ class microV(QtGui.QMainWindow):
 						break
 					time_list.append(time.time())
 
-					self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(np_scan_Z))
+					#self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(np_scan_Z))
 					bg_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(0,i).text()) for i in range(3)])
 
 					self.ui.mocoSection.setCurrentIndex(2)
@@ -1368,13 +1428,16 @@ class microV(QtGui.QMainWindow):
 
 					self.piStage.MOV(bg_center,b'1 2 3',waitUntilReady=True)
 					pos = self.piStage.qPOS()
+
 					self.setUiPiPos(pos=pos)
 					self.andorCameraGetBaseline()
 
 					exposure = self.ui.andorCameraExposure.value()
 					intens = np.array([0]*len(self.andorCCD_wavelength))
 					for index,NP_c in enumerate(NP_centers):
-						self.piStage.MOV(NP_c,b'1 2',waitUntilReady=True)
+						if np.isnan(NP_c).any(): break
+						print(NP_c,index)
+						self.piStage.MOV(NP_c,b'1 2 3',waitUntilReady=True)
 						pos = self.piStage.qPOS()
 						pos = self.piStage.qPOS()
 						self.setUiPiPos(pos=pos)
@@ -1397,7 +1460,7 @@ class microV(QtGui.QMainWindow):
 						#	real_position = self.piStage.qPOS()
 						#	z_real = real_position[2]
 						time_list.append(time.time())
-						intens,wavelength_arr = self.andorCameraGetData(state=1,line_index=index)
+						intens,wavelength_arr = self.andorCameraGetData(state=1,line_index=index+1)
 						time_list.append(time.time())
 						w3 = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
 						integr_intens_THG = intens[w3].sum()
@@ -1431,14 +1494,16 @@ class microV(QtGui.QMainWindow):
 
 						store.put("time_"+str(wl), pd.DataFrame(time_list))
 						if self.ui.n_meas_laser_spectra_track.isChecked():
-							store.put("scanA_"+str(wl), panelA)
-							store.put("scanB_"+str(wl), panelB)
+							if self.ui.n_meas_laser_spectra_rescan2D.isChecked():
+								store.put("scanA_"+str(wl), panelA)
+								store.put("scanB_"+str(wl), panelB)
 
 						store.put("NPsCenters_"+str(wl), pd.DataFrame(NP_centers))
 						store.put("bgCenter_"+str(wl), pd.DataFrame(bg_center))
 						exposure = self.ui.andorCameraExposure.value()
 					if intens.max()>40000 and self.ui.andorCameraExposureAdaptive.isChecked():
 						self.ui.andorCameraExposure.setValue(exposure*0.8)
+
 
 
 		else:
@@ -1593,7 +1658,7 @@ class microV(QtGui.QMainWindow):
 			center = self.piStage.qPOS()
 		else:
 			self.piStage.MOV(center,axis=b'1 2 3', waitUntilReady=True)
-			center = self.piStage.qPOS()
+			#center = self.piStage.qPOS()
 		data_pos_res = []
 		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
 		col = [3,4,5][ch]
@@ -1623,7 +1688,7 @@ class microV(QtGui.QMainWindow):
 			data_pos = [np.hstack([center,pmt_valA, pmt_valB, pmt_valC])]
 			for p in pos4test:
 				self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
-				self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
+				#self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
 				p = self.piStage.qPOS()
 				p = self.piStage.qPOS()
 				self.setUiPiPos(p)
@@ -1638,11 +1703,11 @@ class microV(QtGui.QMainWindow):
 			print(optim_pos)
 			pos = optim_pos[:3]
 			self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
-			self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
+			#self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
 			p = self.piStage.qPOS()
 			center_prev = center.copy()
 			center = self.piStage.qPOS()
-			center_ = 2*center-center_prev
+			center_ = center+(center-center_prev)*0.6
 
 			self.setUiPiPos(center)
 			pmt_valA, pmt_valB, pmt_valC = self.getABData()
@@ -2511,7 +2576,7 @@ class microV(QtGui.QMainWindow):
 			if i<=len(centers[ch_str[ch]]):
 				c_coord = centers[ch_str[ch]][i-1]
 			else:
-				c_coord = [np.nan]*2
+				c_coord = [0,50]
 			self.ui.n_meas_laser_spectra_probe.item(i,0).setText(str(c_coord[0]))
 			self.ui.n_meas_laser_spectra_probe.item(i,1).setText(str(c_coord[1]))
 			self.ui.n_meas_laser_spectra_probe.item(i,2).setText(str(np_scan_Z))
@@ -2699,6 +2764,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.Pi_Z_go.clicked.connect(self.Pi_Z_go)
 		self.ui.Pi_XYZ_50mkm.clicked.connect(self.Pi_XYZ_50mkm)
 		self.ui.Pi_autoZero.clicked.connect(self.Pi_autoZero)
+		self.ui.zSlider.valueChanged[int].connect(self.setPiStateZPosition)
 
 		self.ui.connect_rotPiezoStage.toggled[bool].connect(self.connect_rotPiezoStage)
 		self.ui.rotPiezoStage_Go.clicked.connect(self.rotPiezoStage_Go)
@@ -2716,6 +2782,7 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.laserSetWavelength.clicked.connect(self.laserSetWavelength)
 		self.ui.laserSetShutter.clicked.connect(self.laserSetShutter)
+		self.ui.actionShutter.toggled[bool].connect(self.laserSetShutter_)
 		self.laserStatus.timeout.connect(self.onLaserStatus)
 
 		self.ui.connect_pico.toggled[bool].connect(self.connect_pico)
@@ -2735,7 +2802,9 @@ class microV(QtGui.QMainWindow):
 		self.ui.andorCameraReadoutMode.currentIndexChanged[int].connect(self.andorCameraSetReadoutMode)
 		self.andorCameraLiveTimer.timeout.connect(self.onAndorCameraLiveTimeout)
 		self.ui.andorCameraGetBaseline.clicked.connect(self.andorCameraGetBaseline)
-
+		self.ui.actionBaseline.triggered.connect(self.andorCameraGetBaseline)
+		self.ui.actionSpectra.toggled[bool].connect(self.andorCameraGetData)
+		self.ui.andorCameraCleanLines.clicked.connect(self.andorCameraCleanLines)
 
 
 		self.ui.HWP_stepper_Connect.toggled[bool].connect(self.HWP_stepper_Connect)
@@ -2801,7 +2870,9 @@ class microV(QtGui.QMainWindow):
 		self.line_spectra = []
 		cr = range(0,255)
 		for i in range(10):
-			self.line_spectra.append(self.pw_spectra.plot(pen=(cr[::10][i],cr[::-10][i],cr[::5][i])))
+			pen = (cr[::20][i],cr[::-20][i],cr[::25][i])
+			print(pen)
+			self.line_spectra.append(self.pw_spectra.plot(pen=pen))
 
 		splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
 		splitter.addWidget(self.pw1)
@@ -2931,6 +3002,7 @@ class microV(QtGui.QMainWindow):
 
 
 		restore_gui(self.settings)
+		self.ui.laserShutter.setChecked(False)
 		try:
 			with open('scanArea.csv') as f:
 				data = list(csv.reader(f,delimiter='\t'))
