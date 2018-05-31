@@ -27,7 +27,7 @@
        <enum>QTabWidget::West</enum>
       </property>
       <property name="currentIndex">
-       <number>2</number>
+       <number>5</number>
       </property>
       <widget class="QWidget" name="Laser">
        <attribute name="title">
@@ -138,7 +138,7 @@
         <item>
          <widget class="QToolBox" name="toolBox">
           <property name="currentIndex">
-           <number>4</number>
+           <number>2</number>
           </property>
           <widget class="QWidget" name="page">
            <property name="geometry">
@@ -204,8 +204,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>259</width>
-             <height>155</height>
+             <width>356</width>
+             <height>532</height>
             </rect>
            </property>
            <attribute name="label">
@@ -302,8 +302,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>255</width>
-             <height>121</height>
+             <width>356</width>
+             <height>532</height>
             </rect>
            </property>
            <attribute name="label">
@@ -547,8 +547,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>346</width>
-             <height>532</height>
+             <width>263</width>
+             <height>154</height>
             </rect>
            </property>
            <attribute name="label">
@@ -660,7 +660,7 @@
            <number>2</number>
           </property>
           <property name="currentIndex">
-           <number>4</number>
+           <number>3</number>
           </property>
           <widget class="QWidget" name="CCS200">
            <property name="geometry">
@@ -888,8 +888,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>240</width>
-             <height>295</height>
+             <width>356</width>
+             <height>471</height>
             </rect>
            </property>
            <attribute name="label">
@@ -1308,8 +1308,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>346</width>
-             <height>471</height>
+             <width>289</width>
+             <height>410</height>
             </rect>
            </property>
            <attribute name="label">
@@ -2498,7 +2498,7 @@
                 <number>680</number>
                </property>
                <property name="maximum">
-                <number>1299</number>
+                <number>1300</number>
                </property>
                <property name="value">
                 <number>850</number>
@@ -2508,7 +2508,7 @@
              <item row="1" column="1">
               <widget class="QSpinBox" name="calibr_wavelength_end">
                <property name="minimum">
-                <number>681</number>
+                <number>680</number>
                </property>
                <property name="maximum">
                 <number>1300</number>
@@ -2548,6 +2548,25 @@
            <string>PowerCalibr</string>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_15">
+           <item>
+            <widget class="QComboBox" name="powerCalibrMode">
+             <item>
+              <property name="text">
+               <string>change laser wavelength</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>rotate HWP</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>change laser wavelength -&gt; rotate HWP</string>
+              </property>
+             </item>
+            </widget>
+           </item>
            <item>
             <widget class="QGroupBox" name="groupBox_8">
              <property name="title">
@@ -2622,9 +2641,12 @@
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="power_calibr_go">
+            <widget class="QPushButton" name="powerCalibr_go">
              <property name="text">
               <string>calibr</string>
+             </property>
+             <property name="checkable">
+              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -3413,9 +3435,16 @@
     <addaction name="actionBaseline"/>
     <addaction name="actionSpectra"/>
    </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <addaction name="actionClean"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuLaser"/>
    <addaction name="menuAndor"/>
+   <addaction name="menuView"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -3432,6 +3461,8 @@
    <addaction name="separator"/>
    <addaction name="actionBaseline"/>
    <addaction name="actionSpectra"/>
+   <addaction name="separator"/>
+   <addaction name="actionClean"/>
   </widget>
   <action name="actionExit">
    <property name="text">
@@ -3457,6 +3488,11 @@
    </property>
    <property name="text">
     <string>Spectra</string>
+   </property>
+  </action>
+  <action name="actionClean">
+   <property name="text">
+    <string>Clean</string>
    </property>
   </action>
  </widget>

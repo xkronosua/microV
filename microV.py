@@ -550,9 +550,14 @@ class microV(QtGui.QMainWindow):
 	def readPower(self):
 		if not self.ui.pm100Connect.isChecked():
 			self.ui.pm100Connect.setChecked(True)
-		self.power_meter.sense.correction.wavelength = float(self.ui.laserWavelength.text())
-		val = self.power_meter.read
-		self.ui.pm100Power.setText(str(val))
+		self.power_meter.sense.correction.wavelength = self.ui.laserWavelength.value()
+		val = np.nan
+		try:
+			val = self.power_meter.read
+			self.ui.pm100Power.setText(str(val))
+		except:
+			traceback.print_exc()
+
 		return val
 
 	def pm100Average(self,val):
@@ -819,7 +824,7 @@ class microV(QtGui.QMainWindow):
 			wavelength = self.shamrock.shamrock.GetCalibration()
 		self.line_spectra[0].setData(x=wavelength, y = data)
 		if data.max()>40000 and self.ui.andorCameraExposureAdaptive.isChecked():
-			self.ui.andorCameraExposure.setValue(self.ui.andorCameraExposur.value()*0.8)
+			self.ui.andorCameraExposure.setValue(self.ui.andorCameraExposure.value()*0.8)
 		self.andorCameraLiveTimer.start(100)
 
 	def andorCameraGetBaseline(self):
@@ -1046,24 +1051,29 @@ class microV(QtGui.QMainWindow):
 			start_wavelength = self.ui.calibr_wavelength_start.value()
 			end_wavelength = self.ui.calibr_wavelength_end.value()
 			step_wavelength = self.ui.calibr_wavelength_step.value()
+			if start_wavelength > end_wavelength:
+				step_wavelength = -step_wavelength
 			self.scan3DisAlive = True
-			wl_range = np.arange(start_wavelength,end_wavelength,step_wavelength)
+			wl_range = np.arange(start_wavelength,end_wavelength+step_wavelength,step_wavelength)
 			with pd.HDFStore('data/confParam_scan'+str(round(time.time()))+'.h5') as store:
 				store.keys()
 				self.live_x = np.array([])
 				self.live_integr_spectra = np.array([])
+				self.live_pmtA = np.array([])
+				self.live_pmtB = np.array([])
+
 				for wl in wl_range:
 					self.laserSetWavelength_(status=1,wavelength=wl)
 
 					time.sleep(3)
 					t0 = time.time()
-					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive:
+					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive or not self.ui.confParam_scan.isChecked():
 						time.sleep(0.5)
 						print('wait:Laser')
 						app.processEvents()
 
 
-					self.shamrockSetWavelength(wl/3)
+					self.shamrockSetWavelength((wl/2+wl/3)/2)
 
 					#integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
 
@@ -1078,29 +1088,120 @@ class microV(QtGui.QMainWindow):
 
 					df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['baseline'])
 					for z in Range_Z:
-						print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
+						print(self.piStage.MOV([z],axis=b'3',waitUntilReady=True))
 						real_position = self.piStage.qPOS()
 						self.setUiPiPos(pos=real_position)
 						z_real = real_position[2]
 						intens,wavelength_arr = self.andorCameraGetData(state=1)
-						w = (wavelength_arr>(wl/3-20))&(wavelength_arr<(wl/3+20))
-						integr_intens = intens[w].sum()
+						w2 = (wavelength_arr>(wl/2-20))&(wavelength_arr<(wl/2+20))
+						w3 = (wavelength_arr>(wl/3-20))&(wavelength_arr<(wl/3+20))
+
+						integr_intensA = intens[w2].sum()
+						integr_intensB = intens[w3].sum()
 						df[str(z)] = intens
 						self.live_x = np.hstack((self.live_x, z_real))
-						self.live_integr_spectra = np.hstack((self.live_integr_spectra, integr_intens))
+						self.live_pmtA = np.hstack((self.live_pmtA, integr_intensA))
+						self.live_pmtB = np.hstack((self.live_pmtB, integr_intensB))
 
-						self.line_spectra_central.setData(x=self.live_x,y=self.live_integr_spectra)
+						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
 						app.processEvents()
-						if not self.scan3DisAlive:
+						if not self.scan3DisAlive or not self.ui.confParam_scan.isChecked():
 							store.put("scan_"+str(wl), df)
 							return
 							break
-					store.put("scan_"+str(wl), df)
-
-
+					spectra_name = "scan_"+str(wl)
+					store.put(spectra_name, df)
+					store.get_storer(spectra_name).attrs.centerXYZ = real_position
+					store.get_storer(spectra_name).attrs.zRange = Range_Z
+					store.get_storer(spectra_name).attrs.exposure = self.ui.andorCameraExposure.value()
+					store.get_storer(spectra_name).attrs.laserBultInPower = self.ui.laserPower_internal.value()
+					store.get_storer(spectra_name).attrs.HWP_power = float(self.ui.HWP_angle.text())
+					store.get_storer(spectra_name).attrs.HWP_stepper = float(self.ui.HWP_stepper_angle.text())
+					store.get_storer(spectra_name).attrs.endTime = time.time()
+					store.get_storer(spectra_name).attrs.filter = self.ui.mocoSection.currentText()
 
 		else:
 			self.scan3DisAlive = False
+
+	def laserPowerCalibr(self, state):
+		def move_function(pos):
+			self.HWP.mAbs(pos)
+			pos = self.HWP.getPos()
+			self.ui.HWP_angle.setText(str(round(pos,6)))
+		if state:
+			start_wavelength = self.ui.calibr_wavelength_start.value()
+			end_wavelength = self.ui.calibr_wavelength_end.value()
+			step_wavelength = self.ui.calibr_wavelength_step.value()
+			if start_wavelength > end_wavelength:
+				step_wavelength = -step_wavelength
+			self.scan3DisAlive = True
+			wl_range = np.arange(start_wavelength,end_wavelength+step_wavelength,step_wavelength)
+			with pd.HDFStore('data/powerCalibr'+str(round(time.time()))+'.h5') as store:
+				store.keys()
+				self.live_x = np.array([])
+				self.live_integr_spectra = np.array([])
+				self.live_pmtA = np.array([])
+				self.live_pmtB = np.array([])
+
+				for wl in wl_range:
+					self.laserSetWavelength_(status=1,wavelength=wl)
+
+					time.sleep(3)
+					t0 = time.time()
+					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive or not self.ui.powerCalibr_go.isChecked():
+						time.sleep(0.5)
+						print('wait:Laser')
+						app.processEvents()
+
+					start_angle = self.ui.calibr_start.value()
+					end_angle = self.ui.calibr_end.value()
+					step_angle = self.ui.calibr_step.value()
+
+					steps_range = np.arange(start_angle, end_angle+step_angle, step_angle)
+					power = self.readPower()
+					bi_power = self.ui.laserPower_internal.value()
+					initData = [power,bi_power,time.time()]
+					data = np.zeros((len(steps_range),len(initData)))
+
+
+					for j,new_pos in enumerate(steps_range):
+						move_function(new_pos)
+						if not self.alive: break
+
+						HWP_angle = float(self.ui.HWP_angle.text())
+						HWP_stepper_angle = float(self.ui.HWP_stepper_angle.text())
+
+						x = HWP_angle
+						power = self.readPower()
+						bi_power = self.ui.laserPower_internal.value()
+
+						data[j] = np.array([power,bi_power,time.time()])
+
+						self.live_x = np.hstack((self.live_x, x))
+						self.live_pmtA = np.hstack((self.live_pmtA, power))
+						self.live_pmtB = np.hstack((self.live_pmtB, bi_power))
+
+						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+
+
+						app.processEvents()
+
+
+						app.processEvents()
+						if not self.scan3DisAlive or not self.ui.powerCalibr_go.isChecked():
+							df = pd.DataFrame(data, index=steps_range,columns=['power','laserBultInPower','Time'])
+							store.put("scan_"+str(wl), df)
+							return
+							break
+					df = pd.DataFrame(data, index=steps_range,columns=['power','laserBultInPower','Time'])
+					calibr_name = "powerCalibr_"+str(wl)
+					store.put(calibr_name, df)
+
+		else:
+			self.scan3DisAlive = False
+
 
 	def meas_laser_spectra_go(self,state):
 		if state:
@@ -1485,7 +1586,7 @@ class microV(QtGui.QMainWindow):
 						store.put(spectra_name, df)
 						store.get_storer(spectra_name).attrs.centerXYZ = pos
 						store.get_storer(spectra_name).attrs.exposure = self.ui.andorCameraExposure.value()
-						store.get_storer(spectra_name).attrs.laserBultInPower = float(self.ui.HWP_angle.text())
+						store.get_storer(spectra_name).attrs.laserBultInPower = self.ui.laserPower_internal.value()
 						store.get_storer(spectra_name).attrs.HWP_power = float(self.ui.HWP_angle.text())
 						store.get_storer(spectra_name).attrs.HWP_stepper = float(self.ui.HWP_stepper_angle.text())
 						store.get_storer(spectra_name).attrs.endTime = time.time()
@@ -2533,6 +2634,9 @@ class microV(QtGui.QMainWindow):
 
 		self.ui.pico_samplingDuration.setText(pico_frame_time_prev)
 		self.ui.pico_n_captures.setValue(n_frames_prev)
+		self.ui.connect_pico.setChecked(False)
+		self.ui.connect_pico.setChecked(True)
+		self.pico_set()
 		self.pico_set()
 
 		return data_pmtA, data_pmtB, (Range_x, Range_y, Range_z)
@@ -2548,10 +2652,16 @@ class microV(QtGui.QMainWindow):
 		Range_y = self.data2D_Range_y
 
 		Range_x = self.data2D_Range_x
+		interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
+
+		z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
+
+		np_scan_Z = abs(interf_z + z_offset)
+
 
 		centers = {}
-		centers["A"] = np.array([Range_x[peaks_A[:,0]], Range_y[peaks_A[:,1]]]).T
-		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]]]).T
+		centers["A"] = np.array([Range_x[peaks_A[:,0]], Range_y[peaks_A[:,1]], [np_scan_Z]*len(Range_y[peaks_A[:,1]])]).T
+		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]], [np_scan_Z]*len(Range_y[peaks_A[:,1]])]).T
 		centers["AB"] = np.vstack((centers["A"],centers["B"]))
 		try:
 			centers["mid"] = (centers["A"]+centers["B"])/2
@@ -2567,11 +2677,7 @@ class microV(QtGui.QMainWindow):
 		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
 		ch_str = ['A','B','AB','mid']
 		#self.ui.n_meas_laser_spectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
-		interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
 
-		z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
-
-		np_scan_Z = abs(interf_z + z_offset)
 		for i in range(1,len(centers[ch_str[ch]])+1):
 			if i<=len(centers[ch_str[ch]]):
 				c_coord = centers[ch_str[ch]][i-1]
@@ -2822,6 +2928,9 @@ class microV(QtGui.QMainWindow):
 		self.ui.meas_laser_spectra_go.toggled[bool].connect(self.meas_laser_spectra_go)
 		self.ui.n_meas_laser_spectra_go.toggled[bool].connect(self.n_meas_laser_spectra_go)
 
+		self.ui.powerCalibr_go.toggled[bool].connect(self.laserPowerCalibr)
+
+		self.ui.actionClean.triggered.connect(self.viewCleanLines)
 		########################################################################
 		########################################################################
 		########################################################################
@@ -3026,6 +3135,24 @@ class microV(QtGui.QMainWindow):
 		except:
 			print('scanArea_recovery_err')
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
+	def viewCleanLines(self):
+		for i in range(len(self.line_spectra)):
+			self.line_spectra[i].setData(x=[], y = [])
+		self.line_pmtA.setData(x=[], y = [])
+		self.line_pmtB.setData(x=[], y = [])
+
+		self.line_pico_ChA.setData(x=[], y = [])
+		self.line_pico_ChB.setData(x=[], y = [])
+		self.line_spectra_central.setData(x=[], y = [])
+		self.live_x = np.array([])
+		self.live_y = np.array([])
+		self.live_pmtB = np.array([])
+		self.live_pmtA = np.array([])
+		self.live_integr_spectra = np.array([])
+
+
+
+
 	def syncRectROI(self):
 		sender = self.sender()
 		pos = list(sender.pos())
