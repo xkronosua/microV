@@ -101,6 +101,17 @@ def generate2Dtoolpath(Range_x, Range_y, mask=None,skip=2):
 				continue
 
 
+def zCompensation(ex_wl,zShift=0):
+	"""
+	Z position shift compensation
+	"""
+	cal = np.loadtxt('beamWaistZPosition.txt',skiprows=1)[:,1:]
+	cal[:,1] = medfilt(cal[:,1],3)
+
+	cal = cal[np.unique(cal[:,0],return_index = True)[-1]]
+	cal[:,0] -= cal[:,0].min()
+	fit = interp1d(cal[:,0],cal[:,1],kind='slinear', bounds_error=False,fill_value='extrapolate')
+	return fit(ex_wl)-zShift
 
 def photon_count(signal,t,dt_window,threshold):
 	n = int(len(signal)//10)#int((t.max()-t.min())//dt_window)
@@ -621,7 +632,9 @@ class microV(QtGui.QMainWindow):
 		self.ui.Pi_XPos.setText(str(pos[0]))
 		self.ui.Pi_YPos.setText(str(pos[1]))
 		self.ui.Pi_ZPos.setText(str(pos[2]))
-		self.statusBar_Position.setText('[%.5f\t%.5f\t%.5f]'%tuple(pos))
+		self.statusBar_Position_X.setText('%.5f'%pos[0])
+		self.statusBar_Position_Y.setText('%.5f'%pos[1])
+		self.statusBar_Position_Z.setText('%.5f'%pos[2])
 		self.piStage_position.setData(x=[pos[0]],y=[pos[1]])
 		self.piStage_position1.setData(x=[pos[0]],y=[pos[1]])
 		self.ui.zSlider.blockSignals(True)
@@ -1183,7 +1196,7 @@ class microV(QtGui.QMainWindow):
 						self.live_pmtB = np.hstack((self.live_pmtB, bi_power))
 
 						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
-						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+						self.line_pico_ChA.setData(x=self.live_x,y=self.live_pmtB)
 
 
 						app.processEvents()
@@ -1362,8 +1375,10 @@ class microV(QtGui.QMainWindow):
 			start_wavelength = self.ui.n_meas_laser_spectra_start.value()
 			end_wavelength = self.ui.n_meas_laser_spectra_end.value()
 			step_wavelength = self.ui.n_meas_laser_spectra_step.value()
+			if start_wavelength > end_wavelength:
+				step_wavelength = -step_wavelength
 			self.scan3DisAlive = True
-			wl_range = np.arange(start_wavelength,end_wavelength,step_wavelength)
+			wl_range = np.arange(start_wavelength,end_wavelength+step_wavelength,step_wavelength)
 			with pd.HDFStore(self.ui.n_meas_laser_spectra_filePath.text()+str(round(time.time()))+'.h5') as store:
 				store.keys()
 				self.live_x = np.array([])
@@ -1770,7 +1785,11 @@ class microV(QtGui.QMainWindow):
 			y_step = float(self.ui.scan3D_config.item(1,3).text())
 			z_step = float(self.ui.scan3D_config.item(0,3).text())
 			pos4test = []
-			for i in [center[2]-z_step,center[2],center[2]+z_step]:
+			if self.ui.optim1step_zCompensation.isChecked():
+				z_positions = [zCompensation(self.ui.laserWavelength.value(),self.ui.optim1step_zCompensationShift.value())]
+			else:
+				z_positions = [center[2]-z_step,center[2],center[2]+z_step]
+			for i in z_positions:
 				tmp = center.copy()
 				tmp[2] = i
 				pos4test.append(tmp)
@@ -1826,6 +1845,9 @@ class microV(QtGui.QMainWindow):
 		center = self.piStage.qPOS()
 		self.setUiPiPos(center)
 		pmt_valA, pmt_valB, pmt_valC = self.getABData()
+
+		zCompens = zCompensation(self.ui.laserWavelength.value(),center[2])
+		self.ui.optim1step_zCompensationShift.setValue(zCompens)
 
 		return center, (pmt_valA, pmt_valB, pmt_valC)
 
@@ -1950,14 +1972,15 @@ class microV(QtGui.QMainWindow):
 					if axis == b'2':
 						yi = index_pos
 						r = self.piStage.MOV([t_pos],axis=axis,waitUntilReady=True)
-					elif axis == b'1':
-						if not r: break
 						self.live_pmtA = np.array([])
 						self.live_pmtB = np.array([])
 						self.live_x = np.array([])
 						self.live_y = np.array([])
 
-						self.live_integr_spectra = []
+
+					elif axis == b'1':
+						if not r: break
+
 
 						xi = index_pos
 						start=time.time()
@@ -2636,8 +2659,9 @@ class microV(QtGui.QMainWindow):
 		self.ui.pico_n_captures.setValue(n_frames_prev)
 		self.ui.connect_pico.setChecked(False)
 		self.ui.connect_pico.setChecked(True)
-		self.pico_set()
-		self.pico_set()
+		#self.pico_set()
+
+		#self.pico_set()
 
 		return data_pmtA, data_pmtB, (Range_x, Range_y, Range_z)
 
@@ -2760,11 +2784,11 @@ class microV(QtGui.QMainWindow):
 		axis = self.ui.scan1D_axis.currentText()
 		move_function = None
 		if axis == "X":
-			move_function = lambda pos: self.piStage.MOV(pos,axis=1,waitUntilReady=True)
+			move_function = lambda pos: self.piStage.MOV([pos],axis=b'1',waitUntilReady=True)
 		elif axis == "Y":
-			move_function = lambda pos: self.piStage.MOV(pos,axis=2,waitUntilReady=True)
+			move_function = lambda pos: self.piStage.MOV([pos],axis=b'2',waitUntilReady=True)
 		elif axis == "Z":
-			move_function = lambda pos: self.piStage.MOV(pos,axis=3,waitUntilReady=True)
+			move_function = lambda pos: self.piStage.MOV([pos],axis=b'3',waitUntilReady=True)
 		elif axis == 'HWP_Power':
 			def move_function(pos):
 				self.HWP.mAbs(pos)
@@ -2791,10 +2815,13 @@ class microV(QtGui.QMainWindow):
 
 			if axis == 'X':
 				x = real_position[0]
+				self.setUiPiPos(pos=real_position)
 			if axis == 'Y':
 				x = real_position[1]
+				self.setUiPiPos(pos=real_position)
 			if axis == 'Z':
 				x = real_position[2]
+				self.setUiPiPos(pos=real_position)
 			if axis == 'HWP_Power':
 				x = HWP_angle
 			if axis == 'HWP_stepper':
@@ -2931,6 +2958,28 @@ class microV(QtGui.QMainWindow):
 		self.ui.powerCalibr_go.toggled[bool].connect(self.laserPowerCalibr)
 
 		self.ui.actionClean.triggered.connect(self.viewCleanLines)
+
+		self.comboReadoutSources = QtGui.QComboBox()
+		self.ui.toolBar.addWidget(self.comboReadoutSources)
+		sources = [self.ui.readoutSources.itemText(i) for i in range(self.ui.readoutSources.count())]
+		self.comboReadoutSources.insertItems(1,sources)
+		self.comboReadoutSources.currentIndexChanged[int].connect(self.ui.readoutSources.setCurrentIndex)
+		self.comboReadoutSources.blockSignals(True)
+		self.ui.readoutSources.currentIndexChanged[int].connect(self.comboReadoutSources.setCurrentIndex)
+		self.comboReadoutSources.blockSignals(False)
+
+		self.comboMocoSection = QtGui.QComboBox()
+		self.ui.toolBar.addWidget(self.comboMocoSection)
+		ports = [self.ui.mocoSection.itemText(i) for i in range(self.ui.mocoSection.count())]
+		self.comboMocoSection.insertItems(1,ports)
+		self.comboMocoSection.currentIndexChanged[int].connect(self.ui.mocoSection.setCurrentIndex)
+		self.comboMocoSection.blockSignals(True)
+		self.ui.mocoSection.currentIndexChanged[int].connect(self.comboMocoSection.setCurrentIndex)
+		self.comboMocoSection.blockSignals(False)
+
+
+
+
 		########################################################################
 		########################################################################
 		########################################################################
@@ -3093,8 +3142,15 @@ class microV(QtGui.QMainWindow):
 		self.piStage_position1 = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None), brush=pg.mkBrush(255, 0, 0),symbol='+')
 		self.img1.addItem(self.piStage_position1)
 
-		self.statusBar_Position = QtGui.QLabel('[nan nan nan]')
-		self.ui.statusbar.addWidget(self.statusBar_Position)
+		self.statusBar_Position_X = QtGui.QLabel('X')
+		self.ui.statusbar.addWidget(self.statusBar_Position_X)
+		self.statusBar_Position_X.setStyleSheet('color:orange;')
+		self.statusBar_Position_Y = QtGui.QLabel('Y')
+		self.ui.statusbar.addWidget(self.statusBar_Position_Y)
+		self.statusBar_Position_Y.setStyleSheet('color:pink;')
+		self.statusBar_Position_Z = QtGui.QLabel('Z')
+		self.ui.statusbar.addWidget(self.statusBar_Position_Z)
+		self.statusBar_Position_Z.setStyleSheet('color:cyan;')
 		self.statusBar_ExWavelength = QtGui.QLabel('[exWl]')
 		self.ui.statusbar.addWidget(self.statusBar_ExWavelength)
 		self.statusBar_Shutter = QtGui.QLabel('[SHUTTER]')

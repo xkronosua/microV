@@ -109,3 +109,6 @@ gui.ini
 laserOut
 laserPid
 scanArea.csv
+laserIn
+Pipe_inOut
+Pipe_inOutFifo

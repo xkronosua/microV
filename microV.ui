@@ -27,7 +27,7 @@
        <enum>QTabWidget::West</enum>
       </property>
       <property name="currentIndex">
-       <number>5</number>
+       <number>6</number>
       </property>
       <widget class="QWidget" name="Laser">
        <attribute name="title">
@@ -45,6 +45,9 @@
          <widget class="QDoubleSpinBox" name="laserPower_internal">
           <property name="readOnly">
            <bool>true</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::NoButtons</enum>
           </property>
          </widget>
         </item>
@@ -138,7 +141,7 @@
         <item>
          <widget class="QToolBox" name="toolBox">
           <property name="currentIndex">
-           <number>2</number>
+           <number>4</number>
           </property>
           <widget class="QWidget" name="page">
            <property name="geometry">
@@ -374,8 +377,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>241</width>
-             <height>197</height>
+             <width>356</width>
+             <height>532</height>
             </rect>
            </property>
            <attribute name="label">
@@ -547,8 +550,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>263</width>
-             <height>154</height>
+             <width>356</width>
+             <height>532</height>
             </rect>
            </property>
            <attribute name="label">
@@ -2070,6 +2073,26 @@
                 </property>
                </widget>
               </item>
+              <item row="1" column="1">
+               <widget class="QDoubleSpinBox" name="optim1step_zCompensationShift">
+                <property name="decimals">
+                 <number>3</number>
+                </property>
+                <property name="minimum">
+                 <double>-100.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>100.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QCheckBox" name="optim1step_zCompensation">
+                <property name="text">
+                 <string>zCompensation</string>
+                </property>
+               </widget>
+              </item>
              </layout>
             </widget>
            </item>
@@ -2830,7 +2853,7 @@
                    <number>680</number>
                   </property>
                   <property name="maximum">
-                   <number>1299</number>
+                   <number>1300</number>
                   </property>
                   <property name="value">
                    <number>850</number>
@@ -2840,7 +2863,7 @@
                 <item row="1" column="1">
                  <widget class="QSpinBox" name="n_meas_laser_spectra_end">
                   <property name="minimum">
-                   <number>681</number>
+                   <number>680</number>
                   </property>
                   <property name="maximum">
                    <number>1300</number>
@@ -2853,7 +2876,7 @@
                 <item row="1" column="2">
                  <widget class="QSpinBox" name="n_meas_laser_spectra_step">
                   <property name="minimum">
-                   <number>1</number>
+                   <number>0</number>
                   </property>
                   <property name="maximum">
                    <number>620</number>
@@ -3309,6 +3332,9 @@
              </item>
              <item row="4" column="2">
               <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_scanSpectraExp">
+               <property name="toolTip">
+                <string>scanSpectraExp</string>
+               </property>
                <property name="decimals">
                 <number>5</number>
                </property>
@@ -3359,51 +3385,47 @@
      </widget>
     </item>
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout_4">
-      <item>
-       <widget class="QSplitter" name="view_splitter">
-        <property name="orientation">
-         <enum>Qt::Vertical</enum>
-        </property>
-        <widget class="QSplitter" name="splitter">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <widget class="QWidget" name="gridLayoutWidget">
-          <layout class="QGridLayout" name="previewArea"/>
-         </widget>
-         <widget class="QWidget" name="verticalLayoutWidget">
-          <layout class="QVBoxLayout" name="plotArea"/>
-         </widget>
-        </widget>
-        <widget class="QWidget" name="horizontalLayoutWidget">
-         <layout class="QHBoxLayout" name="imageArea"/>
-        </widget>
+     <widget class="QSplitter" name="view_splitter">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <widget class="QSplitter" name="splitter">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <widget class="QWidget" name="gridLayoutWidget">
+        <layout class="QGridLayout" name="previewArea"/>
        </widget>
-      </item>
-      <item>
-       <widget class="QSlider" name="zSlider">
-        <property name="maximum">
-         <number>100000</number>
-        </property>
-        <property name="singleStep">
-         <number>100</number>
-        </property>
-        <property name="pageStep">
-         <number>10000</number>
-        </property>
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="tickPosition">
-         <enum>QSlider::TicksBothSides</enum>
-        </property>
-        <property name="tickInterval">
-         <number>1000</number>
-        </property>
+       <widget class="QWidget" name="verticalLayoutWidget">
+        <layout class="QVBoxLayout" name="plotArea"/>
        </widget>
-      </item>
-     </layout>
+      </widget>
+      <widget class="QWidget" name="horizontalLayoutWidget">
+       <layout class="QHBoxLayout" name="imageArea"/>
+      </widget>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="zSlider">
+      <property name="maximum">
+       <number>100000</number>
+      </property>
+      <property name="singleStep">
+       <number>100</number>
+      </property>
+      <property name="pageStep">
+       <number>10000</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="tickPosition">
+       <enum>QSlider::TicksBothSides</enum>
+      </property>
+      <property name="tickInterval">
+       <number>1000</number>
+      </property>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -3463,6 +3485,7 @@
    <addaction name="actionSpectra"/>
    <addaction name="separator"/>
    <addaction name="actionClean"/>
+   <addaction name="separator"/>
   </widget>
   <action name="actionExit">
    <property name="text">

@@ -229,7 +229,11 @@ class laserDaemon(QWidget):
 			self.statusLog("WAVelength "+str(val),dir='>>')
 			try:
 				prev_power = self.getPower()
+				#close_shutter = False
 				with self.lock:
+					#if self.ui.shutter.isChecked():
+					#	close_shutter = True
+					#	self.Laser.write("SHUTter 0")
 					self.Laser.write("WAVelength "+str(val))
 
 				t0 = time.time()
@@ -241,6 +245,9 @@ class laserDaemon(QWidget):
 					self.wavelength_ready = (new_power == prev_power and new_wavelength == val)
 					prev_power = new_power
 					print(time.time()-t0, self.wavelength_ready)
+				#if close_shutter:
+				#	with self.lock:
+				#		self.Laser.write("SHUTter 1	")
 				wl = self.getWavelength()
 				motor = self.fineTuneFit(wl)
 				self.ui.motorPos.setValue(motor)
