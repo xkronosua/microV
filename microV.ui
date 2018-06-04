@@ -27,7 +27,7 @@
        <enum>QTabWidget::West</enum>
       </property>
       <property name="currentIndex">
-       <number>6</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="Laser">
        <attribute name="title">
@@ -141,7 +141,7 @@
         <item>
          <widget class="QToolBox" name="toolBox">
           <property name="currentIndex">
-           <number>4</number>
+           <number>2</number>
           </property>
           <widget class="QWidget" name="page">
            <property name="geometry">
@@ -377,8 +377,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>356</width>
-             <height>532</height>
+             <width>241</width>
+             <height>197</height>
             </rect>
            </property>
            <attribute name="label">
@@ -2198,7 +2198,7 @@
                </item>
                <item>
                 <property name="text">
-                 <string>HWP_stepper</string>
+                 <string>HWP_Polarization</string>
                 </property>
                </item>
               </widget>
@@ -2572,30 +2572,25 @@
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_15">
            <item>
-            <widget class="QComboBox" name="powerCalibrMode">
-             <item>
-              <property name="text">
-               <string>change laser wavelength</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>rotate HWP</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>change laser wavelength -&gt; rotate HWP</string>
-              </property>
-             </item>
-            </widget>
-           </item>
-           <item>
             <widget class="QGroupBox" name="groupBox_8">
              <property name="title">
-              <string>HWP_power</string>
+              <string>HWP</string>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_12">
+              <item>
+               <widget class="QComboBox" name="powerCalibrMode">
+                <item>
+                 <property name="text">
+                  <string>HWP_Power</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>HWP_Polarization</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
               <item>
                <layout class="QGridLayout" name="gridLayout_14">
                 <item row="0" column="2">
@@ -2797,27 +2792,6 @@
            <string>MultiScan</string>
           </property>
           <layout class="QGridLayout" name="gridLayout_22">
-           <item row="0" column="0">
-            <layout class="QHBoxLayout" name="horizontalLayout_8">
-             <property name="sizeConstraint">
-              <enum>QLayout::SetDefaultConstraint</enum>
-             </property>
-             <item>
-              <widget class="QLineEdit" name="n_meas_laser_spectra_filePath">
-               <property name="text">
-                <string>./data/multiScan</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="n_meas_laser_spectra_filePath_find">
-               <property name="text">
-                <string>...</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
            <item row="1" column="0">
             <widget class="QGroupBox" name="groupBox_15">
              <property name="title">
@@ -2848,7 +2822,7 @@
                  </widget>
                 </item>
                 <item row="1" column="0">
-                 <widget class="QSpinBox" name="n_meas_laser_spectra_start">
+                 <widget class="QSpinBox" name="nMeasLaserSpectra_start">
                   <property name="minimum">
                    <number>680</number>
                   </property>
@@ -2861,7 +2835,7 @@
                  </widget>
                 </item>
                 <item row="1" column="1">
-                 <widget class="QSpinBox" name="n_meas_laser_spectra_end">
+                 <widget class="QSpinBox" name="nMeasLaserSpectra_end">
                   <property name="minimum">
                    <number>680</number>
                   </property>
@@ -2874,7 +2848,7 @@
                  </widget>
                 </item>
                 <item row="1" column="2">
-                 <widget class="QSpinBox" name="n_meas_laser_spectra_step">
+                 <widget class="QSpinBox" name="nMeasLaserSpectra_step">
                   <property name="minimum">
                    <number>0</number>
                   </property>
@@ -2891,10 +2865,31 @@
              </layout>
             </widget>
            </item>
-           <item row="7" column="0">
+           <item row="0" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_8">
+             <property name="sizeConstraint">
+              <enum>QLayout::SetDefaultConstraint</enum>
+             </property>
+             <item>
+              <widget class="QLineEdit" name="nMeasLaserSpectra_filePath">
+               <property name="text">
+                <string>./data/multiScan</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="nMeasLaserSpectra_filePath_find">
+               <property name="text">
+                <string>...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="8" column="0">
             <layout class="QGridLayout" name="gridLayout_23">
              <item row="1" column="0">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_track">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_track">
                <property name="text">
                 <string>track</string>
                </property>
@@ -2904,7 +2899,7 @@
               </widget>
              </item>
              <item row="1" column="1">
-              <widget class="QComboBox" name="n_meas_laser_spectra_track_channel">
+              <widget class="QComboBox" name="nMeasLaserSpectra_track_channel">
                <item>
                 <property name="text">
                  <string>A</string>
@@ -2928,7 +2923,7 @@
               </widget>
              </item>
              <item row="2" column="0">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_track_fast">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_track_fast">
                <property name="text">
                 <string>Fast</string>
                </property>
@@ -2938,7 +2933,7 @@
               </widget>
              </item>
              <item row="2" column="1">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_FloatingWindow">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_FloatingWindow">
                <property name="text">
                 <string>FloatingWindow</string>
                </property>
@@ -2949,8 +2944,8 @@
              </item>
             </layout>
            </item>
-           <item row="10" column="0">
-            <widget class="QPushButton" name="n_meas_laser_spectra_go">
+           <item row="11" column="0">
+            <widget class="QPushButton" name="nMeasLaserSpectra_go">
              <property name="text">
               <string>Start</string>
              </property>
@@ -2959,10 +2954,16 @@
              </property>
             </widget>
            </item>
-           <item row="5" column="0">
-            <widget class="QTableWidget" name="n_meas_laser_spectra_probe">
+           <item row="6" column="0">
+            <widget class="QTableWidget" name="nMeasLaserSpectra_probe">
              <attribute name="horizontalHeaderCascadingSectionResizes">
               <bool>false</bool>
+             </attribute>
+             <attribute name="horizontalHeaderDefaultSectionSize">
+              <number>80</number>
+             </attribute>
+             <attribute name="horizontalHeaderMinimumSectionSize">
+              <number>20</number>
              </attribute>
              <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
               <bool>false</bool>
@@ -3223,7 +3224,7 @@
               </widget>
              </item>
              <item row="1" column="0">
-              <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_start">
+              <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_Z_start">
                <property name="maximum">
                 <double>100.000000000000000</double>
                </property>
@@ -3237,7 +3238,7 @@
               </widget>
              </item>
              <item row="2" column="2">
-              <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_offset">
+              <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_Z_offset">
                <property name="minimum">
                 <double>-99.000000000000000</double>
                </property>
@@ -3251,7 +3252,7 @@
               </widget>
              </item>
              <item row="1" column="2">
-              <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_step">
+              <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_Z_step">
                <property name="value">
                 <double>0.300000000000000</double>
                </property>
@@ -3265,7 +3266,7 @@
               </widget>
              </item>
              <item row="1" column="1">
-              <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_end">
+              <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_Z_end">
                <property name="maximum">
                 <double>100.000000000000000</double>
                </property>
@@ -3275,7 +3276,7 @@
               </widget>
              </item>
              <item row="3" column="1">
-              <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_Z_interface">
+              <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_Z_interface">
                <property name="toolTip">
                 <string>interface Z position</string>
                </property>
@@ -3294,7 +3295,7 @@
               </widget>
              </item>
              <item row="3" column="2">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_Z_interface_fit">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_Z_interface_fit">
                <property name="text">
                 <string>fit</string>
                </property>
@@ -3304,7 +3305,7 @@
               </widget>
              </item>
              <item row="3" column="0">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_Z_interface_optim">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_Z_interface_optim">
                <property name="text">
                 <string>optimZ</string>
                </property>
@@ -3314,7 +3315,7 @@
               </widget>
              </item>
              <item row="4" column="0">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_MOCO_PMT">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_MOCO_PMT">
                <property name="text">
                 <string>MOCO_PMT</string>
                </property>
@@ -3324,14 +3325,14 @@
               </widget>
              </item>
              <item row="4" column="1">
-              <widget class="QCheckBox" name="n_meas_laser_spectra_rescan2D">
+              <widget class="QCheckBox" name="nMeasLaserSpectra_rescan2D">
                <property name="text">
                 <string>rescan2D</string>
                </property>
               </widget>
              </item>
              <item row="4" column="2">
-              <widget class="QDoubleSpinBox" name="n_meas_laser_spectra_scanSpectraExp">
+              <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_scanSpectraExp">
                <property name="toolTip">
                 <string>scanSpectraExp</string>
                </property>
@@ -3351,8 +3352,8 @@
              </item>
             </layout>
            </item>
-           <item row="4" column="0">
-            <widget class="QPushButton" name="n_meas_laser_spectra_set_point">
+           <item row="5" column="0">
+            <widget class="QPushButton" name="nMeasLaserSpectra_setPoint">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                <horstretch>3</horstretch>
@@ -3367,14 +3368,91 @@
              </property>
             </widget>
            </item>
-           <item row="11" column="0">
-            <widget class="QPushButton" name="n_meas_laser_spectra_pause">
-             <property name="text">
-              <string>Pause</string>
+           <item row="4" column="0">
+            <widget class="QGroupBox" name="groupBox_19">
+             <property name="title">
+              <string>Polarization</string>
              </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
+             <layout class="QGridLayout" name="gridLayout_29">
+              <item row="1" column="1">
+               <widget class="QLabel" name="label_44">
+                <property name="text">
+                 <string>End</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_43">
+                <property name="text">
+                 <string>Start</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="2">
+               <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_testPolar_step">
+                <property name="maximum">
+                 <double>360.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_testPolar_end">
+                <property name="maximum">
+                 <double>360.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QDoubleSpinBox" name="nMeasLaserSpectra_testPolar_start">
+                <property name="maximum">
+                 <double>360.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="2">
+               <widget class="QLabel" name="label_45">
+                <property name="text">
+                 <string>Step</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="0">
+               <widget class="QCheckBox" name="nMeasLaserSpectra_testPolar">
+                <property name="text">
+                 <string>TestPolarization</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QSpinBox" name="nMeasLaserSpectra_testPolarFreq">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>100</number>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="2">
+               <widget class="QComboBox" name="nMeasLaserSpectra_testPolarMode">
+                <item>
+                 <property name="text">
+                  <string>Main NP</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Each NP (Move -&gt; rotate)</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Each NP (Rotate -&gt; Move )</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+             </layout>
             </widget>
            </item>
           </layout>
@@ -3463,10 +3541,18 @@
     </property>
     <addaction name="actionClean"/>
    </widget>
+   <widget class="QMenu" name="menuMeasurement">
+    <property name="title">
+     <string>Measurement</string>
+    </property>
+    <addaction name="actionPause"/>
+    <addaction name="actionStop"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuLaser"/>
    <addaction name="menuAndor"/>
    <addaction name="menuView"/>
+   <addaction name="menuMeasurement"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -3486,6 +3572,8 @@
    <addaction name="separator"/>
    <addaction name="actionClean"/>
    <addaction name="separator"/>
+   <addaction name="actionPause"/>
+   <addaction name="actionStop"/>
   </widget>
   <action name="actionExit">
    <property name="text">
@@ -3518,42 +3606,57 @@
     <string>Clean</string>
    </property>
   </action>
+  <action name="actionPause">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Pause</string>
+   </property>
+  </action>
+  <action name="actionStop">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Stop</string>
+   </property>
+  </action>
  </widget>
  <tabstops>
-  <tabstop>configTabWidget</tabstop>
-  <tabstop>Pi_X_On</tabstop>
-  <tabstop>Pi_X_move_to</tabstop>
-  <tabstop>Pi_X_go</tabstop>
-  <tabstop>Pi_Y_On</tabstop>
-  <tabstop>Pi_Y_move_to</tabstop>
-  <tabstop>Pi_Y_go</tabstop>
-  <tabstop>Pi_Z_On</tabstop>
-  <tabstop>Pi_Z_move_to</tabstop>
-  <tabstop>Pi_Z_go</tabstop>
-  <tabstop>Pi_XYZ_50mkm</tabstop>
-  <tabstop>HWP_move_to_angle</tabstop>
-  <tabstop>HWP_go</tabstop>
-  <tabstop>HWP_go_home</tabstop>
-  <tabstop>HWP_negative_step</tabstop>
-  <tabstop>HWP_rel_step</tabstop>
-  <tabstop>HWP_positive_step</tabstop>
-  <tabstop>usbSpectr_from</tabstop>
-  <tabstop>usbSpectr_to</tabstop>
-  <tabstop>usbSpectr_save_from</tabstop>
-  <tabstop>usbSpectr_save_to</tabstop>
-  <tabstop>usbSpectr_integr_time</tabstop>
   <tabstop>usbSpectr_set_integr_time</tabstop>
   <tabstop>connect_DAQmx</tabstop>
   <tabstop>DAQmx_shift</tabstop>
-  <tabstop>DAQmx_find_shift</tabstop>
-  <tabstop>connect_pico</tabstop>
-  <tabstop>pico_ChA_VRange</tabstop>
-  <tabstop>pico_ChB_VRange</tabstop>
-  <tabstop>pico_AutoRange_min</tabstop>
-  <tabstop>pico_AutoRange_max</tabstop>
-  <tabstop>pico_TrigSource</tabstop>
-  <tabstop>pico_TrigThreshold</tabstop>
-  <tabstop>pico_Trig_mode</tabstop>
+  <tabstop>configTabWidget</tabstop>
+  <tabstop>nMeasLaserSpectra_filePath</tabstop>
+  <tabstop>nMeasLaserSpectra_filePath_find</tabstop>
+  <tabstop>nMeasLaserSpectra_start</tabstop>
+  <tabstop>nMeasLaserSpectra_end</tabstop>
+  <tabstop>nMeasLaserSpectra_step</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_start</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_end</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_step</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_offset</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_interface_optim</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_interface</tabstop>
+  <tabstop>nMeasLaserSpectra_Z_interface_fit</tabstop>
+  <tabstop>nMeasLaserSpectra_MOCO_PMT</tabstop>
+  <tabstop>nMeasLaserSpectra_rescan2D</tabstop>
+  <tabstop>nMeasLaserSpectra_scanSpectraExp</tabstop>
+  <tabstop>nMeasLaserSpectra_testPolar</tabstop>
+  <tabstop>nMeasLaserSpectra_testPolarFreq</tabstop>
+  <tabstop>nMeasLaserSpectra_testPolarMode</tabstop>
+  <tabstop>nMeasLaserSpectra_testPolar_start</tabstop>
+  <tabstop>nMeasLaserSpectra_testPolar_end</tabstop>
+  <tabstop>nMeasLaserSpectra_testPolar_step</tabstop>
+  <tabstop>nMeasLaserSpectra_setPoint</tabstop>
+  <tabstop>nMeasLaserSpectra_probe</tabstop>
+  <tabstop>nMeasLaserSpectra_track</tabstop>
+  <tabstop>nMeasLaserSpectra_track_channel</tabstop>
+  <tabstop>nMeasLaserSpectra_track_fast</tabstop>
+  <tabstop>nMeasLaserSpectra_FloatingWindow</tabstop>
+  <tabstop>nMeasLaserSpectra_go</tabstop>
+  <tabstop>zSlider</tabstop>
   <tabstop>pico_sampleInterval</tabstop>
   <tabstop>pico_samplingDuration</tabstop>
   <tabstop>pico_n_captures</tabstop>
@@ -3563,6 +3666,143 @@
   <tabstop>scan3D_path_dialog</tabstop>
   <tabstop>start3DScan</tabstop>
   <tabstop>scan3D_config</tabstop>
+  <tabstop>laserSetWavelength</tabstop>
+  <tabstop>laserPower_internal</tabstop>
+  <tabstop>laserSetShutter</tabstop>
+  <tabstop>laserWavelength_to_set</tabstop>
+  <tabstop>laserShutter</tabstop>
+  <tabstop>laserWavelength</tabstop>
+  <tabstop>laserWavelength_ready</tabstop>
+  <tabstop>connect_rotPiezoStage</tabstop>
+  <tabstop>rotPiezoStage_Step</tabstop>
+  <tabstop>rotPiezoStage_Go</tabstop>
+  <tabstop>rotPiezoStage_wait</tabstop>
+  <tabstop>HWP_stepper_Connect</tabstop>
+  <tabstop>HWP_stepper_MoveTo</tabstop>
+  <tabstop>HWP_stepper_MoveTo_Go</tabstop>
+  <tabstop>HWP_stepper_wait</tabstop>
+  <tabstop>HWP_stepper_CW</tabstop>
+  <tabstop>HWP_stepper_step</tabstop>
+  <tabstop>HWP_stepper_CCW</tabstop>
+  <tabstop>HWP_stepper_Reset</tabstop>
+  <tabstop>Pi_Velocity</tabstop>
+  <tabstop>Pi_wait</tabstop>
+  <tabstop>Pi_autoZero</tabstop>
+  <tabstop>Pi_Set</tabstop>
+  <tabstop>mocoConnect</tabstop>
+  <tabstop>mocoPosition</tabstop>
+  <tabstop>mocoHome</tabstop>
+  <tabstop>pushButton_3</tabstop>
+  <tabstop>spinBox</tabstop>
+  <tabstop>pushButton_4</tabstop>
+  <tabstop>mocoMoveAbs</tabstop>
+  <tabstop>mocoMoveAbs_target</tabstop>
+  <tabstop>mocoSection</tabstop>
+  <tabstop>usbSpactr_connect</tabstop>
+  <tabstop>pm100Connect</tabstop>
+  <tabstop>pm100Average</tabstop>
+  <tabstop>pm100Live</tabstop>
+  <tabstop>pico_set</tabstop>
+  <tabstop>pico_ChA_offset</tabstop>
+  <tabstop>pico_ChB_offset</tabstop>
+  <tabstop>pico_AutoRange</tabstop>
+  <tabstop>pico_pretrig</tabstop>
+  <tabstop>pico_photon_counter</tabstop>
+  <tabstop>pico_photon_counter_threshold</tabstop>
+  <tabstop>shamrockWavelengthShift</tabstop>
+  <tabstop>shamrockWavelength_to_set</tabstop>
+  <tabstop>shamrockSetWavelength</tabstop>
+  <tabstop>shamrockWavelength</tabstop>
+  <tabstop>shamrockConnect</tabstop>
+  <tabstop>shamrockPort</tabstop>
+  <tabstop>shamrockGrating</tabstop>
+  <tabstop>shamrock_use_MOCO</tabstop>
+  <tabstop>shamrock_MOCO_limit</tabstop>
+  <tabstop>andorCameraLive</tabstop>
+  <tabstop>andorCameraReadoutMode</tabstop>
+  <tabstop>andorCameraExposure</tabstop>
+  <tabstop>andorCameraConnect</tabstop>
+  <tabstop>andorCameraGetBaseline</tabstop>
+  <tabstop>andorCameraGetData</tabstop>
+  <tabstop>andorCameraExposureAdaptive</tabstop>
+  <tabstop>andorCameraCleanLines</tabstop>
+  <tabstop>readoutSources</tabstop>
+  <tabstop>fastScan_time_delay</tabstop>
+  <tabstop>fastScan_time_cutoff</tabstop>
+  <tabstop>fastScan_time_calibr</tabstop>
+  <tabstop>fastScan_pattern</tabstop>
+  <tabstop>fast3DScan</tabstop>
+  <tabstop>scan3D_num_peaks</tabstop>
+  <tabstop>scan3D_peak_find</tabstop>
+  <tabstop>scan3D_threshold_rel</tabstop>
+  <tabstop>Scan3D_min_distance</tabstop>
+  <tabstop>scan3D_maskThreshold</tabstop>
+  <tabstop>scan3D_byMask</tabstop>
+  <tabstop>scan3D_maskStep</tabstop>
+  <tabstop>scan3D_generateMask</tabstop>
+  <tabstop>scan3D_maskSigma</tabstop>
+  <tabstop>optim1step</tabstop>
+  <tabstop>optim1step_n</tabstop>
+  <tabstop>optim1step_zCompensationShift</tabstop>
+  <tabstop>optim1step_zCompensation</tabstop>
+  <tabstop>scan1D_filePath</tabstop>
+  <tabstop>scan1D_filePath_find</tabstop>
+  <tabstop>scan1D_start</tabstop>
+  <tabstop>scan1D_end</tabstop>
+  <tabstop>scan1D_step</tabstop>
+  <tabstop>scan1D_axis</tabstop>
+  <tabstop>scan1D_Scan</tabstop>
+  <tabstop>scanPolar_angle</tabstop>
+  <tabstop>scanPolar</tabstop>
+  <tabstop>meas_laser_spectra_track</tabstop>
+  <tabstop>meas_laser_spectra_track_channel</tabstop>
+  <tabstop>meas_laser_spectra_track_fast</tabstop>
+  <tabstop>meas_laser_spectra_probe</tabstop>
+  <tabstop>meas_laser_spectra_start</tabstop>
+  <tabstop>meas_laser_spectra_end</tabstop>
+  <tabstop>meas_laser_spectra_step</tabstop>
+  <tabstop>meas_laser_spectra_go</tabstop>
+  <tabstop>calibr_wavelength_start</tabstop>
+  <tabstop>calibr_wavelength_end</tabstop>
+  <tabstop>calibr_wavelength_step</tabstop>
+  <tabstop>calibr_step</tabstop>
+  <tabstop>calibr_end</tabstop>
+  <tabstop>calibr_start</tabstop>
+  <tabstop>powerCalibr_go</tabstop>
+  <tabstop>confParam_scan_step</tabstop>
+  <tabstop>confParam_scan_end</tabstop>
+  <tabstop>confParam_scan_start</tabstop>
+  <tabstop>confParam_scan</tabstop>
+  <tabstop>Pi_Y_On</tabstop>
+  <tabstop>Pi_Y_move_to</tabstop>
+  <tabstop>Pi_Y_go</tabstop>
+  <tabstop>Pi_Z_On</tabstop>
+  <tabstop>Pi_Z_move_to</tabstop>
+  <tabstop>pico_ChA_VRange</tabstop>
+  <tabstop>pico_ChB_VRange</tabstop>
+  <tabstop>pico_AutoRange_min</tabstop>
+  <tabstop>pico_AutoRange_max</tabstop>
+  <tabstop>pico_TrigSource</tabstop>
+  <tabstop>connect_pico</tabstop>
+  <tabstop>Pi_Z_go</tabstop>
+  <tabstop>HWP_go</tabstop>
+  <tabstop>HWP_move_to_angle</tabstop>
+  <tabstop>Pi_XYZ_50mkm</tabstop>
+  <tabstop>HWP_negative_step</tabstop>
+  <tabstop>HWP_rel_step</tabstop>
+  <tabstop>HWP_go_home</tabstop>
+  <tabstop>HWP_positive_step</tabstop>
+  <tabstop>usbSpectr_from</tabstop>
+  <tabstop>usbSpectr_to</tabstop>
+  <tabstop>DAQmx_find_shift</tabstop>
+  <tabstop>pico_TrigThreshold</tabstop>
+  <tabstop>pico_Trig_mode</tabstop>
+  <tabstop>Pi_X_go</tabstop>
+  <tabstop>Pi_X_On</tabstop>
+  <tabstop>Pi_X_move_to</tabstop>
+  <tabstop>usbSpectr_save_from</tabstop>
+  <tabstop>usbSpectr_save_to</tabstop>
+  <tabstop>usbSpectr_integr_time</tabstop>
  </tabstops>
  <resources/>
  <connections/>

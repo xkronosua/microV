@@ -172,6 +172,7 @@ class microV(QtGui.QMainWindow):
 	data2D_B = np.array([])
 	dataMask = None
 	NPsCenters = []
+	nMeasLaserSpectra_probe_currentRow = 0
 
 	processOut = Queue()
 	def __init__(self, parent=None):
@@ -1138,10 +1139,21 @@ class microV(QtGui.QMainWindow):
 			self.scan3DisAlive = False
 
 	def laserPowerCalibr(self, state):
-		def move_function(pos):
-			self.HWP.mAbs(pos)
-			pos = self.HWP.getPos()
-			self.ui.HWP_angle.setText(str(round(pos,6)))
+		mode = self.ui.powerCalibrMode.currentText()
+		if mode == 'HWP_Power':
+			def move_function(pos):
+				self.HWP.mAbs(pos)
+				pos = self.HWP.getPos()
+				self.ui.HWP_angle.setText(str(round(pos,6)))
+		elif mode == 'HWP_Polarization':
+			def move_function(pos):
+				if not self.ui.HWP_stepper_Connect.isChecked():
+					self.ui.HWP_stepper_Connect.setChecked(True)
+				self.HWP_stepper_moveTo(float(pos),wait=True)
+				pos = self.HWP_stepper.getAngle()
+				self.ui.HWP_stepper_angle.setText(str(round(pos,6)))
+		else:
+			return
 		if state:
 			start_wavelength = self.ui.calibr_wavelength_start.value()
 			end_wavelength = self.ui.calibr_wavelength_end.value()
@@ -1162,11 +1174,20 @@ class microV(QtGui.QMainWindow):
 
 					time.sleep(3)
 					t0 = time.time()
-					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive or not self.ui.powerCalibr_go.isChecked():
+					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 :
 						time.sleep(0.5)
 						print('wait:Laser')
 						app.processEvents()
 
+						if self.ui.actionPause.isChecked():
+							while self.ui.actionPause.isChecked():
+								app.processEvents()
+						if self.ui.actionStop.isChecked(): break
+
+					if self.ui.actionPause.isChecked():
+						while self.ui.actionPause.isChecked():
+							app.processEvents()
+					if self.ui.actionStop.isChecked(): break
 					start_angle = self.ui.calibr_start.value()
 					end_angle = self.ui.calibr_end.value()
 					step_angle = self.ui.calibr_step.value()
@@ -1185,7 +1206,10 @@ class microV(QtGui.QMainWindow):
 						HWP_angle = float(self.ui.HWP_angle.text())
 						HWP_stepper_angle = float(self.ui.HWP_stepper_angle.text())
 
-						x = HWP_angle
+						if mode == 'HWP_Power':
+							x = HWP_angle
+						elif mode == 'HWP_Polarization':
+							x = HWP_stepper_angle
 						power = self.readPower()
 						bi_power = self.ui.laserPower_internal.value()
 
@@ -1208,6 +1232,10 @@ class microV(QtGui.QMainWindow):
 							store.put("scan_"+str(wl), df)
 							return
 							break
+						if self.ui.actionPause.isChecked():
+							while self.ui.actionPause.isChecked():
+								app.processEvents()
+						if self.ui.actionStop.isChecked(): break
 					df = pd.DataFrame(data, index=steps_range,columns=['power','laserBultInPower','Time'])
 					calibr_name = "powerCalibr_"+str(wl)
 					store.put(calibr_name, df)
@@ -1359,36 +1387,49 @@ class microV(QtGui.QMainWindow):
 
 		else:
 			self.scan3DisAlive = False
-	def n_meas_laser_spectra_filePath_find(self):
-		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.n_meas_laser_spectra_filePath.text())
+	def nMeasLaserSpectra_filePath_find(self):
+		fname = QtGui.QFileDialog.getSaveFileName(self, 'Save file', self.ui.nMeasLaserSpectra_filePath.text())
 		if type(fname)==tuple:
 			fname = fname[0]
 		try:
-			self.ui.n_meas_laser_spectra_filePath.setText(fname)
+			self.ui.nMeasLaserSpectra_filePath.setText(fname)
 		except:
 			traceback.print_exc()
 
-	def n_meas_laser_spectra_go(self,state):
+	def nMeasLaserSpectra_setPoint(self,state):
 		if state:
+			self.nMeasLaserSpectra_probe_currentRow = self.ui.nMeasLaserSpectra_probe.currentRow()
+
+	def nMeasLaserSpectra_go(self,state):
+		if state:
+			self.ui.actionStop.setChecked(False)
+			self.live_x = np.array([])
+			self.live_y = np.array([])
 			self.live_pmtA = np.array([])
 			self.live_pmtB = np.array([])
-			start_wavelength = self.ui.n_meas_laser_spectra_start.value()
-			end_wavelength = self.ui.n_meas_laser_spectra_end.value()
-			step_wavelength = self.ui.n_meas_laser_spectra_step.value()
+			self.nMeasLaserSpectra_testPolar_counter = 0
+
+			start_wavelength = self.ui.nMeasLaserSpectra_start.value()
+			end_wavelength = self.ui.nMeasLaserSpectra_end.value()
+			step_wavelength = self.ui.nMeasLaserSpectra_step.value()
 			if start_wavelength > end_wavelength:
 				step_wavelength = -step_wavelength
 			self.scan3DisAlive = True
 			wl_range = np.arange(start_wavelength,end_wavelength+step_wavelength,step_wavelength)
-			with pd.HDFStore(self.ui.n_meas_laser_spectra_filePath.text()+str(round(time.time()))+'.h5') as store:
+			self.live_x = np.array([])
+			self.live_pmtA = np.array([])
+			self.live_pmtB = np.array([])
+
+			with pd.HDFStore(self.ui.nMeasLaserSpectra_filePath.text()+str(round(time.time()))+'.h5') as store:
 				store.keys()
 				self.live_x = np.array([])
 				self.live_integr_spectra = np.array([])
 
 				for wl in wl_range:
-					if self.ui.n_meas_laser_spectra_pause.isChecked():
-						while self.ui.n_meas_laser_spectra_pause.isChecked():
-							time.sleep(0.02)
+					if self.ui.actionPause.isChecked():
+						while self.ui.actionPause.isChecked():
 							app.processEvents()
+					if self.ui.actionStop.isChecked(): break
 					time_list = []
 					time_list.append(time.time())
 					self.laserSetWavelength_(status=1,wavelength=wl)
@@ -1403,31 +1444,33 @@ class microV(QtGui.QMainWindow):
 						time.sleep(0.1)
 						print('wait:Laser')
 						app.processEvents()
-						if not self.ui.n_meas_laser_spectra_go.isChecked():
+						if not self.ui.nMeasLaserSpectra_go.isChecked():
 							break
+
+						if self.ui.actionStop.isChecked(): break
 
 					time_list.append(time.time())
 
 
-					bg_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(0,i).text()) for i in range(3)])
+					bg_center = np.array([ float(self.ui.nMeasLaserSpectra_probe.item(0,i).text()) for i in range(3)])
 
 
-					spectra_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(1,i).text()) for i in range(3)])
+					spectra_center = np.array([ float(self.ui.nMeasLaserSpectra_probe.item(1,i).text()) for i in range(3)])
 
-					NP_centers = np.array([[ float(self.ui.n_meas_laser_spectra_probe.item(j,i).text()) for i in range(3)] for j in range(1,self.ui.n_meas_laser_spectra_probe.rowCount())])
+					NP_centers = np.array([[ float(self.ui.nMeasLaserSpectra_probe.item(j,i).text()) for i in range(3)] for j in range(1,self.ui.nMeasLaserSpectra_probe.rowCount())])
 
-					z_start = self.ui.n_meas_laser_spectra_Z_start.value()
-					z_end = self.ui.n_meas_laser_spectra_Z_end.value()
-					z_step = self.ui.n_meas_laser_spectra_Z_step.value()
+					z_start = self.ui.nMeasLaserSpectra_Z_start.value()
+					z_end = self.ui.nMeasLaserSpectra_Z_end.value()
+					z_step = self.ui.nMeasLaserSpectra_Z_step.value()
 
 					Range_z = np.arange(z_start,z_end,z_step)
 					data_ZA = np.zeros(len(Range_z))
 					data_ZB = np.zeros(len(Range_z))
 
-					if self.ui.n_meas_laser_spectra_track.isChecked():
+					if self.ui.nMeasLaserSpectra_track.isChecked():
 
 
-						if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
+						if self.ui.nMeasLaserSpectra_MOCO_PMT.isChecked():
 							self.ui.mocoSection.setCurrentIndex(3)
 						else:
 							source = self.ui.readoutSources.currentText()
@@ -1437,8 +1480,8 @@ class microV(QtGui.QMainWindow):
 								self.ui.shamrockPort.setCurrentIndex(1)
 							self.shamrockSetWavelength((wl/2+wl/3)/2)
 
-						if self.ui.n_meas_laser_spectra_Z_interface_optim.isChecked():
-							if self.ui.n_meas_laser_spectra_MOCO_PMT.isChecked():
+						if self.ui.nMeasLaserSpectra_Z_interface_optim.isChecked():
+							if self.ui.nMeasLaserSpectra_MOCO_PMT.isChecked():
 								print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 
 								for zi,z in enumerate(Range_z):
@@ -1453,9 +1496,13 @@ class microV(QtGui.QMainWindow):
 									self.line_pmtA.setData(x=Range_z,y=data_ZA)
 
 									app.processEvents()
+									if self.ui.actionPause.isChecked():
+										while self.ui.actionPause.isChecked():
+											app.processEvents()
+									if self.ui.actionStop.isChecked(): break
 								dz = medfilt(data_ZB,9)
 								interf_z = Range_z[dz==dz.max()][0]
-								if self.ui.n_meas_laser_spectra_Z_interface_fit.isChecked():
+								if self.ui.nMeasLaserSpectra_Z_interface_fit.isChecked():
 
 									gmodel = Model(gaussian)
 									result = gmodel.fit(dz, x=Range_z, amp=dz.max(), cen=interf_z, wid=2,bg=dz.min())
@@ -1469,12 +1516,12 @@ class microV(QtGui.QMainWindow):
 									store.put("scan_Z_"+str(wl), pd.DataFrame(data_ZB,index=Range_z,columns=['scan_Z']))
 							else:
 								self.andorCamera_prevExposure = self.ui.andorCameraExposure.value()
-								self.ui.andorCameraExposure.setValue(self.ui.n_meas_laser_spectra_scanSpectraExp.value())
+								self.ui.andorCameraExposure.setValue(self.ui.nMeasLaserSpectra_scanSpectraExp.value())
 								app.processEvents()
 
 								print(self.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 								self.andorCameraGetBaseline()
-								current_row = self.ui.n_meas_laser_spectra_probe.currentRow()-1
+								current_row = self.ui.nMeasLaserSpectra_probe.currentRow()-1
 								print(self.piStage.MOV(NP_centers[current_row],axis=b'1 2 3',waitUntilReady=True))
 								N = self.ui.optim1step_n.value()
 								pos,v = self.center3Doptim(center=NP_centers[current_row],N=N)
@@ -1484,57 +1531,57 @@ class microV(QtGui.QMainWindow):
 								delta = pos - NP_centers[current_row]
 								for i in range(len(NP_centers)):
 									for j in range(3):
-										self.ui.n_meas_laser_spectra_probe.item(i+1,j).setText(str(NP_centers[i,j]+delta[j]))
-								self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]+delta[0]))
-								self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]+delta[1]))
-								self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(bg_center[2]+delta[2]))
-									#self.ui.n_meas_laser_spectra_probe.item(i+1,2).setText(str(np_scan_Z))
+										self.ui.nMeasLaserSpectra_probe.item(i+1,j).setText(str(NP_centers[i,j]+delta[j]))
+								self.ui.nMeasLaserSpectra_probe.item(0,0).setText(str(bg_center[0]+delta[0]))
+								self.ui.nMeasLaserSpectra_probe.item(0,1).setText(str(bg_center[1]+delta[1]))
+								self.ui.nMeasLaserSpectra_probe.item(0,2).setText(str(bg_center[2]+delta[2]))
+									#self.ui.nMeasLaserSpectra_probe.item(i+1,2).setText(str(np_scan_Z))
 
-							self.ui.n_meas_laser_spectra_Z_interface.setValue(interf_z)
+							self.ui.nMeasLaserSpectra_Z_interface.setValue(interf_z)
 						else:
-							interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
-						z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
+							interf_z = self.ui.nMeasLaserSpectra_Z_interface.value()
+						z_offset = self.ui.nMeasLaserSpectra_Z_offset.value()
 
 						np_scan_Z = interf_z + z_offset
 						print(self.piStage.MOV([np_scan_Z],axis=b'3',waitUntilReady=True))
 
-						if self.ui.n_meas_laser_spectra_rescan2D.isChecked():
+						if self.ui.nMeasLaserSpectra_rescan2D.isChecked():
 							centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
 							NP_centers = self.scan3D_peak_find()
 
 							for i in range(len(NP_centers)):
 								for j in range(2):
-									self.ui.n_meas_laser_spectra_probe.item(i+1,j).setText(str(NP_centers[i,j]))
-								self.ui.n_meas_laser_spectra_probe.item(i+1,2).setText(str(np_scan_Z))
+									self.ui.nMeasLaserSpectra_probe.item(i+1,j).setText(str(NP_centers[i,j]))
+								self.ui.nMeasLaserSpectra_probe.item(i+1,2).setText(str(np_scan_Z))
 
-						if self.ui.n_meas_laser_spectra_FloatingWindow.isChecked():
+						if self.ui.nMeasLaserSpectra_FloatingWindow.isChecked():
 							center_tmp = NP_centers.mean(axis=0)
 							if len(center_tmp)>0:
 								pos = np.array(self.rectROI.pos())
 								size = self.rectROI.size()
 								prev_center = np.array([size[0]/2+pos[0],size[1]/2+pos[1]])
 								shift = center_tmp - prev_center
-								self.ui.n_meas_laser_spectra_probe.item(0,0).setText(str(bg_center[0]+shift[0]))
-								self.ui.n_meas_laser_spectra_probe.item(0,1).setText(str(bg_center[1]+shift[1]))
+								self.ui.nMeasLaserSpectra_probe.item(0,0).setText(str(bg_center[0]+shift[0]))
+								self.ui.nMeasLaserSpectra_probe.item(0,1).setText(str(bg_center[1]+shift[1]))
 								self.rectROI.setPos(pos+shift)
 
 						if self.ui.scan3D_byMask.isChecked():
 							self.generate2Dmask(view=False)
 
 
-					if not self.ui.n_meas_laser_spectra_go.isChecked():
+					if not self.ui.nMeasLaserSpectra_go.isChecked():
 						break
 					time_list.append(time.time())
 
-					#self.ui.n_meas_laser_spectra_probe.item(0,2).setText(str(np_scan_Z))
-					bg_center = np.array([ float(self.ui.n_meas_laser_spectra_probe.item(0,i).text()) for i in range(3)])
+					#self.ui.nMeasLaserSpectra_probe.item(0,2).setText(str(np_scan_Z))
+					bg_center = np.array([ float(self.ui.nMeasLaserSpectra_probe.item(0,i).text()) for i in range(3)])
 
 					self.ui.mocoSection.setCurrentIndex(2)
 
 					self.ui.shamrockPort.setCurrentIndex(0)
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
 
-					interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
+					interf_z = self.ui.nMeasLaserSpectra_Z_interface.value()
 					self.piStage.MOV(bg_center,b'1 2 3',waitUntilReady=True)
 					self.piStage.MOV([interf_z],b'3',waitUntilReady=True)
 					self.andorCameraGetBaseline()
@@ -1550,6 +1597,10 @@ class microV(QtGui.QMainWindow):
 
 					exposure = self.ui.andorCameraExposure.value()
 					intens = np.array([0]*len(self.andorCCD_wavelength))
+
+
+
+
 					for index,NP_c in enumerate(NP_centers):
 						if np.isnan(NP_c).any(): break
 						print(NP_c,index)
@@ -1558,8 +1609,12 @@ class microV(QtGui.QMainWindow):
 						pos = self.piStage.qPOS()
 						self.setUiPiPos(pos=pos)
 
-						if not self.ui.n_meas_laser_spectra_go.isChecked():
+						if not self.ui.nMeasLaserSpectra_go.isChecked():
 							break
+						if self.ui.actionPause.isChecked():
+							while self.ui.actionPause.isChecked():
+								app.processEvents()
+						if self.ui.actionStop.isChecked(): break
 						#self.andorCameraGetBaseline()
 
 						#integr_intens,intens,wavelength_arr = self.andorCameraGetData(state=1,integr_range=[wl/3-20,wl/3+20])
@@ -1570,30 +1625,81 @@ class microV(QtGui.QMainWindow):
 						#step_Z = self.ui.confParam_scan_step.value()
 						#Range_Z = np.arange(start_Z,end_Z,step_Z)
 
-						df = pd.DataFrame(self.andorCCDBaseline, index=self.andorCCD_wavelength,columns=['baseline'])
+						df = pd.DataFrame(self.andorCCDBaseline,columns=['baseline'])
+						df['wavelength'] = self.andorCCD_wavelength
 						#for z in Range_Z:
 						#	print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
 						#	real_position = self.piStage.qPOS()
 						#	z_real = real_position[2]
-						time_list.append(time.time())
-						intens,wavelength_arr = self.andorCameraGetData(state=1,line_index=index+1)
-						time_list.append(time.time())
-						w3 = (wavelength_arr>wl/3-20)&(wavelength_arr>wl/3+20)
-						integr_intens_THG = intens[w3].sum()
-						w2 = (wavelength_arr>wl/2-20)&(wavelength_arr>wl/2+20)
-						integr_intens_SHG = intens[w2].sum()
-						df['wavelength'] = wavelength_arr
-						df['intens'] = intens
 
-						#self.live_x = np.hstack((self.live_x, wl))
-						#self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
+						if self.ui.nMeasLaserSpectra_testPolar.isChecked() and index == 0 and \
+							self.nMeasLaserSpectra_testPolar_counter >= self.ui.nMeasLaserSpectra_testPolarFreq.value()-1:
+							self.nMeasLaserSpectra_testPolar_counter = 0
+							def HWP_move_function(pos):
+								if not self.ui.HWP_stepper_Connect.isChecked():
+									self.ui.HWP_stepper_Connect.setChecked(True)
+								self.HWP_stepper_moveTo(float(pos),wait=True)
+								pos = self.HWP_stepper.getAngle()
+								self.ui.HWP_stepper_angle.setText(str(round(pos,6)))
+							start_angle = self.ui.nMeasLaserSpectra_testPolar_start.value()
+							end_angle = self.ui.nMeasLaserSpectra_testPolar_end.value()
+							step_angle = self.ui.nMeasLaserSpectra_testPolar_step.value()
+							HWP_range = np.arange(start_angle,end_angle+step_angle,step_angle)
 
-						#self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
-						#self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
+							for ang in HWP_range:
 
-						#self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+								if self.ui.actionPause.isChecked():
+									while self.ui.actionPause.isChecked():
+										app.processEvents()
+								if self.ui.actionStop.isChecked(): break
+								HWP_move_function(ang)
+								print(ang)
+								time_list.append(time.time())
+								intens,wavelength_arr = self.andorCameraGetData(state=1,line_index=index+1)
+								time_list.append(time.time())
+								w3 = abs(wavelength_arr-wl/3)<10
+								integr_intens_THG = intens[w3].sum()
+								w2 = abs(wavelength_arr-wl/2)<10
+								integr_intens_SHG = intens[w2].sum()
+								df['intens_'+str(ang)] = intens
+
+								self.live_x = np.hstack((self.live_x, wl))
+								self.live_y = np.hstack((self.live_y, ang))
+								self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
+								self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
+
+								self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+								self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+								self.line_pico_ChA.setData(x=self.live_y,y=self.live_pmtA)
+								self.line_pico_ChB.setData(x=self.live_y,y=self.live_pmtB)
+								app.processEvents()
+
+							HWP_move_function(start_angle)
+							app.processEvents()
+
+						else:
+							time_list.append(time.time())
+							intens,wavelength_arr = self.andorCameraGetData(state=1,line_index=index+1)
+							time_list.append(time.time())
+							w3 = abs(wavelength_arr-wl/3)<10
+							integr_intens_THG = intens[w3].sum()
+							w2 = abs(wavelength_arr-wl/2)<10
+							integr_intens_SHG = intens[w2].sum()
+							df['intens'] = intens
+
+							self.live_x = np.hstack((self.live_x, wl))
+							ang = self.HWP_stepper.getAngle()
+							self.live_y = np.hstack((self.live_y, ang))
+							self.live_pmtA = np.hstack((self.live_pmtA, integr_intens_SHG))
+							self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
+
+							self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
+							self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
+
+
+
 						app.processEvents()
-						if not self.ui.n_meas_laser_spectra_go.isChecked():
+						if not self.ui.nMeasLaserSpectra_go.isChecked():
 							store.put("forceEnd_"+str(wl), df)
 							return
 							break
@@ -1609,8 +1715,8 @@ class microV(QtGui.QMainWindow):
 
 
 						store.put("time_"+str(wl), pd.DataFrame(time_list))
-						if self.ui.n_meas_laser_spectra_track.isChecked():
-							if self.ui.n_meas_laser_spectra_rescan2D.isChecked():
+						if self.ui.nMeasLaserSpectra_track.isChecked():
+							if self.ui.nMeasLaserSpectra_rescan2D.isChecked():
 								store.put("scanA_"+str(wl), panelA)
 								store.put("scanB_"+str(wl), panelB)
 
@@ -1620,7 +1726,12 @@ class microV(QtGui.QMainWindow):
 					if intens.max()>40000 and self.ui.andorCameraExposureAdaptive.isChecked():
 						self.ui.andorCameraExposure.setValue(exposure*0.8)
 
+					if self.ui.actionPause.isChecked():
+						while self.ui.actionPause.isChecked():
+							app.processEvents()
+					if self.ui.actionStop.isChecked(): break
 
+					self.nMeasLaserSpectra_testPolar_counter += 1
 
 		else:
 			self.scan3DisAlive = False
@@ -1776,7 +1887,7 @@ class microV(QtGui.QMainWindow):
 			self.piStage.MOV(center,axis=b'1 2 3', waitUntilReady=True)
 			#center = self.piStage.qPOS()
 		data_pos_res = []
-		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
+		ch = self.ui.nMeasLaserSpectra_track_channel.currentIndex()
 		col = [3,4,5][ch]
 
 		for n in range(N):
@@ -1815,6 +1926,10 @@ class microV(QtGui.QMainWindow):
 				pmt_valA, pmt_valB, pmt_valC = self.getABData()
 				data_pos.append(np.hstack([p,pmt_valA, pmt_valB, pmt_valC]))
 				app.processEvents()
+				if self.ui.actionPause.isChecked():
+					while self.ui.actionPause.isChecked():
+						app.processEvents()
+				if self.ui.actionStop.isChecked(): break
 			data_pos = np.array(data_pos)
 
 
@@ -1825,12 +1940,17 @@ class microV(QtGui.QMainWindow):
 			self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
 			#self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
 			p = self.piStage.qPOS()
+			p = self.piStage.qPOS()
 			center_prev = center.copy()
 			center = self.piStage.qPOS()
-			center_ = center+(center-center_prev)*0.6
+			center_ = center+(center-center_prev)/1.618
 
 			self.setUiPiPos(center)
 			pmt_valA, pmt_valB, pmt_valC = self.getABData()
+			pmt_valA1, pmt_valB1, pmt_valC1 = self.getABData()
+			pmt_valA = (pmt_valA+pmt_valA1)/2
+			pmt_valB = (pmt_valB+pmt_valB1)/2
+			pmt_valC = (pmt_valC+pmt_valC1)/2
 			data_pos_res.append(np.hstack([center,pmt_valA, pmt_valB, pmt_valC]))
 			center = center_
 
@@ -1842,6 +1962,7 @@ class microV(QtGui.QMainWindow):
 		self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
 		self.piStage.MOV(pos,axis=b'1 2 3', waitUntilReady=True)
 		p = self.piStage.qPOS()
+		p = self.piStage.qPOS()
 		center = self.piStage.qPOS()
 		self.setUiPiPos(center)
 		pmt_valA, pmt_valB, pmt_valC = self.getABData()
@@ -1852,6 +1973,7 @@ class microV(QtGui.QMainWindow):
 		return center, (pmt_valA, pmt_valB, pmt_valC)
 
 	def optim1step(self):
+		self.ui.actionStop.setChecked(False)
 		N = self.ui.optim1step_n.value()
 		self.center3Doptim(N=N)
 
@@ -1876,6 +1998,7 @@ class microV(QtGui.QMainWindow):
 			self.live_y = []
 
 			self.scan3DisAlive = False
+
 	def getABData(self):
 		source = self.ui.readoutSources.currentText()
 		if source == 'Picoscope':
@@ -1884,8 +2007,8 @@ class microV(QtGui.QMainWindow):
 		elif source == 'AndorCamera':
 			intens,wavelength_arr = self.andorCameraGetData(state=1)
 			Ex_wl = self.ui.laserWavelength.value()
-			w3 = (wavelength_arr>Ex_wl/3-20)&(wavelength_arr<Ex_wl/3+20)
-			w2 = (wavelength_arr>Ex_wl/2-20)&(wavelength_arr<Ex_wl/2+20)
+			w3 = (wavelength_arr>Ex_wl/3-10)&(wavelength_arr<Ex_wl/3+10)
+			w2 = (wavelength_arr>Ex_wl/2-10)&(wavelength_arr<Ex_wl/2+10)
 			A = intens[w2].sum()
 			B = intens[w3].sum()
 			C = intens.sum()
@@ -1894,6 +2017,7 @@ class microV(QtGui.QMainWindow):
 		return A,B,C
 
 	def scan3D(self):
+		self.ui.actionStop.setChecked(False)
 		self.calibrTimer.stop()
 		data = []
 		rows = self.ui.scan3D_config.rowCount()
@@ -2047,6 +2171,10 @@ class microV(QtGui.QMainWindow):
 							traceback.print_exc()
 						#time.sleep(0.01)
 						wait = self.ui.Pi_wait.isChecked()
+						if self.ui.actionPause.isChecked():
+							while self.ui.actionPause.isChecked():
+								app.processEvents()
+						if self.ui.actionStop.isChecked(): break
 						#print(time.time()-start)
 					#self.setImage(data_spectra)
 
@@ -2131,7 +2259,7 @@ class microV(QtGui.QMainWindow):
 				self.data2D_Range_y = yr
 
 
-			ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
+			ch = self.ui.nMeasLaserSpectra_track_channel.currentIndex()
 			if ch==0:
 				data = self.data2D_A
 			elif ch==1:
@@ -2636,6 +2764,13 @@ class microV(QtGui.QMainWindow):
 				#	data_pmtB_.append([i.mean() for i in np.array_split(scanB,len(Range_x))][::-1])
 				#	forward = True
 				app.processEvents()
+				if self.ui.actionStop.isChecked():
+					self.ui.pico_samplingDuration.setText(pico_frame_time_prev)
+					self.ui.pico_n_captures.setValue(n_frames_prev)
+					self.ui.connect_pico.setChecked(False)
+					self.ui.connect_pico.setChecked(True)
+					break
+
 			t1=time.time()
 			print("dt: %.9f\n"%(t1-t0))
 
@@ -2659,9 +2794,12 @@ class microV(QtGui.QMainWindow):
 		self.ui.pico_n_captures.setValue(n_frames_prev)
 		self.ui.connect_pico.setChecked(False)
 		self.ui.connect_pico.setChecked(True)
+
 		#self.pico_set()
 
 		#self.pico_set()
+		real_position = self.piStage.qPOS()
+		self.setUiPiPos(real_position)
 
 		return data_pmtA, data_pmtB, (Range_x, Range_y, Range_z)
 
@@ -2676,9 +2814,9 @@ class microV(QtGui.QMainWindow):
 		Range_y = self.data2D_Range_y
 
 		Range_x = self.data2D_Range_x
-		interf_z = self.ui.n_meas_laser_spectra_Z_interface.value()
+		interf_z = self.ui.nMeasLaserSpectra_Z_interface.value()
 
-		z_offset = self.ui.n_meas_laser_spectra_Z_offset.value()
+		z_offset = self.ui.nMeasLaserSpectra_Z_offset.value()
 
 		np_scan_Z = abs(interf_z + z_offset)
 
@@ -2687,6 +2825,7 @@ class microV(QtGui.QMainWindow):
 		centers["A"] = np.array([Range_x[peaks_A[:,0]], Range_y[peaks_A[:,1]], [np_scan_Z]*len(Range_y[peaks_A[:,1]])]).T
 		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]], [np_scan_Z]*len(Range_y[peaks_A[:,1]])]).T
 		centers["AB"] = np.vstack((centers["A"],centers["B"]))
+		'''
 		try:
 			centers["mid"] = (centers["A"]+centers["B"])/2
 		except:
@@ -2695,21 +2834,22 @@ class microV(QtGui.QMainWindow):
 				centers["mid"] = (centers["A"][:len(centers['B'])]+centers["B"])/2
 			elif len(centers['A'])<len(centers['B']):
 				centers["mid"] = (centers["A"]+centers["B"][:len(centers['A'])])/2
+		'''
 		self.NP_centersA.setData(x=centers["A"][:,0],y=centers["A"][:,1])
 		self.NP_centersB.setData(x=centers["B"][:,0],y=centers["B"][:,1])
 
-		ch = self.ui.n_meas_laser_spectra_track_channel.currentIndex()
+		ch = self.ui.nMeasLaserSpectra_track_channel.currentIndex()
 		ch_str = ['A','B','AB','mid']
-		#self.ui.n_meas_laser_spectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
+		#self.ui.nMeasLaserSpectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
 
 		for i in range(1,len(centers[ch_str[ch]])+1):
 			if i<=len(centers[ch_str[ch]]):
 				c_coord = centers[ch_str[ch]][i-1]
 			else:
 				c_coord = [0,50]
-			self.ui.n_meas_laser_spectra_probe.item(i,0).setText(str(c_coord[0]))
-			self.ui.n_meas_laser_spectra_probe.item(i,1).setText(str(c_coord[1]))
-			self.ui.n_meas_laser_spectra_probe.item(i,2).setText(str(np_scan_Z))
+			self.ui.nMeasLaserSpectra_probe.item(i,0).setText(str(c_coord[0]))
+			self.ui.nMeasLaserSpectra_probe.item(i,1).setText(str(c_coord[1]))
+			self.ui.nMeasLaserSpectra_probe.item(i,2).setText(str(np_scan_Z))
 		print(centers)
 
 		self.NPsCenters = centers[ch_str[ch]]
@@ -2777,7 +2917,9 @@ class microV(QtGui.QMainWindow):
 
 	def scan1D(self):
 		self.calibrTimer.stop()
-
+		self.live_x = np.array([0])
+		self.live_pmtA = np.array([0])
+		self.live_pmtB = np.array([0])
 		fname = self.ui.scan1D_filePath.text()+"_"+str(round(time.time()))+".txt"
 		with open(fname,'a') as f:
 			f.write("#X\tY\tZ\tHWP_power\tHWP_stepper\tpmtA_signal\tpmtB_signal\ttime\n")
@@ -2794,7 +2936,7 @@ class microV(QtGui.QMainWindow):
 				self.HWP.mAbs(pos)
 				pos = self.HWP.getPos()
 				self.ui.HWP_angle.setText(str(round(pos,6)))
-		elif axis == 'HWP_stepper':
+		elif axis == 'HWP_Polarization':
 			def move_function(pos):
 				if not self.ui.HWP_stepper_Connect.isChecked():
 					self.ui.HWP_stepper_Connect.setChecked(True)
@@ -2816,20 +2958,21 @@ class microV(QtGui.QMainWindow):
 			if axis == 'X':
 				x = real_position[0]
 				self.setUiPiPos(pos=real_position)
-			if axis == 'Y':
+			elif axis == 'Y':
 				x = real_position[1]
 				self.setUiPiPos(pos=real_position)
-			if axis == 'Z':
+			elif axis == 'Z':
 				x = real_position[2]
 				self.setUiPiPos(pos=real_position)
-			if axis == 'HWP_Power':
+			elif axis == 'HWP_Power':
 				x = HWP_angle
-			if axis == 'HWP_stepper':
+			elif axis == 'HWP_Polarization':
 				x = HWP_stepper_angle
-
+			else: x = 0
 			self.live_pmtA = np.hstack((self.live_pmtA, pmt_valA))
 			self.live_pmtB = np.hstack((self.live_pmtB, pmt_valB))
 			self.live_x = np.hstack((self.live_x, x))
+			#print(self.live_x,self.live_pmtA,self.live_pmtB)
 
 			self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
 			self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
@@ -2874,7 +3017,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.meas_laser_spectra_probe.cellChanged[int,int].connect(self.meas_laser_spectra_probe_update)
 
 		self.ui.scan1D_filePath_find.clicked.connect(self.scan1D_filePath_find)
-		self.ui.n_meas_laser_spectra_filePath_find.clicked.connect(self.n_meas_laser_spectra_filePath_find)
+		self.ui.nMeasLaserSpectra_filePath_find.clicked.connect(self.nMeasLaserSpectra_filePath_find)
 
 		self.ui.scan3D_path_dialog.clicked.connect(self.scan3D_path_dialog)
 
@@ -2953,7 +3096,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.confParam_scan.toggled[bool].connect(self.confParam_scan)
 
 		self.ui.meas_laser_spectra_go.toggled[bool].connect(self.meas_laser_spectra_go)
-		self.ui.n_meas_laser_spectra_go.toggled[bool].connect(self.n_meas_laser_spectra_go)
+		self.ui.nMeasLaserSpectra_go.toggled[bool].connect(self.nMeasLaserSpectra_go)
 
 		self.ui.powerCalibr_go.toggled[bool].connect(self.laserPowerCalibr)
 
@@ -2977,6 +3120,7 @@ class microV(QtGui.QMainWindow):
 		self.ui.mocoSection.currentIndexChanged[int].connect(self.comboMocoSection.setCurrentIndex)
 		self.comboMocoSection.blockSignals(False)
 
+		self.ui.nMeasLaserSpectra_setPoint.toggled[bool].connect(self.nMeasLaserSpectra_setPoint)
 
 
 
@@ -3114,6 +3258,12 @@ class microV(QtGui.QMainWindow):
 
 			if event.modifiers() & QtCore.Qt.ControlModifier:
 				print(pos.x(),pos.y())
+				if self.ui.nMeasLaserSpectra_setPoint.isChecked() and not self.nMeasLaserSpectra_probe_currentRow==-1:
+					coord = [str(pos.x()),str(pos.y()),self.statusBar_Position_Z.text()]
+					print(self.nMeasLaserSpectra_probe_currentRow)
+					for i in range(3):
+						self.ui.nMeasLaserSpectra_probe.item(self.nMeasLaserSpectra_probe_currentRow,i).setText(coord[i])
+					self.ui.nMeasLaserSpectra_setPoint.setChecked(False)
 			if event.modifiers() & QtCore.Qt.ShiftModifier:
 				print(pos.x(),pos.y())
 				if pos.x()>0 and pos.x()<100 and pos.y()>0 and pos.y()<100:
@@ -3127,6 +3277,12 @@ class microV(QtGui.QMainWindow):
 
 			if event.modifiers() & QtCore.Qt.ControlModifier:
 				print(pos.x(),pos.y())
+				if self.ui.nMeasLaserSpectra_setPoint.isChecked() and not self.nMeasLaserSpectra_probe_currentRow==-1:
+					coord = [str(pos.x()),str(pos.y()),self.statusBar_Position_Z.text()]
+
+					for i in range(3):
+						self.ui.nMeasLaserSpectra_probe.item(self.nMeasLaserSpectra_probe_currentRow,i).setText(coord[i])
+					self.ui.nMeasLaserSpectra_setPoint.setChecked(False)
 			if event.modifiers() & QtCore.Qt.ShiftModifier:
 				print(pos.x(),pos.y())
 				if pos.x()>0 and pos.x()<100 and pos.y()>0 and pos.y()<100:

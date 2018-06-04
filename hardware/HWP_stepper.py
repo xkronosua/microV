@@ -3,6 +3,8 @@ import time
 from PyDAQmx.DAQmxFunctions import *
 from PyDAQmx.DAQmxConstants import *
 from threading import Timer, Thread
+import traceback
+from threading import RLock
 
 class HWP_stepper():
 	""" Class to create a continuous pulse train on a counter
@@ -22,6 +24,7 @@ class HWP_stepper():
 	steps_deg = 1.8
 	calibr = 8.92*2
 	currentAngle = 0
+	lock = RLock()
 	def __init__(self, freq=10.,duty_cycle=0.5, counter="Dev1/ctr1", reset=False, enableTimeout=10, currentAngle=0):
 		self.reset = reset
 		if reset:
@@ -64,9 +67,10 @@ class HWP_stepper():
 		if not self.Enable == state:
 			self.Enable = state
 			data = np.array([self.Direction, self.Enable], dtype=np.uint8)
-			DAQmxStartTask(self.taskHandleDirEnable)
-			DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
-			DAQmxStopTask(self.taskHandleDirEnable)
+			with self.lock:
+				DAQmxStartTask(self.taskHandleDirEnable)
+				DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
+				DAQmxStopTask(self.taskHandleDirEnable)
 			if state == 1:
 				enableTimeout_thread = Thread(target=self.onEnableTimeout)
 				self.enableTimeStart = time.time()
@@ -82,10 +86,12 @@ class HWP_stepper():
 		else:
 			state = 0
 		self.Direction = state
+
 		data = np.array([self.Direction, self.Enable], dtype=np.uint8)
-		DAQmxStartTask(self.taskHandleDirEnable)
-		DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
-		DAQmxStopTask(self.taskHandleDirEnable)
+		with self.lock:
+			DAQmxStartTask(self.taskHandleDirEnable)
+			DAQmxWriteDigitalLines(self.taskHandleDirEnable,1,1,10.0,DAQmx_Val_GroupByChannel,data,None,None)
+			DAQmxStopTask(self.taskHandleDirEnable)
 
 	def start(self,step=1, wait=False,timeout=100):
 		if step>0:
@@ -99,12 +105,17 @@ class HWP_stepper():
 
 			#if not self.Enable:
 			self.enable(1)
-			DAQmxCfgImplicitTiming(self.taskHandle,DAQmx_Val_FiniteSamps,steps)
-			DAQmxStartTask(self.taskHandle)
-			if wait:
-				DAQmxWaitUntilTaskDone(self.taskHandle,timeout)
+			try:
+				with self.lock:
+					DAQmxCfgImplicitTiming(self.taskHandle,DAQmx_Val_FiniteSamps,steps)
+					DAQmxStartTask(self.taskHandle)
+				if wait:
+					DAQmxWaitUntilTaskDone(self.taskHandle,timeout)
 
-				self.stop()
+					self.stop()
+
+			except:
+				traceback.print_exc()
 
 
 	def moveTo(self,angle,wait=False):
@@ -114,7 +125,8 @@ class HWP_stepper():
 		time.sleep(0.1)
 
 	def stop(self):
-		DAQmxStopTask(self.taskHandle)
+		with self.lock:
+			DAQmxStopTask(self.taskHandle)
 		#self.enable(0)
 
 	def setAngle(self,new_angle):
@@ -125,8 +137,9 @@ class HWP_stepper():
 		self.currentAngle = 0
 
 	def clear(self):
-		DAQmxClearTask(self.taskHandle)
-		DAQmxClearTask(self.taskHandleDirEnable)
+		with self.lock:
+			DAQmxClearTask(self.taskHandle)
+			DAQmxClearTask(self.taskHandleDirEnable)
 
 
 	def close(self):
