@@ -1546,6 +1546,9 @@ class microV(QtGui.QMainWindow):
 						print(self.piStage.MOV([np_scan_Z],axis=b'3',waitUntilReady=True))
 
 						if self.ui.nMeasLaserSpectra_rescan2D.isChecked():
+							self.andorCamera_prevExposure = self.ui.andorCameraExposure.value()
+							self.ui.andorCameraExposure.setValue(self.ui.nMeasLaserSpectra_scanSpectraExp.value())
+
 							centerA, centerB, panelA, panelB = self.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2)
 							NP_centers = self.scan3D_peak_find()
 
@@ -1553,6 +1556,7 @@ class microV(QtGui.QMainWindow):
 								for j in range(2):
 									self.ui.nMeasLaserSpectra_probe.item(i+1,j).setText(str(NP_centers[i,j]))
 								self.ui.nMeasLaserSpectra_probe.item(i+1,2).setText(str(np_scan_Z))
+							self.ui.andorCameraExposure.setValue(self.andorCamera_prevExposure)
 
 						if self.ui.nMeasLaserSpectra_FloatingWindow.isChecked():
 							center_tmp = NP_centers.mean(axis=0)
@@ -1834,6 +1838,10 @@ class microV(QtGui.QMainWindow):
 						print(xi,yi,zi)
 						app.processEvents()
 						self.setUiPiPos([x,y,z])
+						if self.ui.actionPause.isChecked():
+							while self.ui.actionPause.isChecked():
+								app.processEvents()
+						if self.ui.actionStop.isChecked(): break
 						#real_position = self.piStage.qPOS()
 						#########################################
 						#if self.ui.andorCameraConnect.isChecked():
@@ -1943,7 +1951,7 @@ class microV(QtGui.QMainWindow):
 			p = self.piStage.qPOS()
 			center_prev = center.copy()
 			center = self.piStage.qPOS()
-			center_ = center+(center-center_prev)/1.618
+			center_ = center+(center-center_prev)/(2.618)
 
 			self.setUiPiPos(center)
 			pmt_valA, pmt_valB, pmt_valC = self.getABData()
@@ -2835,27 +2843,31 @@ class microV(QtGui.QMainWindow):
 			elif len(centers['A'])<len(centers['B']):
 				centers["mid"] = (centers["A"]+centers["B"][:len(centers['A'])])/2
 		'''
-		self.NP_centersA.setData(x=centers["A"][:,0],y=centers["A"][:,1])
-		self.NP_centersB.setData(x=centers["B"][:,0],y=centers["B"][:,1])
-
-		ch = self.ui.nMeasLaserSpectra_track_channel.currentIndex()
-		ch_str = ['A','B','AB','mid']
-		#self.ui.nMeasLaserSpectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
-
-		for i in range(1,len(centers[ch_str[ch]])+1):
-			if i<=len(centers[ch_str[ch]]):
-				c_coord = centers[ch_str[ch]][i-1]
-			else:
-				c_coord = [0,50]
-			self.ui.nMeasLaserSpectra_probe.item(i,0).setText(str(c_coord[0]))
-			self.ui.nMeasLaserSpectra_probe.item(i,1).setText(str(c_coord[1]))
-			self.ui.nMeasLaserSpectra_probe.item(i,2).setText(str(np_scan_Z))
 		print(centers)
+		try:
+			self.NP_centersA.setData(x=centers["A"][:,0],y=centers["A"][:,1])
+			self.NP_centersB.setData(x=centers["B"][:,0],y=centers["B"][:,1])
 
-		self.NPsCenters = centers[ch_str[ch]]
+			ch = self.ui.nMeasLaserSpectra_track_channel.currentIndex()
+			ch_str = ['A','B','AB','mid']
+			#self.ui.nMeasLaserSpectra_probe.setRowCount(len(centers[ch_str[ch]])+1)
 
-		return centers[ch_str[ch]]
+			for i in range(1,len(centers[ch_str[ch]])+1):
+				if i<=len(centers[ch_str[ch]]):
+					c_coord = centers[ch_str[ch]][i-1]
+				else:
+					c_coord = [0,50]
+				self.ui.nMeasLaserSpectra_probe.item(i,0).setText(str(c_coord[0]))
+				self.ui.nMeasLaserSpectra_probe.item(i,1).setText(str(c_coord[1]))
+				self.ui.nMeasLaserSpectra_probe.item(i,2).setText(str(np_scan_Z))
+			print(centers)
 
+			self.NPsCenters = centers[ch_str[ch]]
+
+			return centers[ch_str[ch]]
+		except:
+			traceback.print_exc()
+			return [[np.nan]*3]
 
 	############################################################################
 	###############################   scan3D	################################
