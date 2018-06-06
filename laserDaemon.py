@@ -9,6 +9,8 @@ from threading import RLock, Thread
 import traceback
 from scipy.interpolate import interp1d
 import numpy as np
+import logging
+
 
 class laserDaemon(QWidget):
 	resMan = visa.ResourceManager()
@@ -24,6 +26,9 @@ class laserDaemon(QWidget):
 		QWidget.__init__(self, parent)
 		self.ui = uic.loadUi('laser.ui', self)  # Loads all widgets of uifile.ui into self
 		self.watchdogTimer = QtCore.QTimer()
+		logging.basicConfig(filename='laserDaemon.log',level=logging.INFO)
+
+		self.logger = logging.getLogger("laserDaemon")
 		self.lock = RLock()
 		with open('laserIn','w+') as f:
 			f.write('')
@@ -54,6 +59,7 @@ class laserDaemon(QWidget):
 		else:
 			out = ds + " : "+text
 		self.ui.laserLog.appendPlainText(out)
+		self.logger.info(out)
 		print(out)
 
 
@@ -97,6 +103,7 @@ class laserDaemon(QWidget):
 
 			val = [time.time(), status, shutter, laserPower,wavelength,self.wavelength_ready]
 			print(val)
+			self.logger.info(val)
 			out = '\t'.join([str(i) for i in val])
 			#self.ui.wavelength.setValue(float(wavelength))
 			with open('laserOut','w+') as f:
