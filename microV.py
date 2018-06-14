@@ -188,7 +188,7 @@ class microV(QtGui.QMainWindow):
 	shamrockConnect_thread = None
 	andorCameraConnect_thread = None
 	andorCCD_prev_centr_wavelength = -1
-
+	uiUpdate_t0 = time.time()
 	def __init__(self, parent=None):
 		QtGui.QMainWindow.__init__(self, parent)
 		#from mainwindow import Ui_mw
@@ -1164,7 +1164,7 @@ class microV(QtGui.QMainWindow):
 					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive or not self.ui.confParam_scan.isChecked():
 						time.sleep(0.5)
 						print('wait:Laser')
-						app.processEvents()
+						#app.processEvents()
 
 
 					self.shamrockSetWavelength((wl/2+wl/3)/2)
@@ -1199,7 +1199,7 @@ class microV(QtGui.QMainWindow):
 
 						self.line_pmtA.setData(x=self.live_x,y=self.live_pmtA)
 						self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
-						app.processEvents()
+						#app.processEvents()
 						if not self.scan3DisAlive or not self.ui.confParam_scan.isChecked():
 							store.put("scan_"+str(wl), df)
 							return
@@ -1262,16 +1262,18 @@ class microV(QtGui.QMainWindow):
 					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 :
 						time.sleep(0.5)
 						print('wait:Laser')
-						app.processEvents()
+						#app.processEvents()
 
 						if self.ui.actionPause.isChecked():
 							while self.ui.actionPause.isChecked():
-								app.processEvents()
+								#app.processEvents()
+								pass
 						if self.ui.actionStop.isChecked(): break
 
 					if self.ui.actionPause.isChecked():
 						while self.ui.actionPause.isChecked():
-							app.processEvents()
+							#app.processEvents()
+							pass
 					if self.ui.actionStop.isChecked(): break
 					start_angle = self.ui.calibr_start.value()
 					end_angle = self.ui.calibr_end.value()
@@ -1308,10 +1310,10 @@ class microV(QtGui.QMainWindow):
 						self.line_pico_ChA.setData(x=self.live_x,y=self.live_pmtB)
 
 
-						app.processEvents()
+						#app.processEvents()
 
 
-						app.processEvents()
+						#app.processEvents()
 						if not self.scan3DisAlive or not self.ui.powerCalibr_go.isChecked():
 							df = pd.DataFrame(data, index=steps_range,columns=['power','laserBultInPower','Time'])
 							store.put("scan_"+str(wl), df)
@@ -1319,7 +1321,8 @@ class microV(QtGui.QMainWindow):
 							break
 						if self.ui.actionPause.isChecked():
 							while self.ui.actionPause.isChecked():
-								app.processEvents()
+								pass
+								#app.processEvents()
 						if self.ui.actionStop.isChecked(): break
 					df = pd.DataFrame(data, index=steps_range,columns=['power','laserBultInPower','Time'])
 					calibr_name = "powerCalibr_"+str(wl)
@@ -1351,13 +1354,13 @@ class microV(QtGui.QMainWindow):
 					#time.sleep(3)
 					for i in range(100):
 						time.sleep(0.03)
-						app.processEvents()
+						#app.processEvents()
 					t0 = time.time()
 
 					while not wl == float(self.ui.laserWavelength.text()) and time.time()-t0<10 and self.scan3DisAlive:
 						time.sleep(0.1)
 						print('wait:Laser')
-						app.processEvents()
+						#app.processEvents()
 						if not self.scan3DisAlive:
 							break
 
@@ -1454,7 +1457,7 @@ class microV(QtGui.QMainWindow):
 					self.live_pmtB = np.hstack((self.live_pmtB, integr_intens_THG))
 
 					self.line_pmtB.setData(x=self.live_x,y=self.live_pmtB)
-					app.processEvents()
+					#app.processEvents()
 					if not self.scan3DisAlive:
 						store.put("forceEnd_"+str(wl), df)
 						return
@@ -1759,7 +1762,7 @@ class microV(QtGui.QMainWindow):
 								if self.ui.actionPause.isChecked():
 									while self.ui.actionPause.isChecked():
 										#app.processEvents()
-										time.sleep()
+										time.sleep(0.01)
 								if self.ui.actionStop.isChecked(): break
 								HWP_move_function(ang)
 								print(ang)
@@ -2010,43 +2013,48 @@ class microV(QtGui.QMainWindow):
 		x_step = float(self.ui.scan3D_config.item(2,3).text())
 		y_step = float(self.ui.scan3D_config.item(1,3).text())
 		z_step = float(self.ui.scan3D_config.item(0,3).text())
+		pmt_valA, pmt_valB, pmt_valC = self.getABData()
+		data_pos = np.hstack([center,pmt_valA, pmt_valB, pmt_valC])
 
 		for n in range(N):
-			pmt_valA, pmt_valB, pmt_valC = self.getABData()
-			x_step = x_step/1.6**n
-			y_step = y_step/1.6**n
-			z_step = z_step/1.6**n
+
+			x_step = x_step/1.6
+			y_step = y_step/1.6
+			z_step = z_step/1.6
 			pos4test = []
-			if self.ui.optim1step_zCompensation.isChecked():
-				z_positions = [zCompensation(self.ui.laserWavelength.value(),self.ui.optim1step_zCompensationShift.value())]
-			else:
-				z_positions = [center[2]-z_step,center[2], center[2]+z_step]
-			x_positions = [center[0]-x_step,center[0],center[0]+x_step]
-			y_positions = [center[1]-y_step,center[1],center[1]+y_step]
+			#if self.ui.optim1step_zCompensation.isChecked():
+			#	z_positions = [zCompensation(self.ui.laserWavelength.value(),self.ui.optim1step_zCompensationShift.value())]
+			#else:
+
+			x_positions = [center[0]-x_step,center[0], center[0]+x_step]
+			y_positions = [center[1]-y_step,center[1], center[1]+y_step]
+			z_positions = [center[2]-z_step,center[2], center[2]+z_step]
 			pos4test = np.array(np.meshgrid(x_positions, y_positions, z_positions)).T.reshape(-1,3)
 
 			#f=[sum(k==center)!=3 for k in pos4test]
 			#pos4test = pos4test[f]
 			print(pos4test)
-			data_pos = [np.hstack([center,pmt_valA, pmt_valB, pmt_valC])]
+
 			for p in pos4test:
 				self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
 				#self.piStage.MOV(p,axis=b'1 2 3', waitUntilReady=True)
+				time.sleep(0.02)
 				p = self.piStage.qPOS()
 				p = self.piStage.qPOS()
 				self.setUiPiPos(p)
 				pmt_valA, pmt_valB, pmt_valC = self.getABData()
-				data_pos.append(np.hstack([p,pmt_valA, pmt_valB, pmt_valC]))
+				data_pos = np.vstack((data_pos,np.hstack([p,pmt_valA, pmt_valB, pmt_valC])))
 				#app.processEvents()
 				if self.ui.actionPause.isChecked():
 					while self.ui.actionPause.isChecked():
 						#app.processEvents()
 						time.sleep(0.02)
 				if self.ui.actionStop.isChecked(): break
-			data_pos = np.array(data_pos)
+
 
 
 			print(ch,data_pos)
+
 			optim_pos = data_pos[data_pos[:,col]==data_pos[:,col].max()][0]
 			print(optim_pos)
 			pos = optim_pos[:3]
@@ -2056,8 +2064,14 @@ class microV(QtGui.QMainWindow):
 			p = self.piStage.qPOS()
 			center_prev = center.copy()
 			center1 = self.piStage.qPOS()
-			center_ = center1+(center1-center_prev)
-
+			if (pos-center_prev).all()>0:
+				shift = np.array([x_step,y_step,z_step])/2
+			else:
+				shift = -np.array([x_step,y_step,z_step])/2
+			if n<N-1:
+				center_ = center1+shift
+			else:
+				center_ = center1
 			self.setUiPiPos(center1)
 			pmt_valA, pmt_valB, pmt_valC = self.getABData()
 			pmt_valA1, pmt_valB1, pmt_valC1 = self.getABData()
@@ -2192,6 +2206,12 @@ class microV(QtGui.QMainWindow):
 			data_pmtB = np.zeros((len(Range_z),len(Range_x),len(Range_y)))
 			print(data_pmtA.shape)
 			layerIndex = 0
+
+			self.img.setImage(data_pmtA,pos=(Range_x.min(),Range_y.min()),
+			scale=(x_step,y_step),xvals=Range_z)
+			self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
+			scale=(x_step,y_step),xvals=Range_z)
+
 			for z,zi in zip(Range_z,Range_zi):
 				if not self.scan3DisAlive: break
 				print(self.piStage.MOV(z,axis=3,waitUntilReady=True))
@@ -2302,8 +2322,8 @@ class microV(QtGui.QMainWindow):
 					scale=(x_step,y_step),xvals=Range_z)
 					self.img1.setImage(data_pmtB,pos=(Range_x.min(),Range_y.min()),
 					scale=(x_step,y_step),xvals=Range_z)
-					self.img.setCurrentIndex(layerIndex)
-					self.img1.setCurrentIndex(layerIndex)
+					self.img.setCurrentIndex(zi)
+					self.img1.setCurrentIndex(zi)
 
 					self.data2D_A = np.array(data_pmtA[zi])
 					self.data2D_B = np.array(data_pmtB[zi])
@@ -3493,15 +3513,23 @@ class microV(QtGui.QMainWindow):
 		self.timer_thread.start()
 
 	def update_ui(self):
-		self.pw1.update()
-		self.pw.update()
-		self.pw_preview.update()
-		self.pw_spectra.update()
-		self.img.update()
-		self.img1.update()
-		#self.img.updateImage(autoHistogramRange=False)
-		#self.img1.updateImage(autoHistogramRange=False)
 
+
+		t = time.time()
+		if t - self.uiUpdate_t0 >1:
+			self.ui.update()
+			self.uiUpdate_t0 = time.time()
+			if not self.laserStatus.isActive():
+				self.laserStatus.start(500)
+			self.img.updateImage(autoHistogramRange=True)
+			self.img1.updateImage(autoHistogramRange=True)
+		else:
+			self.pw1.update()
+			self.pw.update()
+			self.pw_preview.update()
+			self.pw_spectra.update()
+			self.img.update()
+			self.img1.update()
 
 		#self.ui.configTabWidget.setStyleSheet('QTabBar::tab[objectName="Readout"] {background-color=red;}')
 	def viewCleanLines(self):

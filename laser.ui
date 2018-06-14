@@ -14,8 +14,31 @@
    <string>Form</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">background-color: rgb(16, 5, 52);
-color: rgb(255, 250, 85);</string>
+   <string notr="true">*{background-color: rgb(0, 0, 111);
+color: rgb(255, 243, 197);
+}
+/*
+QPushButton:active{
+background-color: rgb(85, 255, 0);
+color:rgb(0, 0, 0);
+}
+*/
+QPushButton:clicked{
+background-color:rgb(255, 38, 38);
+color:rgb(0, 0, 0);
+}
+
+QPushButton:pressed{
+background-color:rgb(255, 38, 38);
+color:rgb(0, 0, 0);
+}
+
+QPushButton:checked{
+background-color:rgb(255, 100, 38);
+color:rgb(0, 0, 0);
+}
+
+</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
