@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>688</width>
-    <height>773</height>
+    <height>899</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -57,7 +57,7 @@ color:rgb(0, 0, 0);
        <enum>QTabWidget::West</enum>
       </property>
       <property name="currentIndex">
-       <number>6</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="Laser">
        <attribute name="title">
@@ -178,8 +178,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>196</width>
-             <height>113</height>
+             <width>224</width>
+             <height>148</height>
             </rect>
            </property>
            <attribute name="label">
@@ -237,8 +237,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>257</width>
-             <height>155</height>
+             <width>290</width>
+             <height>198</height>
             </rect>
            </property>
            <attribute name="label">
@@ -335,8 +335,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>356</width>
-             <height>529</height>
+             <width>353</width>
+             <height>620</height>
             </rect>
            </property>
            <attribute name="label">
@@ -407,8 +407,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>244</width>
-             <height>201</height>
+             <width>280</width>
+             <height>272</height>
             </rect>
            </property>
            <attribute name="label">
@@ -580,8 +580,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>259</width>
-             <height>152</height>
+             <width>312</width>
+             <height>204</height>
             </rect>
            </property>
            <attribute name="label">
@@ -693,60 +693,33 @@ color:rgb(0, 0, 0);
            <number>2</number>
           </property>
           <property name="currentIndex">
-           <number>3</number>
+           <number>0</number>
           </property>
           <widget class="QWidget" name="CCS200">
            <property name="geometry">
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>227</width>
-             <height>118</height>
+             <width>353</width>
+             <height>543</height>
             </rect>
            </property>
            <attribute name="label">
             <string>Thorlabs CCS200</string>
            </attribute>
            <layout class="QGridLayout" name="gridLayout_2">
-            <item row="3" column="1">
-             <widget class="QPushButton" name="usbSpectr_set_integr_time">
-              <property name="text">
-               <string>Set</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QSpinBox" name="usbSpectr_from">
-              <property name="maximum">
-               <number>3647</number>
-              </property>
-              <property name="value">
-               <number>1400</number>
-              </property>
-             </widget>
-            </item>
             <item row="1" column="2">
-             <widget class="QSpinBox" name="usbSpectr_to">
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <number>3648</number>
-              </property>
-              <property name="value">
-               <number>1600</number>
+             <widget class="QCheckBox" name="ccs200ExtTrig">
+              <property name="text">
+               <string>ExtTrig</string>
               </property>
              </widget>
             </item>
-            <item row="2" column="1">
-             <widget class="QSpinBox" name="usbSpectr_save_from">
-              <property name="maximum">
-               <number>3647</number>
+            <item row="1" column="0">
+             <widget class="QDoubleSpinBox" name="ccs200Exposure">
+              <property name="keyboardTracking">
+               <bool>false</bool>
               </property>
-             </widget>
-            </item>
-            <item row="3" column="0">
-             <widget class="QDoubleSpinBox" name="usbSpectr_integr_time">
               <property name="decimals">
                <number>3</number>
               </property>
@@ -761,40 +734,27 @@ color:rgb(0, 0, 0);
               </property>
              </widget>
             </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label">
-              <property name="text">
-               <string>Integrate:</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="2">
-             <widget class="QSpinBox" name="usbSpectr_save_to">
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <number>3648</number>
-              </property>
-              <property name="value">
-               <number>3648</number>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QLabel" name="label_2">
-              <property name="text">
-               <string>Save:</string>
-              </property>
-             </widget>
-            </item>
             <item row="0" column="0">
-             <widget class="QPushButton" name="usbSpactr_connect">
+             <widget class="QPushButton" name="ccs200Connect">
               <property name="text">
                <string>Connect</string>
               </property>
               <property name="checkable">
                <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QPushButton" name="ccs200GetSpectra">
+              <property name="text">
+               <string>GetSpectra</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QCheckBox" name="ccs200Live">
+              <property name="text">
+               <string>live</string>
               </property>
              </widget>
             </item>
@@ -805,8 +765,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>174</width>
-             <height>70</height>
+             <width>186</width>
+             <height>86</height>
             </rect>
            </property>
            <attribute name="label">
@@ -847,8 +807,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>154</width>
-             <height>109</height>
+             <width>174</width>
+             <height>138</height>
             </rect>
            </property>
            <attribute name="label">
@@ -921,8 +881,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>356</width>
-             <height>468</height>
+             <width>353</width>
+             <height>543</height>
             </rect>
            </property>
            <attribute name="label">
@@ -1341,8 +1301,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>285</width>
-             <height>400</height>
+             <width>330</width>
+             <height>548</height>
             </rect>
            </property>
            <attribute name="label">
@@ -1823,6 +1783,16 @@ color:rgb(0, 0, 0);
              <item>
               <property name="text">
                <string>DAQmx</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>CCS200</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>spectraSIM</string>
               </property>
              </item>
             </widget>
@@ -3721,7 +3691,7 @@ color:rgb(0, 0, 0);
      <x>0</x>
      <y>0</y>
      <width>688</width>
-     <height>21</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -3732,26 +3702,26 @@ color:rgb(0, 0, 0);
    </widget>
    <widget class="QMenu" name="menuLaser">
     <property name="title">
-     <string>Laser</string>
+     <string>&amp;Laser</string>
     </property>
     <addaction name="actionShutter"/>
    </widget>
    <widget class="QMenu" name="menuAndor">
     <property name="title">
-     <string>Andor</string>
+     <string>A&amp;ndor</string>
     </property>
     <addaction name="actionBaseline"/>
     <addaction name="actionSpectra"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
-     <string>View</string>
+     <string>V&amp;iew</string>
     </property>
     <addaction name="actionClean"/>
    </widget>
    <widget class="QMenu" name="menuMeasurement">
     <property name="title">
-     <string>Measurement</string>
+     <string>&amp;Measurement</string>
     </property>
     <addaction name="actionPause"/>
     <addaction name="actionStop"/>
@@ -3793,12 +3763,12 @@ color:rgb(0, 0, 0);
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Shutter</string>
+    <string>&amp;Shutter</string>
    </property>
   </action>
   <action name="actionBaseline">
    <property name="text">
-    <string>Baseline</string>
+    <string>&amp;Baseline</string>
    </property>
   </action>
   <action name="actionSpectra">
@@ -3806,12 +3776,12 @@ color:rgb(0, 0, 0);
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Spectra</string>
+    <string>&amp;Spectra</string>
    </property>
   </action>
   <action name="actionClean">
    <property name="text">
-    <string>Clean</string>
+    <string>&amp;Clean</string>
    </property>
   </action>
   <action name="actionPause">
@@ -3819,7 +3789,7 @@ color:rgb(0, 0, 0);
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Pause</string>
+    <string>&amp;Pause</string>
    </property>
   </action>
   <action name="actionStop">
@@ -3827,12 +3797,11 @@ color:rgb(0, 0, 0);
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Stop</string>
+    <string>&amp;Stop</string>
    </property>
   </action>
  </widget>
  <tabstops>
-  <tabstop>usbSpectr_set_integr_time</tabstop>
   <tabstop>connect_DAQmx</tabstop>
   <tabstop>DAQmx_shift</tabstop>
   <tabstop>configTabWidget</tabstop>
@@ -3906,7 +3875,7 @@ color:rgb(0, 0, 0);
   <tabstop>mocoMoveAbs</tabstop>
   <tabstop>mocoMoveAbs_target</tabstop>
   <tabstop>mocoSection</tabstop>
-  <tabstop>usbSpactr_connect</tabstop>
+  <tabstop>ccs200Connect</tabstop>
   <tabstop>pm100Connect</tabstop>
   <tabstop>pm100Average</tabstop>
   <tabstop>pm100Live</tabstop>
@@ -4000,17 +3969,13 @@ color:rgb(0, 0, 0);
   <tabstop>HWP_rel_step</tabstop>
   <tabstop>HWP_go_home</tabstop>
   <tabstop>HWP_positive_step</tabstop>
-  <tabstop>usbSpectr_from</tabstop>
-  <tabstop>usbSpectr_to</tabstop>
   <tabstop>DAQmx_find_shift</tabstop>
   <tabstop>pico_TrigThreshold</tabstop>
   <tabstop>pico_Trig_mode</tabstop>
   <tabstop>Pi_X_go</tabstop>
   <tabstop>Pi_X_On</tabstop>
   <tabstop>Pi_X_move_to</tabstop>
-  <tabstop>usbSpectr_save_from</tabstop>
-  <tabstop>usbSpectr_save_to</tabstop>
-  <tabstop>usbSpectr_integr_time</tabstop>
+  <tabstop>ccs200Exposure</tabstop>
  </tabstops>
  <resources/>
  <connections/>
