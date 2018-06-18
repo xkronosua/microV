@@ -57,7 +57,7 @@ color:rgb(0, 0, 0);
        <enum>QTabWidget::West</enum>
       </property>
       <property name="currentIndex">
-       <number>5</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="Laser">
        <attribute name="title">
@@ -693,15 +693,15 @@ color:rgb(0, 0, 0);
            <number>2</number>
           </property>
           <property name="currentIndex">
-           <number>3</number>
+           <number>4</number>
           </property>
           <widget class="QWidget" name="CCS200">
            <property name="geometry">
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>356</width>
-             <height>594</height>
+             <width>201</width>
+             <height>94</height>
             </rect>
            </property>
            <attribute name="label">
@@ -1318,8 +1318,8 @@ color:rgb(0, 0, 0);
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>285</width>
-             <height>400</height>
+             <width>339</width>
+             <height>448</height>
             </rect>
            </property>
            <attribute name="label">
@@ -1490,14 +1490,14 @@ color:rgb(0, 0, 0);
                <string>Andor</string>
               </property>
               <layout class="QGridLayout" name="gridLayout_13">
-               <item row="2" column="0">
+               <item row="4" column="1">
                 <widget class="QCheckBox" name="andorCameraLive">
                  <property name="text">
                   <string>Live</string>
                  </property>
                 </widget>
                </item>
-               <item row="0" column="1" rowspan="2">
+               <item row="0" column="2" rowspan="3">
                 <layout class="QVBoxLayout" name="verticalLayout_10">
                  <item>
                   <widget class="QLabel" name="label_20">
@@ -1522,17 +1522,103 @@ color:rgb(0, 0, 0);
                  </item>
                 </layout>
                </item>
-               <item row="1" column="0">
-                <layout class="QHBoxLayout" name="horizontalLayout_10">
-                 <item>
-                  <widget class="QLabel" name="label_19">
-                   <property name="text">
-                    <string>Exposure, s</string>
+               <item row="0" column="0">
+                <widget class="QPushButton" name="andorCameraConnect">
+                 <property name="text">
+                  <string>Connect</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="2">
+                <widget class="QPushButton" name="andorCameraGetBaseline">
+                 <property name="text">
+                  <string>GetBaseline</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="0">
+                <widget class="QPushButton" name="andorCameraGetData">
+                 <property name="text">
+                  <string>GetData</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="2">
+                <widget class="QCheckBox" name="andorCameraExposureAdaptive">
+                 <property name="text">
+                  <string>Adaptive</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0" colspan="2">
+                <layout class="QGridLayout" name="gridLayout_32">
+                 <item row="2" column="1">
+                  <widget class="QDoubleSpinBox" name="andorCameraExposure_fast">
+                   <property name="decimals">
+                    <number>5</number>
+                   </property>
+                   <property name="minimum">
+                    <double>0.000010000000000</double>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="value">
+                    <double>0.100000000000000</double>
                    </property>
                   </widget>
                  </item>
-                 <item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_19">
+                   <property name="text">
+                    <string>Exp.(long), s</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QDoubleSpinBox" name="andorCameraExposure_long">
+                   <property name="decimals">
+                    <number>5</number>
+                   </property>
+                   <property name="minimum">
+                    <double>0.000010000000000</double>
+                   </property>
+                   <property name="maximum">
+                    <double>1000.000000000000000</double>
+                   </property>
+                   <property name="value">
+                    <double>1.000000000000000</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="label_2">
+                   <property name="text">
+                    <string>Exp.(fast), s</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_46">
+                   <property name="text">
+                    <string>Exposure</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
                   <widget class="QDoubleSpinBox" name="andorCameraExposure">
+                   <property name="readOnly">
+                    <bool>false</bool>
+                   </property>
+                   <property name="buttonSymbols">
+                    <enum>QAbstractSpinBox::UpDownArrows</enum>
+                   </property>
                    <property name="decimals">
                     <number>5</number>
                    </property>
@@ -1548,40 +1634,6 @@ color:rgb(0, 0, 0);
                   </widget>
                  </item>
                 </layout>
-               </item>
-               <item row="0" column="0">
-                <widget class="QPushButton" name="andorCameraConnect">
-                 <property name="text">
-                  <string>Connect</string>
-                 </property>
-                 <property name="checkable">
-                  <bool>true</bool>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="1">
-                <widget class="QPushButton" name="andorCameraGetBaseline">
-                 <property name="text">
-                  <string>GetBaseline</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="3" column="0">
-                <widget class="QPushButton" name="andorCameraGetData">
-                 <property name="text">
-                  <string>GetData</string>
-                 </property>
-                 <property name="checkable">
-                  <bool>true</bool>
-                 </property>
-                </widget>
-               </item>
-               <item row="3" column="1">
-                <widget class="QCheckBox" name="andorCameraExposureAdaptive">
-                 <property name="text">
-                  <string>Adaptive</string>
-                 </property>
-                </widget>
                </item>
               </layout>
              </widget>
@@ -2812,98 +2864,11 @@ color:rgb(0, 0, 0);
            <string>MultiScan</string>
           </property>
           <layout class="QGridLayout" name="gridLayout_22">
-           <item row="1" column="0">
-            <widget class="QGroupBox" name="groupBox_15">
-             <property name="locale">
-              <locale language="C" country="AnyCountry"/>
+           <item row="13" column="0">
+            <widget class="QCheckBox" name="finishLaserOFF">
+             <property name="text">
+              <string>Finish-&gt;LaserOFF</string>
              </property>
-             <property name="title">
-              <string>Laser_wavelength</string>
-             </property>
-             <layout class="QVBoxLayout" name="verticalLayout_18">
-              <item>
-               <layout class="QGridLayout" name="gridLayout_24">
-                <item row="0" column="2">
-                 <widget class="QLabel" name="label_36">
-                  <property name="locale">
-                   <locale language="C" country="AnyCountry"/>
-                  </property>
-                  <property name="text">
-                   <string>Step</string>
-                  </property>
-                 </widget>
-                </item>
-                <item row="0" column="1">
-                 <widget class="QLabel" name="label_37">
-                  <property name="locale">
-                   <locale language="C" country="AnyCountry"/>
-                  </property>
-                  <property name="text">
-                   <string>End</string>
-                  </property>
-                 </widget>
-                </item>
-                <item row="0" column="0">
-                 <widget class="QLabel" name="label_38">
-                  <property name="locale">
-                   <locale language="C" country="AnyCountry"/>
-                  </property>
-                  <property name="text">
-                   <string>Start</string>
-                  </property>
-                 </widget>
-                </item>
-                <item row="1" column="0">
-                 <widget class="QSpinBox" name="nMeasLaserSpectra_start">
-                  <property name="locale">
-                   <locale language="C" country="AnyCountry"/>
-                  </property>
-                  <property name="minimum">
-                   <number>680</number>
-                  </property>
-                  <property name="maximum">
-                   <number>1300</number>
-                  </property>
-                  <property name="value">
-                   <number>850</number>
-                  </property>
-                 </widget>
-                </item>
-                <item row="1" column="1">
-                 <widget class="QSpinBox" name="nMeasLaserSpectra_end">
-                  <property name="locale">
-                   <locale language="C" country="AnyCountry"/>
-                  </property>
-                  <property name="minimum">
-                   <number>680</number>
-                  </property>
-                  <property name="maximum">
-                   <number>1300</number>
-                  </property>
-                  <property name="value">
-                   <number>1300</number>
-                  </property>
-                 </widget>
-                </item>
-                <item row="1" column="2">
-                 <widget class="QSpinBox" name="nMeasLaserSpectra_step">
-                  <property name="locale">
-                   <locale language="C" country="AnyCountry"/>
-                  </property>
-                  <property name="minimum">
-                   <number>0</number>
-                  </property>
-                  <property name="maximum">
-                   <number>620</number>
-                  </property>
-                  <property name="displayIntegerBase">
-                   <number>10</number>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </item>
-             </layout>
             </widget>
            </item>
            <item row="0" column="0">
@@ -2933,7 +2898,7 @@ color:rgb(0, 0, 0);
              </item>
             </layout>
            </item>
-           <item row="8" column="0">
+           <item row="9" column="0">
             <layout class="QGridLayout" name="gridLayout_23">
              <item row="1" column="0">
               <widget class="QCheckBox" name="nMeasLaserSpectra_track">
@@ -3003,7 +2968,7 @@ color:rgb(0, 0, 0);
              </item>
             </layout>
            </item>
-           <item row="11" column="0">
+           <item row="12" column="0">
             <widget class="QPushButton" name="nMeasLaserSpectra_go">
              <property name="locale">
               <locale language="C" country="AnyCountry"/>
@@ -3016,7 +2981,7 @@ color:rgb(0, 0, 0);
              </property>
             </widget>
            </item>
-           <item row="6" column="0">
+           <item row="7" column="0">
             <widget class="QTableWidget" name="nMeasLaserSpectra_probe">
              <property name="locale">
               <locale language="C" country="AnyCountry"/>
@@ -3132,6 +3097,11 @@ color:rgb(0, 0, 0);
                <string>0</string>
               </property>
              </item>
+             <item row="0" column="3">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
              <item row="1" column="0">
               <property name="text">
                <string>0</string>
@@ -3167,6 +3137,11 @@ color:rgb(0, 0, 0);
                <string>nan</string>
               </property>
              </item>
+             <item row="2" column="3">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
              <item row="3" column="0">
               <property name="text">
                <string>nan</string>
@@ -3178,6 +3153,11 @@ color:rgb(0, 0, 0);
               </property>
              </item>
              <item row="3" column="2">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
+             <item row="3" column="3">
               <property name="text">
                <string>nan</string>
               </property>
@@ -3197,6 +3177,11 @@ color:rgb(0, 0, 0);
                <string>nan</string>
               </property>
              </item>
+             <item row="4" column="3">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
              <item row="5" column="0">
               <property name="text">
                <string>nan</string>
@@ -3208,6 +3193,11 @@ color:rgb(0, 0, 0);
               </property>
              </item>
              <item row="5" column="2">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
+             <item row="5" column="3">
               <property name="text">
                <string>nan</string>
               </property>
@@ -3227,6 +3217,11 @@ color:rgb(0, 0, 0);
                <string>nan</string>
               </property>
              </item>
+             <item row="6" column="3">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
              <item row="7" column="0">
               <property name="text">
                <string>nan</string>
@@ -3238,6 +3233,11 @@ color:rgb(0, 0, 0);
               </property>
              </item>
              <item row="7" column="2">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
+             <item row="7" column="3">
               <property name="text">
                <string>nan</string>
               </property>
@@ -3257,6 +3257,11 @@ color:rgb(0, 0, 0);
                <string>nan</string>
               </property>
              </item>
+             <item row="8" column="3">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
              <item row="9" column="0">
               <property name="text">
                <string>nan</string>
@@ -3272,6 +3277,11 @@ color:rgb(0, 0, 0);
                <string>nan</string>
               </property>
              </item>
+             <item row="9" column="3">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
              <item row="10" column="0">
               <property name="text">
                <string>nan</string>
@@ -3283,6 +3293,11 @@ color:rgb(0, 0, 0);
               </property>
              </item>
              <item row="10" column="2">
+              <property name="text">
+               <string>nan</string>
+              </property>
+             </item>
+             <item row="10" column="3">
               <property name="text">
                <string>nan</string>
               </property>
@@ -3480,25 +3495,114 @@ color:rgb(0, 0, 0);
                </property>
               </widget>
              </item>
+             <item row="5" column="0">
+              <widget class="QComboBox" name="nMeasLaserSpectra_posOptim">
+               <item>
+                <property name="text">
+                 <string>1D</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>2D</string>
+                </property>
+               </item>
+              </widget>
+             </item>
             </layout>
            </item>
-           <item row="5" column="0">
-            <widget class="QPushButton" name="nMeasLaserSpectra_setPoint">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-               <horstretch>3</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
+           <item row="1" column="0">
+            <widget class="QGroupBox" name="groupBox_15">
              <property name="locale">
               <locale language="C" country="AnyCountry"/>
              </property>
-             <property name="text">
-              <string>Set Point</string>
+             <property name="title">
+              <string>Laser_wavelength</string>
              </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_18">
+              <item>
+               <layout class="QGridLayout" name="gridLayout_24">
+                <item row="0" column="2">
+                 <widget class="QLabel" name="label_36">
+                  <property name="locale">
+                   <locale language="C" country="AnyCountry"/>
+                  </property>
+                  <property name="text">
+                   <string>Step</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QLabel" name="label_37">
+                  <property name="locale">
+                   <locale language="C" country="AnyCountry"/>
+                  </property>
+                  <property name="text">
+                   <string>End</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="0">
+                 <widget class="QLabel" name="label_38">
+                  <property name="locale">
+                   <locale language="C" country="AnyCountry"/>
+                  </property>
+                  <property name="text">
+                   <string>Start</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QSpinBox" name="nMeasLaserSpectra_start">
+                  <property name="locale">
+                   <locale language="C" country="AnyCountry"/>
+                  </property>
+                  <property name="minimum">
+                   <number>680</number>
+                  </property>
+                  <property name="maximum">
+                   <number>1300</number>
+                  </property>
+                  <property name="value">
+                   <number>850</number>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <widget class="QSpinBox" name="nMeasLaserSpectra_end">
+                  <property name="locale">
+                   <locale language="C" country="AnyCountry"/>
+                  </property>
+                  <property name="minimum">
+                   <number>680</number>
+                  </property>
+                  <property name="maximum">
+                   <number>1300</number>
+                  </property>
+                  <property name="value">
+                   <number>1300</number>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="2">
+                 <widget class="QSpinBox" name="nMeasLaserSpectra_step">
+                  <property name="locale">
+                   <locale language="C" country="AnyCountry"/>
+                  </property>
+                  <property name="minimum">
+                   <number>0</number>
+                  </property>
+                  <property name="maximum">
+                   <number>620</number>
+                  </property>
+                  <property name="displayIntegerBase">
+                   <number>10</number>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
             </widget>
            </item>
            <item row="4" column="0">
@@ -3617,6 +3721,43 @@ color:rgb(0, 0, 0);
               </item>
              </layout>
             </widget>
+           </item>
+           <item row="6" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_3">
+             <item>
+              <widget class="QPushButton" name="nMeasLaserSpectra_setPoint">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                 <horstretch>3</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="locale">
+                <locale language="C" country="AnyCountry"/>
+               </property>
+               <property name="text">
+                <string>Set Point</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="nMeasLaserSpectra_moveToPoint">
+               <property name="text">
+                <string>moveToPoint</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="nMeasLaserSpectra_resetPoint">
+               <property name="text">
+                <string>Reset</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
           </layout>
          </widget>
@@ -3842,7 +3983,6 @@ color:rgb(0, 0, 0);
   <tabstop>nMeasLaserSpectra_testPolar_start</tabstop>
   <tabstop>nMeasLaserSpectra_testPolar_end</tabstop>
   <tabstop>nMeasLaserSpectra_testPolar_step</tabstop>
-  <tabstop>nMeasLaserSpectra_setPoint</tabstop>
   <tabstop>nMeasLaserSpectra_probe</tabstop>
   <tabstop>nMeasLaserSpectra_track</tabstop>
   <tabstop>nMeasLaserSpectra_track_channel</tabstop>
@@ -3909,9 +4049,7 @@ color:rgb(0, 0, 0);
   <tabstop>shamrockGrating</tabstop>
   <tabstop>shamrock_use_MOCO</tabstop>
   <tabstop>shamrock_MOCO_limit</tabstop>
-  <tabstop>andorCameraLive</tabstop>
   <tabstop>andorCameraReadoutMode</tabstop>
-  <tabstop>andorCameraExposure</tabstop>
   <tabstop>andorCameraConnect</tabstop>
   <tabstop>andorCameraGetBaseline</tabstop>
   <tabstop>andorCameraGetData</tabstop>

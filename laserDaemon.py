@@ -120,6 +120,9 @@ class laserDaemon(QWidget):
 					elif re.match('SHUTter [0-1]\n', c):
 						sh = int(self.command.split(' ')[-1])
 						self.setShutter(sh,manual=True)
+					elif re.match('OFF\n', c):
+						self.ui.onOff.setChecked(False)
+						self.ui.connect.setChecked(False)
 
 			print(self.command)
 

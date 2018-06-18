@@ -209,6 +209,12 @@ class microV(QtGui.QMainWindow):
 
 	redrawQueue = Queue()
 
+	actionThreads = {}
+	actionThreads['startCalibr'] = None
+	actionThreads['confParam'] = None
+	actionThreads['nMeas'] = None
+
+
 	startCalibr_thread = None
 	confParam_thread = None
 
@@ -639,7 +645,10 @@ class microV(QtGui.QMainWindow):
 		self.HWP.mAbs(to_angle)
 		pos = self.HWP.getPos()
 		self.ui.HWP_angle.setText(str(round(pos,6)))
-
+	def HWP_power_moveTo(self, pos):
+		self.HWP.mAbs(pos)
+		pos = self.HWP.getPos()
+		self.ui.HWP_angle.setText(str(round(pos,6)))
 	def HWP_go_home(self):
 		self.HWP.go_home()
 		pos = self.HWP.getPos()
@@ -719,6 +728,11 @@ class microV(QtGui.QMainWindow):
 
 	def Pi_XYZ_50mkm(self):
 		print(self.piStage.MOV([50,50,50],axis=b'1 2 3',waitUntilReady=True))
+		pos = self.piStage.qPOS()
+		self.setUiPiPos(pos=pos)
+
+	def piStage_moveTo(self,pos,axis=b'1 2 3'):
+		print(self.piStage.MOV(pos,axis=axis,waitUntilReady=True))
 		pos = self.piStage.qPOS()
 		self.setUiPiPos(pos=pos)
 
@@ -860,9 +874,18 @@ class microV(QtGui.QMainWindow):
 		self.andorCCD.SetExposureTime(val)
 		val = self.andorCCD.GetAcquisitionTimings()[0]
 
-	def andorCameraSetExposure_(self,val):
+	def andorCameraSetExposure_mode(self,index=0,mode=None):
+		modes = {'fast':1, 'long':0}
+		if mode is None:
+			pass
+		else:
+			index = modes[mode]
+		if index == 0:
+			val = self.ui.andorCameraExposure_long.value()
+		else:
+			val = self.ui.andorCameraExposure_fast.value()
 		self.ui.andorCameraExposure.setValue(val)
-		self.andorCamera_prevExposure = val
+
 
 	def andorCameraSetReadoutMode(self,val):
 		if not self.ui.andorCameraConnect.isChecked():
@@ -1163,8 +1186,7 @@ class microV(QtGui.QMainWindow):
 			print('startCalibr: active')
 		if start:
 			print('startCalibr: start')
-			if not self.ui.connect_pico.isChecked():
-				self.ui.connect_pico.setChecked(True)
+
 			#self.calibrTimer.start(100)
 			self.live_pmtA = np.array([])
 			self.live_pmtB = np.array([])
@@ -1351,6 +1373,23 @@ class microV(QtGui.QMainWindow):
 	def nMeasLaserSpectra_setPoint(self,state):
 		if state:
 			self.nMeasLaserSpectra_probe_currentRow = self.ui.nMeasLaserSpectra_probe.currentRow()
+	def nMeasLaserSpectra_resetPoint(self):
+		self.NPsCenters = None
+		for j in range(self.ui.nMeasLaserSpectra_probe.rowCount()):
+			for i in range(self.ui.nMeasLaserSpectra_probe.columnCount()):
+				self.ui.nMeasLaserSpectra_probe.item(j,i).setText('nan')
+		self.NP_centersA.setData(x=[],y=[])
+		self.NP_centersB.setData(x=[],y=[])
+		self.spectra_bg_probe.setData(x=[],y=[])
+		self.spectra_bg_probe1.setData(x=[],y=[])
+
+	def nMeasLaserSpectra_moveToPoint(self):
+		try:
+			row = self.ui.nMeasLaserSpectra_probe.currentRow()
+			pos = [float(self.ui.nMeasLaserSpectra_probe.item(row,i).text()) for i in range(3)]
+			self.piStage_moveTo(pos)
+		except:
+			traceback.print_exc()
 
 	def nMeasLaserSpectra_go(self):
 			self.nMeasLaserSpectra_thread = nMeasThread(parent=self)
@@ -1435,7 +1474,6 @@ class microV(QtGui.QMainWindow):
 				x = 0
 				for target in generate2Dtoolpath(Range_x,Range_y,self.dataMask,self.ui.scan3D_maskStep.value()):
 					#print('target',target)
-					if not self.scan3DisAlive: break
 					if target[0] == b'2':
 						axis, yi, y = target
 						r = self.piStage.MOV([y],axis=axis,waitUntilReady=True)
@@ -1700,51 +1738,41 @@ class microV(QtGui.QMainWindow):
 			xr = np.arange(x_start,x_end,x_step)
 			yr = np.arange(y_start,y_end,y_step)
 
-			if MODE == 'sim':
-
-				self.data2D_A = np.zeros((len(xr),len(yr)))+1
-				self.data2D_B = np.zeros((len(xr),len(yr)))+1
-				self.data2D_A[len(xr)//3,len(yr)//4] = 100
-				self.data2D_A[len(xr)//2,len(yr)//2] = 30
-				self.data2D_B[2+len(xr)//3,3+len(yr)//4] = 80
-				self.data2D_B[2+len(xr)//2,1+len(yr)//2] = 40
-				self.data2D_A = gaussian_filter(self.data2D_A,sigma=10)
-				self.data2D_B = gaussian_filter(self.data2D_B,sigma=18)
-				self.data2D_Range_x = xr
-				self.data2D_Range_y = yr
-
 
 			ch = self.ui.nMeasLaserSpectra_track_channel.currentIndex()
-			if ch==0:
-				data = self.data2D_A
-			elif ch==1:
-				data = self.data2D_B
-			else:
-				data = self.data2D_A * self.data2D_B
+
 			s = self.ui.scan3D_maskSigma.value()
 			t = self.ui.scan3D_maskThreshold.value()
-			if len(NPsCenters)==0:
-				NPsCenters = self.NPsCenters
-			if len(NPsCenters)==0:
-				d = gaussian_filter(data,sigma=s)
-				d_min = d[d>0].min()
-				d = abs(d - d_min)
-				self.dataMask = d>d.max()*t/100.
+			print(self.NPsCenters)
+
+			if self.NPsCenters is None:
+				self.dataMask = None
+				print('dataMask:None')
+				return
 
 			else:
+				print('>')
 				Y,X = np.meshgrid(yr,xr)
-				mask = np.zeros(data.shape)
-				for c in NPsCenters:
-					print(c)
+				mask = np.zeros(Y.shape)
+				for c in self.NPsCenters:
+					print("XYZ:",c)
 					mask = mask + (((X-c[0])**2+(Y-c[1])**2)<=s**2).astype(np.int16)
 				self.dataMask = mask>0
+				print('dataMask:',self.dataMask.sum())
 
 
 			if view:
-				self.img.setImage(self.dataMask*self.data2D_A,pos=(x_start,y_start),
-				scale=(x_step,y_step))
-				self.img1.setImage(self.dataMask*self.data2D_B,pos=(x_start,y_start),
-				scale=(x_step,y_step))
+				if ch == 0:
+					self.img1.setImage(self.dataMask,pos=(x_start,y_start),
+					scale=(x_step,y_step))
+				elif ch == 1:
+					self.img.setImage(self.dataMask,pos=(x_start,y_start),
+					scale=(x_step,y_step))
+				else:
+					self.img.setImage(self.dataMask,pos=(x_start,y_start),
+					scale=(x_step,y_step))
+					self.img1.setImage(self.dataMask,pos=(x_start,y_start),
+					scale=(x_step,y_step))
 		except:
 			traceback.print_exc()
 			self.dataMask = None
@@ -1985,11 +2013,11 @@ class microV(QtGui.QMainWindow):
 		z_offset = self.ui.nMeasLaserSpectra_Z_offset.value()
 
 		np_scan_Z = abs(interf_z + z_offset)
-
+		print(peaks_B,Range_x[peaks_B[:,0]])
 
 		centers = {}
 		centers["A"] = np.array([Range_x[peaks_A[:,0]], Range_y[peaks_A[:,1]], [np_scan_Z]*len(Range_y[peaks_A[:,1]])]).T
-		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]], [np_scan_Z]*len(Range_y[peaks_A[:,1]])]).T
+		centers["B"] = np.array([Range_x[peaks_B[:,0]], Range_y[peaks_B[:,1]], [np_scan_Z]*len(Range_y[peaks_B[:,1]])]).T
 		centers["AB"] = np.vstack((centers["A"],centers["B"]))
 		'''
 		try:
@@ -2211,6 +2239,9 @@ class microV(QtGui.QMainWindow):
 
 
 		self.ui.nMeasLaserSpectra_setPoint.toggled[bool].connect(self.nMeasLaserSpectra_setPoint)
+		self.ui.nMeasLaserSpectra_resetPoint.clicked.connect(self.nMeasLaserSpectra_resetPoint)
+		self.ui.nMeasLaserSpectra_moveToPoint.clicked.connect(self.nMeasLaserSpectra_moveToPoint)
+
 		###########################################################!!!!!!!!!!!!!
 		self.comboReadoutSources = QtGui.QComboBox()
 		self.ui.toolBar.addWidget(self.comboReadoutSources)
@@ -2239,10 +2270,10 @@ class microV(QtGui.QMainWindow):
 		self.ui.nMeasLaserSpectra_track_channel.currentIndexChanged[int].connect(self.trackChannel.setCurrentIndex)
 		self.trackChannel.blockSignals(False)
 
-		self.andorCameraExposure_toolBar = QtGui.QDoubleSpinBox()
-		self.andorCameraExposure_toolBar.setKeyboardTracking(False)
-		self.ui.toolBar.addWidget(self.andorCameraExposure_toolBar)
-		self.andorCameraExposure_toolBar.valueChanged[float].connect(self.andorCameraSetExposure_)
+		self.andorCameraExposure_mode = QtGui.QComboBox()
+		self.andorCameraExposure_mode.insertItems(1,['long','fast'])
+		self.ui.toolBar.addWidget(self.andorCameraExposure_mode)
+		self.andorCameraExposure_mode.currentIndexChanged[int].connect(self.andorCameraSetExposure_mode)
 
 		########################################################################
 		########################################################################
@@ -2280,13 +2311,24 @@ class microV(QtGui.QMainWindow):
 
 		self.pw_spectra = pg.PlotWidget(name='Spectra')
 		self.line_spectra = []
-		cr = range(0,255)
+		cr = [#range(0,255)
+		(230, 0, 0),
+		(81, 99, 242),
+		(230, 162, 0),
+		(81, 255, 242),
+		(218, 255, 0),
+		(218, 122, 0),
+		(47, 187, 172),
+		(0, 255, 0),
+		(131, 170, 255),
+		(224, 170, 10),
+		(120, 223, 230)]
 		for i in range(10):
-			pen = (cr[::20][i],cr[::-10][i],cr[::25][i])
+			pen = cr[i]# (cr[::20][i],cr[::10][i],cr[::25][i])
 			print(pen)
 			self.line_spectra.append(self.pw_spectra.plot(pen=pen))
-		self.vLine_THG = pg.InfiniteLine(angle=90,label='THG', pen=(0,255,255))
-		self.vLine_SHG = pg.InfiniteLine(angle=90,label='SHG', pen=(255,215,0))
+		self.vLine_THG = pg.InfiniteLine(angle=90,label='THG', pen=pg.mkPen(color=(0,255,255), style=QtCore.Qt.DashLine))
+		self.vLine_SHG = pg.InfiniteLine(angle=90,label='SHG', pen=pg.mkPen(color=(255,215,0), style=QtCore.Qt.DashLine))
 		self.pw_spectra.addItem(self.vLine_SHG)
 		self.pw_spectra.addItem(self.vLine_THG)
 
@@ -2337,7 +2379,7 @@ class microV(QtGui.QMainWindow):
 		self.spectra_signal_probe.setData(x=[x],y=[y])
 		self.spectra_signal_probe1.setData(x=[x],y=[y])
 
-		#self.img.addItem(self.spectra_bg_probe)
+		self.img.addItem(self.spectra_bg_probe)
 		#self.img.addItem(self.spectra_signal_probe)
 
 
@@ -2359,7 +2401,7 @@ class microV(QtGui.QMainWindow):
 		self.rectROI.sigRegionChanged.connect(self.syncRectROI)
 		self.rectROI_1.sigRegionChanged.connect(self.syncRectROI)
 
-		#self.img1.addItem(self.spectra_bg_probe1)
+		self.img1.addItem(self.spectra_bg_probe1)
 		#self.img1.addItem(self.spectra_signal_probe1)
 		self.img1.addItem(self.NP_centersB)
 		self.move_scat_flag = False
@@ -2371,10 +2413,31 @@ class microV(QtGui.QMainWindow):
 			if event.modifiers() & QtCore.Qt.ControlModifier:
 				print(pos.x(),pos.y())
 				if self.ui.nMeasLaserSpectra_setPoint.isChecked() and not self.nMeasLaserSpectra_probe_currentRow==-1:
-					coord = [str(pos.x()),str(pos.y()),self.statusBar_Position_Z.text()]
+					coord = np.array([pos.x(),pos.y(),float(self.statusBar_Position_Z.text())])
 					print(self.nMeasLaserSpectra_probe_currentRow)
 					for i in range(3):
-						self.ui.nMeasLaserSpectra_probe.item(self.nMeasLaserSpectra_probe_currentRow,i).setText(coord[i])
+						self.ui.nMeasLaserSpectra_probe.item(self.nMeasLaserSpectra_probe_currentRow,i).setText(str(coord[i]))
+					if self.nMeasLaserSpectra_probe_currentRow!=0:
+						NP_centers = np.array([[ float(self.ui.nMeasLaserSpectra_probe.item(j,i).text()) for i in range(3)] for j in range(1,self.ui.nMeasLaserSpectra_probe.rowCount())])
+						self.NPsCenters = NP_centers
+						self.NP_centersA.setData(x=self.NPsCenters[:,0],y=self.NPsCenters[:,1])
+						self.NP_centersB.setData(x=self.NPsCenters[:,0],y=self.NPsCenters[:,1])
+						data = []
+						rows = self.ui.nMeasLaserSpectra_probe.rowCount()
+						columns = self.ui.nMeasLaserSpectra_probe.columnCount()
+
+						for r in range(rows):
+							d = []
+							for c in range(columns):
+								print(r,c)
+								d.append(self.ui.nMeasLaserSpectra_probe.item(r,c).text())
+							data.append(d)
+						with open("probeCoord.csv", "w+") as myCsv:
+							csvWriter = csv.writer(myCsv, delimiter='\t')
+							csvWriter.writerows(data)
+					else:
+						self.spectra_bg_probe.setData(x=[coord[0]],y=[coord[1]])
+						self.spectra_bg_probe1.setData(x=[coord[0]],y=[coord[1]])
 					self.ui.nMeasLaserSpectra_setPoint.setChecked(False)
 			if event.modifiers() & QtCore.Qt.ShiftModifier:
 				print(pos.x(),pos.y())
@@ -2390,10 +2453,30 @@ class microV(QtGui.QMainWindow):
 			if event.modifiers() & QtCore.Qt.ControlModifier:
 				print(pos.x(),pos.y())
 				if self.ui.nMeasLaserSpectra_setPoint.isChecked() and not self.nMeasLaserSpectra_probe_currentRow==-1:
-					coord = [str(pos.x()),str(pos.y()),self.statusBar_Position_Z.text()]
-
+					coord = np.array([pos.x(),pos.y(),float(self.statusBar_Position_Z.text())])
+					print(self.nMeasLaserSpectra_probe_currentRow)
 					for i in range(3):
-						self.ui.nMeasLaserSpectra_probe.item(self.nMeasLaserSpectra_probe_currentRow,i).setText(coord[i])
+						self.ui.nMeasLaserSpectra_probe.item(self.nMeasLaserSpectra_probe_currentRow,i).setText(str(coord[i]))
+					if self.nMeasLaserSpectra_probe_currentRow!=0:
+						NP_centers = np.array([[ float(self.ui.nMeasLaserSpectra_probe.item(j,i).text()) for i in range(3)] for j in range(1,self.ui.nMeasLaserSpectra_probe.rowCount())])
+						self.NPsCenters = NP_centers
+						self.NP_centersA.setData(x=self.NPsCenters[:,0],y=self.NPsCenters[:,1])
+						self.NP_centersB.setData(x=self.NPsCenters[:,0],y=self.NPsCenters[:,1])
+						data = []
+						rows = self.ui.nMeasLaserSpectra_probe.rowCount()
+						columns = self.ui.nMeasLaserSpectra_probe.columnCount()
+
+						for r in range(rows):
+							d = []
+							for c in range(columns):
+								d.append(self.ui.nMeasLaserSpectra_probe.item(r,c).text())
+							data.append(d)
+						with open("probeCoord.csv", "w+") as myCsv:
+							csvWriter = csv.writer(myCsv, delimiter='\t')
+							csvWriter.writerows(data)
+					else:
+						self.spectra_bg_probe.setData(x=[coord[0]],y=[coord[1]])
+						self.spectra_bg_probe1.setData(x=[coord[0]],y=[coord[1]])
 					self.ui.nMeasLaserSpectra_setPoint.setChecked(False)
 			if event.modifiers() & QtCore.Qt.ShiftModifier:
 				print(pos.x(),pos.y())
@@ -2458,6 +2541,27 @@ class microV(QtGui.QMainWindow):
 						self.ui.scan3D_config.item(r,3).setText('10')
 		except:
 			print('scanArea_recovery_err')
+
+		try:
+			with open('probeCoord.csv') as f:
+				data = list(csv.reader(f,delimiter='\t'))
+			print(data)
+			d = []
+			for i in data:
+				if not len(i)==0:
+					d.append(i)
+			data = d
+			rows = self.ui.nMeasLaserSpectra_probe.rowCount()
+			columns = self.ui.nMeasLaserSpectra_probe.columnCount()
+			for r in range(rows):
+				for c in range(columns):
+					try:
+						self.ui.nMeasLaserSpectra_probe.item(r,c).setText(data[r][c])
+					except:
+						traceback.print_exc()
+						self.ui.nMeasLaserSpectra_probe.item(r,c).setText('nan')
+		except:
+			print('probeCoord_recovery_err')
 		#stop_flag = threading.Event()
 		#self.timer_thread = TimerThread(stop_flag)
 		#self.timer_thread.update.connect(self.update_ui)
@@ -2554,7 +2658,7 @@ class microV(QtGui.QMainWindow):
 		#self.ui.update()
 
 		t = time.time()
-		print(len(items))
+		#print(len(items))
 		#QtCore.QCoreApplication.processEvents()
 		#if t - self.uiUpdate_t0>0.5:
 		#	self.ui.update()
@@ -2760,16 +2864,12 @@ class laserPowerCalibrThread(QThread):
 		mode = self.parent.ui.powerCalibrMode.currentText()
 		if mode == 'HWP_Power':
 			def move_function(pos):
-				self.parent.HWP.mAbs(pos)
-				pos = self.parent.HWP.getPos()
-				self.parent.ui.HWP_angle.setText(str(round(pos,6)))
+				self.parent.HWP_power_moveTo(pos)
+
 		elif mode == 'HWP_Polarization':
 			def move_function(pos):
-				if not self.parent.ui.HWP_stepper_Connect.isChecked():
-					self.parent.ui.HWP_stepper_Connect.setChecked(True)
 				self.parent.HWP_stepper_moveTo(float(pos),wait=True)
-				pos = self.parent.HWP_stepper.getAngle()
-				self.parent.ui.HWP_stepper_angle.setText(str(round(pos,6)))
+
 		else:
 			return
 
@@ -2992,18 +3092,25 @@ class nMeasThread(QThread):
 							else:
 								store.put("scan_Z_"+str(wl), pd.DataFrame(data_ZB,index=Range_z,columns=['scan_Z']))
 						else:
-							self.parent.andorCamera_prevExposure = self.parent.ui.andorCameraExposure.value()
-							self.parent.ui.andorCameraExposure.setValue(self.parent.ui.nMeasLaserSpectra_scanSpectraExp.value())
+
+							self.parent.andorCameraSetExposure_mode.setCurrentIndex(1)
+							#self.parent.andorCamera_prevExposure = self.parent.ui.andorCameraExposure.value()
+							#self.parent.ui.andorCameraExposure.setValue(self.parent.ui.andorCameraExposure_fast.value())
 							#app.processEvents()
 
 							print(self.parent.piStage.MOV(bg_center,axis=b'1 2 3',waitUntilReady=True))
 							self.parent.andorCameraGetBaseline()
-							current_row = np.where([self.parent.ui.nMeasLaserSpectra_probe.item(i,3) for i in range(10)])[0][0]-1#self.parent.ui.nMeasLaserSpectra_probe.currentRow()-1
+							try:
+								current_row = np.where([self.parent.ui.nMeasLaserSpectra_probe.item(i,3).text()!='nan' for i in range(10)])[0][0]-1#self.parent.ui.nMeasLaserSpectra_probe.currentRow()-1
+							except:
+								traceback.print_exc()
+								current_row = 0
 							print(self.parent.piStage.MOV(NP_centers[current_row],axis=b'1 2 3',waitUntilReady=True))
 							N = self.parent.ui.optim1step_n.value()
 							pos,v = self.parent.center3Doptim(center=NP_centers[current_row],N=N)
 							interf_z = pos[2]
-							self.parent.ui.andorCameraExposure.setValue(self.parent.andorCamera_prevExposure)
+							self.parent.andorCameraSetExposure_mode.setCurrentIndex(0)
+							#self.parent.ui.andorCameraExposure.setValue(self.parent.andorCamera_prevExposure)
 							#app.processEvents()
 							delta = pos - NP_centers[current_row]
 							for i in range(len(NP_centers)):
@@ -3025,18 +3132,21 @@ class nMeasThread(QThread):
 					if self.parent.ui.nMeasLaserSpectra_rescan2D.isChecked():
 						if self.parent.nMeasLaserSpectra_rescan2D_counter>=self.parent.ui.nMeasLaserSpectra_rescan2D_freq.value():
 							self.parent.nMeasLaserSpectra_rescan2D_counter = 0
-							self.parent.andorCamera_prevExposure = self.parent.ui.andorCameraExposure.value()
-							self.parent.ui.andorCameraExposure.setValue(self.parent.ui.nMeasLaserSpectra_scanSpectraExp.value())
+							self.parent.andorCameraSetExposure_mode.setCurrentIndex(1)
+							#self.parent.andorCamera_prevExposure = self.parent.ui.andorCameraExposure.value()
+							#self.parent.ui.andorCameraExposure.setValue(self.parent.ui.nMeasLaserSpectra_scanSpectraExp.value())
 
 							centerA, centerB, panelA, panelB = self.parent.center_optim(z_start=np_scan_Z, z_end=np_scan_Z+0.1, z_step=0.2,update=True)
-							NP_centers = self.parent.scan3D_peak_find()
-							'''
-							for i in range(len(NP_centers)):
-								for j in range(2):
-									self.parent.ui.nMeasLaserSpectra_probe.item(i+1,j).setText(str(NP_centers[i,j]))
-								self.parent.ui.nMeasLaserSpectra_probe.item(i+1,2).setText(str(np_scan_Z))
-							'''
-							self.parent.ui.andorCameraExposure.setValue(self.parent.andorCamera_prevExposure)
+							if self.parent.ui.nMeasLaserSpectra_posOptim.currentText()=='2D':
+								NP_centers = self.parent.scan3D_peak_find()
+
+								for i in range(len(NP_centers)):
+									for j in range(2):
+										self.parent.ui.nMeasLaserSpectra_probe.item(i+1,j).setText(str(NP_centers[i,j]))
+									self.parent.ui.nMeasLaserSpectra_probe.item(i+1,2).setText(str(np_scan_Z))
+
+							#self.parent.ui.andorCameraExposure.setValue(self.parent.andorCamera_prevExposure)
+							self.parent.andorCameraSetExposure_mode.setCurrentIndex(0)
 							store.put("scanA_"+str(wl), panelA)
 							store.put("scanB_"+str(wl), panelB)
 						self.parent.nMeasLaserSpectra_rescan2D_counter += 1
@@ -3228,6 +3338,11 @@ class nMeasThread(QThread):
 
 				self.parent.nMeasLaserSpectra_testPolar_counter += 1
 
+		if self.parent.ui.finishLaserOFF.isChecked():
+			self.parent.laserStatus.stop()
+			with open('laserIn','w+') as f:
+				f.write('OFF\n')
+			self.parent.laserStatus.start(500)
 
 
 class confParamThread(QThread):
@@ -3438,8 +3553,8 @@ class scan3DThread(QThread):
 				if not self.parent.ui.scan3D_byMask.isChecked():
 					mask = None
 				for target in generate2Dtoolpath(Range_x,Range_y,mask,self.parent.ui.scan3D_maskStep.value()):
-					#print('target',target)
-					if not self.parent.scan3DisAlive: break
+
+
 					axis, index_pos, t_pos = target
 					if axis == b'2':
 						yi = index_pos
@@ -3609,16 +3724,12 @@ class scan1DThread(QThread):
 			move_function = lambda pos: self.parent.piStage.MOV([pos],axis=b'3',waitUntilReady=True)
 		elif axis == 'HWP_Power':
 			def move_function(pos):
-				self.parent.HWP.mAbs(pos)
-				pos = self.parent.HWP.getPos()
-				self.parent.ui.HWP_angle.setText(str(round(pos,6)))
+				self.parent.HWP_power_moveTo(pos)
+
 		elif axis == 'HWP_Polarization':
 			def move_function(pos):
-				if not self.parent.ui.HWP_stepper_Connect.isChecked():
-					self.parent.ui.HWP_stepper_Connect.setChecked(True)
 				self.parent.HWP_stepper_moveTo(float(pos),wait=True)
-				pos = self.parent.HWP_stepper_getAngle()
-				#self.parent.ui.HWP_stepper_angle.setText(str(round(pos,6)))
+
 
 		steps_range = np.arange(self.parent.ui.scan1D_start.value(),
 								self.parent.ui.scan1D_end.value(),
